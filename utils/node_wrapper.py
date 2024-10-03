@@ -1,7 +1,8 @@
 from maya.api import OpenMaya as om2
 import maya.cmds as cmds
 from typing import Union
-import utils.utils as utils
+import utils.om as utils_om
+from utils import snake_to_camel
 import utils.apiundo as apiundo
 
 def derive_node(arg):
@@ -9,6 +10,23 @@ def derive_node(arg):
     if node.node_type == "container":
         return Container(node)
     return node
+
+def create_node(node_type:str, name:str=None):
+    """create node
+
+    Args:
+        type (str):
+        name (str):
+    """
+    cast_class = Node
+    if node_type == "container":
+        cast_class = Container
+    if name:
+        return cast_class(cmds.createNode(node_type, name=name))
+    return cast_class(cmds.createNode(node_type))
+
+def exists(node):
+    return cmds.objExists(str(node))
 
 class Node():
     """
@@ -28,9 +46,9 @@ class Node():
         """
         if isinstance(node, str):
             if not cmds.objExists(node):
-                cmds.error("node {0} does not exist".format(node))
+                cmds.error(f"node {node} does not exist")
                 return
-        self._dep_node = utils.get_dep_node(node)
+        self._dep_node = utils_om.get_dep_node(node)
         self.__attr_cache = {}
         self.__full_attr_list = None
     
@@ -50,22 +68,8 @@ class Node():
     @property
     def mobject(self):
         return self._dep_node.object()
-
-    @staticmethod
-    def create_node(node_type:str, name:str=None):
-        """create node
-
-        Args:
-            type (str):
-            name (str):
-        """
-        if name:
-            return Node(cmds.createNode(node_type, name=name))
-        return Node(cmds.createNode(node_type))
     
-    @staticmethod
-    def exists(node):
-        return cmds.objExists(str(node))
+    
 
     def has_attr(self, attr_name):
         try:
@@ -101,7 +105,7 @@ class Node():
 
         new_kwargs = {}
         for key in kwargs:
-            new_kwargs[utils.snake_to_camel(key)] = kwargs[key]
+            new_kwargs[snake_to_camel(key)] = kwargs[key]
 
         cmds.addAttr(str(self), longName=long_name, **new_kwargs)
         
@@ -135,19 +139,6 @@ class Node():
             attribute_list = [x for x in attribute_list if x.node == self]
             return attribute_list
         return []
-
-    # def get_keyable_attribute_list(self):
-    #     attribute_list = cmds.listAttr(str(self), keyable=True)
-    #     return self._check_node_in_attr_list(attribute_list)
-    # def get_unlocked_attribute_list(self):
-    #     attribute_list = cmds.listAttr(str(self), unlocked=True)
-    #     return self._check_node_in_attr_list(attribute_list)
-    # def get_dynamic_attribute_list(self):
-    #     attribute_list = cmds.listAttr(str(self), userDefined=True)
-    #     return self._check_node_in_attr_list(attribute_list)
-    # def get_channel_box_list(self):
-    #     attribute_list = cmds.listAttr(str(self), channelBox=True)
-    #     return self._check_node_in_attr_list(attribute_list)
 
     def delete_node(self, clean=True):
         """delete node
@@ -257,10 +248,15 @@ class Node():
             Attr: returns Attr class of node"s attribute
         """
         attr_instance = None
+        
+        error = False
         try:
             attr_instance = self._get_cached_attr(attr)
         except:
-            raise RuntimeError("{0}.{1} attribute not found".format(self.name, attr))
+            error=True
+        if error:
+            error_str = f"{self.name} does not have attribute \"{attr}\""
+            raise RuntimeError(error_str)
 
         return attr_instance
     def __setitem__(self, attr: str, new_value):
@@ -284,7 +280,7 @@ class Node():
             Attr: returns Attr class of nodes attribute
         """
         if attr not in self.__attr_cache.keys():
-            self.__attr_cache[attr] = Attr(self, utils.get_plug(
+            self.__attr_cache[attr] = Attr(self, utils_om.get_plug(
                 self._dep_node, attr))
         return self.__attr_cache[attr]
     
@@ -379,7 +375,7 @@ class Container(Node):
         if attr.node in self.get_nodes():
             cmds.container(str(self), edit=True, publishAndBind=[str(attr), attr_bind_name])
         else:
-            raise RuntimeError("{} is not a node of container {}".format(attr.node, str(self)))
+            raise RuntimeError(f"{attr.node} is not a node of container {str(self)}")
 
     def unpublish_attr(self, attr):
         cmds.container(str(self), edit=True, unbindAndUnpublish=str(attr))
@@ -435,12 +431,6 @@ class Container(Node):
             return_child_containers.extend(container.get_child_containers(all=all))
         return return_child_containers
 
-    @classmethod
-    def create_node(cls, name:str=None):
-        node = super(Container, cls).create_node("container", name)
-        node.__class__ = Container
-        return node
-
     def __setitem__(self, attr: str, new_value):
         publish_attr_map = self.get_published_attr_map()
         if attr in publish_attr_map.keys():
@@ -467,95 +457,94 @@ class Container(Node):
                 if parent_attr in publish_attr_map.keys():
                     return publish_attr_map[parent_attr][back_attrs]
         return super().__getitem__(attr)
-        
     
-class AttrIter():
-    """
-    Iterator for attr. Iterates through child attrs at a depth equal
-    to max depth
-    """
-    """
-    Attributes:
-    parent_attr (Attr): 
-    current_attr (Attr): current child of parent attr
-    depth (int): depth of search
-    curr_index (int): index of the current elements
-    max_depth (int): max depth to stop at (and include)
+# class AttrIter():
+#     """
+#     Iterator for attr. Iterates through child attrs at a depth equal
+#     to max depth
+#     """
+#     """
+#     Attributes:
+#     parent_attr (Attr): 
+#     current_attr (Attr): current child of parent attr
+#     depth (int): depth of search
+#     curr_index (int): index of the current elements
+#     max_depth (int): max depth to stop at (and include)
 
-    """
-    def __init__(self, attr, max_depth:int=-1):
-        """initializes data to iterate through AttrIter
+#     """
+#     def __init__(self, attr, max_depth:int=-1):
+#         """initializes data to iterate through AttrIter
 
-        Args:
-            attr (Attr): starting attribute to iterate through
-            max_depth (int, optional): max depth to search of attr. 
-            Defaults to -1.
-        """
-        self.__original_attr__ = attr
-        self.__current_attr__ = None
-        self.__max_depth__ = max_depth
-        self.__depth__ = 0
+#         Args:
+#             attr (Attr): starting attribute to iterate through
+#             max_depth (int, optional): max depth to search of attr. 
+#             Defaults to -1.
+#         """
+#         self.__original_attr__ = attr
+#         self.__current_attr__ = None
+#         self.__max_depth__ = max_depth
+#         self.__depth__ = 0
 
-    def _reached_max_depth(self):
-        return self.__depth__ + 1 > self.__max_depth__ and self.__max_depth__ >= 0
-    def __next__(self):
-        """gets next attr
+#     def _reached_max_depth(self):
+#         return self.__depth__ + 1 > self.__max_depth__ and self.__max_depth__ >= 0
+#     def __next__(self):
+#         """gets next attr
 
-        Raises:
-            StopIteration: stops the iterator
+#         Raises:
+#             StopIteration: stops the iterator
 
-        Returns:
-            Attr: 
-        """
-        # when to stop iteration
-        if not self.__original_attr__.has_children() and len(self.__original_attr__) > 0:
-            raise StopIteration
+#         Returns:
+#             Attr: 
+#         """
+#         # when to stop iteration
+#         if not self.__original_attr__.has_children() and len(self.__original_attr__) > 0:
+#             raise StopIteration
         
 
         
-        # to get the starting one
-        if self.__current_attr__ is None:
-            self.__current_attr__ = self.__original_attr__[0]
-            self.__depth__ += 1
-            return self.__current_attr__
+#         # to get the starting one
+#         if self.__current_attr__ is None:
+#             self.__current_attr__ = self.__original_attr__[0]
+#             self.__depth__ += 1
+#             return self.__current_attr__
         
-        # if attr has children
-        elif self.__current_attr__.has_children() and len(self.__current_attr__) > 0 and not self._reached_max_depth():
-            self.__current_attr__ = self.__current_attr__[0]
-            self.__depth__ += 1
-            return self.__current_attr__
+#         # if attr has children
+#         elif self.__current_attr__.has_children() and len(self.__current_attr__) > 0 and not self._reached_max_depth():
+#             self.__current_attr__ = self.__current_attr__[0]
+#             self.__depth__ += 1
+#             return self.__current_attr__
         
-        # if at the end of list of attributes
-        elif self.__current_attr__.index + 1 >= len(self.__current_attr__.parent):
-            for x in range(100):
-                if self.__current_attr__.index + 1 >= len(self.__current_attr__.parent):
-                    self.__current_attr__ = self.__current_attr__.parent
-                    self.__depth__ -= 1
-                    if self.__current_attr__ == self.__original_attr__:
-                        raise StopIteration
-                    continue
+#         # if at the end of list of attributes
+#         elif self.__current_attr__.index + 1 >= len(self.__current_attr__.parent):
+#             for x in range(100):
+#                 if self.__current_attr__.index + 1 >= len(self.__current_attr__.parent):
+#                     self.__current_attr__ = self.__current_attr__.parent
+#                     self.__depth__ -= 1
+#                     if self.__current_attr__ == self.__original_attr__:
+#                         raise StopIteration
+#                     continue
 
-            index = self.__current_attr__.index
-            parent = self.__current_attr__.parent
-            self.__current_attr__ = parent[index + 1]
-            return self.__current_attr__
+#             index = self.__current_attr__.index
+#             parent = self.__current_attr__.parent
+#             self.__current_attr__ = parent[index + 1]
+#             return self.__current_attr__
             
 
-        # go to sibling
-        elif self.__current_attr__.index + 1 < len(self.__current_attr__.parent):
-            index = self.__current_attr__.index
-            parent = self.__current_attr__.parent
-            self.__current_attr__ = parent[index + 1]
-            return self.__current_attr__
+#         # go to sibling
+#         elif self.__current_attr__.index + 1 < len(self.__current_attr__.parent):
+#             index = self.__current_attr__.index
+#             parent = self.__current_attr__.parent
+#             self.__current_attr__ = parent[index + 1]
+#             return self.__current_attr__
         
-        raise StopIteration
-    def __iter__(self):
-        """returns self as it"s iterator
+#         raise StopIteration
+#     def __iter__(self):
+#         """returns self as it"s iterator
 
-        Returns:
-            AttrIter: returns itself
-        """
-        return self
+#         Returns:
+#             AttrIter: returns itself
+#         """
+#         return self
     
 class Attr():
     """
@@ -595,18 +584,18 @@ class Attr():
         """
         self.node = node
         
-        self.plug = utils.get_plug(None, attr)
+        self.plug = utils_om.get_plug(None, attr)
         if self.plug is None:
-            cmds.error("{} attribute\"s plug not found".format(attr))
+            cmds.error(f"{attr} attribute\"s plug not found")
 
         if self.node == None:
             self.node = Node(self.plug)
         if self.node == None:
-            cmds.error("{} attribute\"s node not found".format(attr))
+            cmds.error(f"{attr} attribute\"s node not found")
 
     @property
     def name(self):
-        return "{}.{}".format(self.node.full_name, self.attr_name)
+        return f"{self.node.full_name}.{self.attr_name}"
     @property
     def attr_name(self):
         return str(self.plug).split(".", 1)[1]
@@ -618,8 +607,6 @@ class Attr():
         if cmds.getAttr(str(self), type=True) == "TdataCompound":
             return "compound"
         return cmds.getAttr(str(self), type=True)
-
-        # return self._plug_attr_type(self.plug)
     @property
     def value(self):
         return self._get_value(self.plug)
@@ -691,7 +678,7 @@ class Attr():
                 connection_pairs.append((attr.plug, self.plug))
         
         if connection_pairs == []:
-            cmds.warning("nothing to disconnect from {0}".format(str(self.plug)))
+            cmds.warning(f"nothing to disconnect from {str(self.plug)}")
             return
         locked = self.is_locked()
         if locked:
@@ -761,10 +748,10 @@ class Attr():
             do(self.plug, value)
         except ValueError:
             self._set_value(self.plug, orig_val)
-            cmds.warning("set info, mismatch {} was not changed".format(str(self.plug)))
+            cmds.warning(f"set info, mismatch {str(self.plug)} was not changed")
         except:
             self._set_value(self.plug, orig_val)
-            cmds.warning("error occured when setting {} was not changed".format(str(self.plug)))
+            cmds.warning(f"error occured when setting {str(self.plug)} was not changed")
         
         apiundo.commit(
             redo = lambda: do(self.plug, value),
@@ -786,6 +773,9 @@ class Attr():
             return True
         except:
             return False
+    @property
+    def attr_type(self):
+        return cmds.getAttr(str(self), type=True)
     def _set_value(self, plug: om2.MPlug, value):
         """Sets value on plug. is recurrsive when plug is has children or
         elements. 
@@ -801,7 +791,7 @@ class Attr():
             ValueError: if number of children is mismatched by length of
             value
         """
-        attr_type = cmds.getAttr(str(self), type=True)
+        attr_type = self.attr_type
         locked = self.is_locked()
         if locked:
             self.set_locked(False)
@@ -895,13 +885,13 @@ class Attr():
                 self.set_locked(False)
             if dest_locked:
                 other.set_locked(False)
-            utils.connect_plugs(self.plug, other.plug)
+            utils_om.connect_plugs(self.plug, other.plug)
             if src_locked:
                 self.set_locked(True)
             if dest_locked:
                 other.set_locked(True)
         else:
-            cmds.error("{} not class Attr".format(other))
+            cmds.error("{other} not of type Attr")
     def __lshift__(self, other):
         """Tries to connect the other attr to this attr
 
@@ -917,13 +907,13 @@ class Attr():
                 other.set_locked(False)
             if dest_locked:
                 self.set_locked(False)
-            utils.connect_plugs(other.plug, self.plug)
+            utils_om.connect_plugs(other.plug, self.plug)
             if src_locked:
                 other.set_locked(True)
             if dest_locked:
                 self.set_locked(True)
         else:
-            cmds.error("{} not class Attr".format(other))
+            cmds.error(f"{other} not of type Attr")
     def __invert__(self):
         """Disconnects anything to this attribute with this attribute
         as the destination
@@ -943,15 +933,18 @@ class Attr():
             Attr:
         """
         full_attr_name = self.attr_name
+        if not self.has_attr(f"{self.attr_short_name}.{attr}"):
+            error_str = f"{self.node} does not have attribute \"{self.attr_short_name}.{attr}\""
+            raise RuntimeError(error_str)
         if self.plug.isArray:
-            full_attr_name = "{0}[{1}]".format(full_attr_name, attr)
+            full_attr_name = f"{full_attr_name}[{attr}]"
         elif self.plug.isCompound:
-            full_attr_name = "{0}.{1}".format(full_attr_name, attr)
+            full_attr_name = f"{full_attr_name}.{attr}"
 
         if full_attr_name in self.node.get_attr_cache().keys():
             return self.node.get_attr_cache()[full_attr_name]
 
-        plug = utils.get_plug(self.plug, attr)
+        plug = utils_om.get_plug(self.plug, attr)
         return Attr(self.node, plug)
     
     def __setitem__(self, attr: str, new_value):
@@ -982,19 +975,19 @@ class Attr():
         elif self.plug.isCompound:
             return self.plug.numChildren()
     # Iterator overloads
-    def __iter__(self):
-        """Gets the iterator object
+    # def __iter__(self):
+    #     """Gets the iterator object
 
-        Raises:
-            TypeError: if attribute is not a compound or array
+    #     Raises:
+    #         TypeError: if attribute is not a compound or array
 
-        Returns:
-            AttrIter: 
-        """
-        if not self.has_children():
-            raise TypeError("attribute is not of type compound or array")
-        iter_obj = AttrIter(self)
-        return iter_obj
+    #     Returns:
+    #         AttrIter: 
+    #     """
+    #     if not self.has_children():
+    #         raise TypeError("attribute is not of type compound or array")
+    #     iter_obj = AttrIter(self)
+    #     return iter_obj
             
     # Math Operator Overloads
     def _base_math_operators(self, x, y, function):
@@ -1083,7 +1076,6 @@ class Attr():
 
     # TODO: 
         # node
-            # disconnect attr from other side ----------------
             # get_shapes ----------------
             # get_children ----------------
             # get_parent ----------------
@@ -1097,6 +1089,11 @@ class Attr():
             # get connections (get if attribute is connected to something)
         
         # skin cluster
-
+    # TODO
         # container
+            # get all nodes in container
+        # nodes
+            # set attr should be easier
+            # error check __getItem__
+
 
