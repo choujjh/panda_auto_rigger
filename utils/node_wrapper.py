@@ -2,7 +2,7 @@ from maya.api import OpenMaya as om2
 import maya.cmds as cmds
 from typing import Union
 import utils.om as utils_om
-from utils import snake_to_camel
+from utils.utils import snake_to_camel
 import utils.apiundo as apiundo
 
 def derive_node(arg):
@@ -157,7 +157,7 @@ class Node():
             all_children.extend([Node(x) for x in children])
 
         # unpublish
-        node_container = self.get_container()
+        node_container = self.get_container_node()
         if node_container is not None:
             publish_attrs = node_container.get_published_attrs()
             filter_publish_attrs = [x for x in publish_attrs if x.node == self]
@@ -180,7 +180,7 @@ class Node():
 
             cmds.delete(str(node))
 
-    def get_container(self):
+    def get_container_node(self):
         container = cmds.container(findContainer=self.full_name, query=True)
         if container is not None:
             return Container(container)
@@ -317,7 +317,7 @@ class Container(Node):
             current_container = self
             while current_container is not None:
                 container_list.append(current_container)
-                current_container = current_container.get_container()
+                current_container = current_container.get_container_node()
         else:
             container_list = [self]
 
@@ -330,7 +330,7 @@ class Container(Node):
             current_container = self
             while current_container is not None:
                 container_list.append(current_container)
-                current_container = current_container.get_container()
+                current_container = current_container.get_container_node()
 
         else:
             container_list = [self]
@@ -356,7 +356,7 @@ class Container(Node):
         args.extend(conversionNodes)
         cmds.container(str(self), addNode=args, edit=True, iha=include_hierarchy_above, ihb=include_hierarchy_below, inc=include_network, force=force)
 
-    def get_container(self):
+    def get_container_node(self):
         containers = cmds.container(str(self),  query=True, parentContainer=True)
         if containers is not None:
             return Container(containers[0])
@@ -923,7 +923,7 @@ class Attr():
         """
         self.disconnect()
         return self
-    def __getitem__(self, attr: str):
+    def __getitem__(self, attr):
         """Get a child attribute of this attr
 
         Args:
@@ -933,19 +933,20 @@ class Attr():
             Attr:
         """
         full_attr_name = self.attr_name
-        if not self.has_attr(f"{self.attr_short_name}.{attr}"):
+        try:
+            if self.plug.isArray:
+                full_attr_name = f"{full_attr_name}[{attr}]"
+            elif self.plug.isCompound:
+                full_attr_name = f"{full_attr_name}.{attr}"
+
+            if full_attr_name in self.node.get_attr_cache().keys():
+                return self.node.get_attr_cache()[full_attr_name]
+
+            plug = utils_om.get_plug(self.plug, attr)
+            return Attr(self.node, plug)
+        except:
             error_str = f"{self.node} does not have attribute \"{self.attr_short_name}.{attr}\""
             raise RuntimeError(error_str)
-        if self.plug.isArray:
-            full_attr_name = f"{full_attr_name}[{attr}]"
-        elif self.plug.isCompound:
-            full_attr_name = f"{full_attr_name}.{attr}"
-
-        if full_attr_name in self.node.get_attr_cache().keys():
-            return self.node.get_attr_cache()[full_attr_name]
-
-        plug = utils_om.get_plug(self.plug, attr)
-        return Attr(self.node, plug)
     
     def __setitem__(self, attr: str, new_value):
         """Gets the new attribute and sets a child attribute"s value to new value
@@ -975,19 +976,19 @@ class Attr():
         elif self.plug.isCompound:
             return self.plug.numChildren()
     # Iterator overloads
-    # def __iter__(self):
-    #     """Gets the iterator object
+    def __iter__(self):
+        """Gets the iterator object
 
-    #     Raises:
-    #         TypeError: if attribute is not a compound or array
+        Raises:
+            TypeError: if attribute is not a compound or array
 
-    #     Returns:
-    #         AttrIter: 
-    #     """
-    #     if not self.has_children():
-    #         raise TypeError("attribute is not of type compound or array")
-    #     iter_obj = AttrIter(self)
-    #     return iter_obj
+        Returns:
+            AttrIter: 
+        """
+        if not self.has_children():
+            raise TypeError("attribute is not of type compound or array")
+        for index in range(self.__len__()):
+            yield self.__getitem__(index)
             
     # Math Operator Overloads
     def _base_math_operators(self, x, y, function):
