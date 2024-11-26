@@ -14,6 +14,110 @@ def get_component(container_node):
         component_class = utils.string_to_class(container_node["componentClass"].value)
         return component_class(container_node)
     
+def control_setup_node(name="controlSetup") -> nw.Node:
+    import component.control as control
+    control_setup_node = nw.create_node("network", name)
+
+    setup_node_data = component_data.NodeData(
+        component_data.AttrData(attr_name="controlClass", attr_type="enum", enum_name=":".join(utils.get_classes_from_package(control))),
+        component_data.AttrData(attr_name="instanceName", attr_type="string"),
+        component_data.AttrData(attr_name="shapeColor", attr_type="enum", enum_name=component_enum.Colors.maya_enum_str()),
+        component_data.AttrData(attr_name="attrs", attr_type="string", multi=True),
+        component_data.AttrData(attr_name="lockAttrs", attr_type="compound"),
+        component_data.AttrData(attr_name="lockDefaultAttrs", attr_type="bool", parent="lockAttrs"),
+        component_data.AttrData(attr_name="lockTX", attr_type="bool", parent="lockAttrs"),
+        component_data.AttrData(attr_name="lockTY", attr_type="bool", parent="lockAttrs"),
+        component_data.AttrData(attr_name="lockTZ", attr_type="bool", parent="lockAttrs"),
+        component_data.AttrData(attr_name="lockRX", attr_type="bool", parent="lockAttrs"),
+        component_data.AttrData(attr_name="lockRY", attr_type="bool", parent="lockAttrs"),
+        component_data.AttrData(attr_name="lockRZ", attr_type="bool", parent="lockAttrs"),
+        component_data.AttrData(attr_name="lockSX", attr_type="bool", parent="lockAttrs"),
+        component_data.AttrData(attr_name="lockSY", attr_type="bool", parent="lockAttrs"),
+        component_data.AttrData(attr_name="lockSZ", attr_type="bool", parent="lockAttrs"),
+        component_data.AttrData(attr_name="lockVis", attr_type="bool", parent="lockAttrs"),
+        component_data.AttrData(attr_name="buildTranslate", attr_type="double3"),
+        component_data.AttrData(attr_name="buildTranslateX", attr_type="double", parent="buildTranslate"),
+        component_data.AttrData(attr_name="buildTranslateY", attr_type="double", parent="buildTranslate"),
+        component_data.AttrData(attr_name="buildTranslateZ", attr_type="double", parent="buildTranslate"),
+        component_data.AttrData(attr_name="buildRotate", attr_type="double3"),
+        component_data.AttrData(attr_name="buildRotateX", attr_type="double", parent="buildRotate"),
+        component_data.AttrData(attr_name="buildRotateY", attr_type="double", parent="buildRotate"),
+        component_data.AttrData(attr_name="buildRotateZ", attr_type="double", parent="buildRotate"),
+        component_data.AttrData(attr_name="buildScale", attr_type="double3"),
+        component_data.AttrData(attr_name="buildScaleX", attr_type="double", parent="buildScale"),
+        component_data.AttrData(attr_name="buildScaleY", attr_type="double", parent="buildScale"),
+        component_data.AttrData(attr_name="buildScaleZ", attr_type="double", parent="buildScale"),
+    )
+    setup_node_data.add_attr_data_attributes(control_setup_node)
+
+    return control_setup_node
+
+class KwargToNode():
+    def __init__(self, node, **attr_kwargs):
+        self.set_node_attrs(node, **attr_kwargs)
+    @classmethod
+    def _modify_attr_kwarg_value(self, value):
+
+        if component_enum.get_enum_item_class(value) is not None:
+            value = component_enum.get_index_of_item(value)
+
+        elif isinstance(value, type):
+            value = value.__name__
+
+        return value
+    @classmethod
+    def set_node_attrs(cls, node, **attr_kwargs):
+        filtered_dict = cls._modify_attr_kwargs(attr_kwargs)
+
+        for key in filtered_dict:
+            if not node.has_attr(key):
+                cmds.warning(f"{node}.{key} attr does not exist")
+                continue
+            dict_value = filtered_dict[key]
+            if dict_value is not None:
+                if isinstance(dict_value, nw.Attr):
+                    dict_value >> node[key]
+                else:
+                    node[key].set(cls._modify_attr_kwarg_value(dict_value))
+    @classmethod
+    def _modify_attr_kwargs(cls, attr_kwargs:dict):
+        return_dict = {}
+
+        # while there's still items in attr_kwargs
+        while(len(attr_kwargs) > 0):
+            item = attr_kwargs.popitem()
+            key = item[0]
+            data = item[1]
+            
+            if isinstance(data, dict):
+                for data_key in data:
+                    attr_kwargs[f"{key}__{data_key}"] = data[data_key]
+
+            elif isinstance(data, list):
+                for index, sub_data in enumerate(data):
+                    attr_kwargs[f"{key}__{index}"] = sub_data
+
+            else:
+                # modified keys
+                new_key = cls._modify_attr_kwarg_key(key)
+                # modify values 
+                return_dict[new_key] = data
+
+        return return_dict
+    @classmethod
+    def _modify_attr_kwarg_key(cls, key):
+        pattern = r'(_|\d+)'
+    
+        # Use re.split to split by the pattern and keep the delimiters (numbers)
+        key = utils.snake_to_camel(key)
+        return_key = [part for part in re.split(pattern, key) if part not in  ("__", "")]
+        # return_key = [utils.snake_to_camel(part) for part in return_key]
+        
+        new_return_key = [return_key[0]]
+        new_return_key.extend([f"[{utils.uncapitalize(part)}]" for part in return_key[1:]])
+        new_return_key = "".join(new_return_key)
+
+        return new_return_key
 
 
 class Component():
@@ -36,7 +140,7 @@ class Component():
         
         return self.__node_data_cache[key]
 
-    # node property
+    # node attr
     @property 
     def container_node(self)->nw.Container:
         if "container_node" in self.__node_data_cache.keys():
@@ -157,6 +261,17 @@ class Component():
         return component_data.NodeData()
 
     # creating nodes
+    def create_component(self, **initial_attr_kwargs):
+        if self.container_node is None:
+            self.initialize_component(**initial_attr_kwargs)
+            self.build_component()
+    def initialize_component(self, **initial_attr_kwargs):
+        if self.container_node is None:
+            self.__create_base_nodes()
+            KwargToNode(self.container_node, **initial_attr_kwargs)
+    def build_component(self):
+        if type(self).has_hier_attrs:
+            self.xform_override_function()
     def __create_base_nodes(self):
         # input node
         if type(self).root_transform_name is not None:
@@ -167,9 +282,12 @@ class Component():
         input_node_attr_data.add_attr_data_attributes(input_node)
 
         # output node
-        output_node = nw.create_node("network", "output")
         output_node_attr_data = self._get_output_node_attr_data()
-        output_node_attr_data.add_attr_data_attributes(output_node)
+        has_output_node = len(output_node_attr_data.node_attr_list) > 1
+        if has_output_node:
+            output_node = nw.create_node("network", "output")
+            output_node_attr_data = self._get_output_node_attr_data()
+            output_node_attr_data.add_attr_data_attributes(output_node)
 
         # container node
         self.__node_data_cache["container_node"] = nw.create_node("container", "component_container")
@@ -178,105 +296,45 @@ class Component():
         if self.parent_container_node is not None:
             self.parent_container_node.add_nodes(self.container_node)
 
-        # add to container
-        self.container_node.add_nodes(input_node, output_node)
-        
-        # map to container
-        utils.map_to_container(input_node, node_message_name="input_node")
-        utils.map_to_container(output_node, node_message_name="output_node")
+        # add to container -> map to container -> publish attributes
+        # if output
+        component_nodes = [input_node]
+        if has_output_node:
+            component_nodes.append(output_node)
 
+        self.container_node.add_nodes(*component_nodes)
+
+        utils.map_to_container(input_node, node_message_name="input_node")
+        if has_output_node:
+            utils.map_to_container(output_node, node_message_name="output_node")
+            
+            output_node_attr_data.publish_attr_data_attributes(output_node)
+        
         input_node_attr_data.publish_attr_data_attributes(input_node)
-        output_node_attr_data.publish_attr_data_attributes(output_node)
         container_node_attr_data.publish_attr_data_attributes(self.container_node)
 
         # renaming to nodes
         self.rename_nodes()
-
-    def create_component(self, **initial_attr_kwargs):
-        if self.container_node is None:
-            self.initialize_component(**initial_attr_kwargs)
-            self.build_component()
-
-    def initialize_component(self, **initial_attr_kwargs):
-        if self.container_node is None:
-            self.__create_base_nodes()
-            self.__initialize_attrs(initial_attr_kwargs)
-
-    def build_component(self):
-        if type(self).has_hier_attrs:
-            self.xform_override_function()
-
     def xform_override_function(self):
         for index, attr in enumerate(self.input_node[component_data.HierData.input_xform]):
             attr[component_data.HierData.input_xform_name] >> self.output_node[component_data.HierData.output_xform][index][component_data.HierData.output_xform_name]
             attr[component_data.HierData.input_init_matrix] >> self.output_node[component_data.HierData.output_xform][index][component_data.HierData.output_init_matrix]
-
-    # initialize kwargs
-    def __initialize_attrs(self, attr_kwargs):
-        attr_kwargs = self._modify_attr_kwargs(attr_kwargs)
-
-        for key in attr_kwargs:
-            attr_data = attr_kwargs[key]
-            if attr_data is not None:
-                if isinstance(attr_data.attr_value, nw.Attr):
-                    attr_data.attr_value >> attr_data.attr
-                else:
-                    attr_data.attr.set(attr_data.attr_value)
-    def _modify_attr_kwarg_key(self, key):
-        pattern = r'(_|\d+)'
     
-        # Use re.split to split by the pattern and keep the delimiters (numbers)
-        key = utils.snake_to_camel(key)
-        return_key = [part for part in re.split(pattern, key) if part not in  ("__", "")]
-        # return_key = [utils.snake_to_camel(part) for part in return_key]
-        
-        new_return_key = [return_key[0]]
-        new_return_key.extend([f"[{utils.uncapitalize(part)}]" for part in return_key[1:]])
-        new_return_key = "".join(new_return_key)
-
-        return new_return_key
-    def _modify_attr_kwarg_value(self, attr_name, value):
-
-        if not self.container_node.has_attr(attr_name):
-            cmds.warning(f"not have attribute {self.container_node}.{attr_name} exists")
-            return None
-        
-        attr = self.container_node[attr_name]
-
-        if attr.attr_type == "enum" and component_enum.get_enum_item_class(value) is not None:
-            value = component_enum.get_index_of_item(value)
-
-        if not isinstance(value, component_data.ComponentAttrData):
-            value = component_data.ComponentAttrData(attr, value)
-
-        return value
-    def _modify_attr_kwargs(self, attr_kwargs:dict):
-        return_dict = {}
-
-        # while there's still items in attr_kwargs
-        while(len(attr_kwargs) > 0):
-            item = attr_kwargs.popitem()
-            key = item[0]
-            data = item[1]
-            
-            if isinstance(data, dict):
-                for data_key in data:
-                    attr_kwargs[f"{key}__{data_key}"] = data[data_key]
-
-            else:
-                # modified keys
-                new_key = self._modify_attr_kwarg_key(key)
-                # modify values 
-                return_dict[key] = self._modify_attr_kwarg_value(new_key, data)
-
-        return return_dict
-
-    # other class functions
-    def insert_component(self, component, **component_kwargs):
+    # other functions
+    def insert_component(self, component, parent_transform = None, **component_kwargs):
         component_inst = component(parent_container_node=self.container_node)
         component_inst.create_component(**component_kwargs)
 
+        if parent_transform is None and self.transform_node is not None:
+            parent_transform = self.transform_node
+
+        if component_inst.transform_node is not None and parent_transform is not None:
+            cmds.parent(str(component_inst.transform_node), str(parent_transform), relative=True)
+
         return component_inst
+    def add_nodes(self, *nodes):
+        self.container_node.add_nodes(*nodes)
+        self.rename_nodes()
     def rename_nodes(self):
         def rename_node(node, full_namespace):
             if not node.name.startswith(full_namespace):
@@ -286,7 +344,7 @@ class Component():
         prev_namespace = utils.Namespace.get_namespace(self.container_node.name)
 
         # if you need to add the namespace
-        if full_namespace != prev_namespace:
+        if not utils.Namespace.equal_namespace(full_namespace, prev_namespace):
             # if namespace doesn't exist
             if utils.Namespace.exists(full_namespace):
                 parent_namespace = utils.Namespace.get_namespace(full_namespace)
@@ -315,3 +373,18 @@ class Component():
         # check if nothing else in namespace delete
         if utils.Namespace.empty(prev_namespace):
             utils.Namespace.delete(prev_namespace)
+
+    def promote_attr(self, *attrs, **control_kwargs):
+        control_setup = control_setup_node()
+        self.add_nodes(control_setup)
+
+        for index, attr in enumerate(attrs):
+            control_setup[f"attrs[{index}]"] = attr.attr_name
+        
+        KwargToNode(control_setup, **control_kwargs)
+
+        # create control
+        # connect it up
+        # re publish if needs be
+
+        

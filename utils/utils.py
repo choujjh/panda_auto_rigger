@@ -157,3 +157,8 @@ class Namespace:
         if child_nodes is None and child_namespaces is None:
             return True
         return False
+    
+    @classmethod
+    def equal_namespace(cls, namespace1, namespace2):
+        return cls.strip_outer_colons(namespace1) == cls.strip_outer_colons(namespace2)
+    

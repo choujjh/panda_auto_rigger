@@ -810,6 +810,16 @@ class Attr():
             cmds.setAttr(str(self), value, type="string")
         elif attr_type == "matrix":
             cmds.setAttr(str(self), value, type='matrix')
+        elif attr_type == "enum":
+            if not hasattr(self, "enum_list"):
+                self.enum_list = cmds.addAttr(str(self), query=True, enumName=True).split(":")
+            
+            if isinstance(value, str):
+                index = self.enum_list.index(value)
+                if index != -1:
+                    value = index
+            cmds.setAttr(str(self), value)
+
         elif self._plug_attr_type(plug) in self.__attr_data_map__.keys():
             self.__attr_data_map__[self._plug_attr_type(plug)]["set"](plug, value)
         else:
@@ -1072,8 +1082,6 @@ class Attr():
             value: calculated value
         """
         return self._base_math_operators(self, other, lambda x, y: y / x)
-
-    
 
     # TODO: 
         # node
