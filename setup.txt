@@ -1,0 +1,29 @@
+import os
+import importlib
+
+try:
+    panda_auto_rigging_tool_root = os.environ['PANDA_AUTO_RIGGING_DIR']
+except:
+    print('PANDA_AUTO_RIGGING_DIR environment variable not correctly configured')
+else:
+    import sys
+    path = panda_auto_rigging_tool_root
+
+
+    if not path in sys.path:
+        sys.path.append(path)
+
+    import system.test as test
+    import importlib
+
+    importlib.reload(test)
+
+    try:
+        test.test()
+    except:
+        import traceback
+        traceback.print_exc()
+
+
+# maya env
+PANDA_AUTO_RIGGING_DIR = directory
