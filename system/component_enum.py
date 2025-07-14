@@ -82,7 +82,7 @@ class MayaEnumAttr(Enum):
     
 def get_enum_item_class(item)->MayaEnumAttr:
     import system.component_enum as component_enum
-    for curr_enum_class in utils.get_classes_from_package(component_enum):
+    for curr_enum_class in utils.get_classes_from_package(component_enum)[0]:
         curr_enum_class = getattr(component_enum, curr_enum_class)
         if isinstance(item, curr_enum_class) or item == curr_enum_class:
             return curr_enum_class
@@ -105,11 +105,12 @@ class ComponentTypes(MayaEnumAttr):
     anim = 0
     character = 1
     component = 2
-    control = 3
-    hier = 4
-    matrix = 5
-    motion = 6
-    setup = 7
+    control_setup = 3
+    control = 4
+    hier = 5
+    matrix = 6
+    motion = 7
+    setup = 8
 
 
 class Colors(MayaEnumAttr):
@@ -167,7 +168,7 @@ class Colors(MayaEnumAttr):
             remap_node["value[{}].value_Interp".format(index)] = 1
 
         return remap_node
-    
+        
 class CharacterSide(MayaEnumAttr):
     none = "none"
     mid = "M"

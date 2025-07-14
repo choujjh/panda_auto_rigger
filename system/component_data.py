@@ -1,7 +1,7 @@
 import utils.node_wrapper as nw
 import system.component_enum as component_enum
 
-class NodeData(list):
+class NodeData():
     def __init__(self, *args):
         self.node_attr_list = []
 
@@ -14,7 +14,7 @@ class NodeData(list):
             args = [data for data in args if isinstance(data, AttrData)]
         self.node_attr_list.extend(args)
 
-    def add_attr_data_attributes(self, node:nw.Node):
+    def add_attrs_to_node(self, node:nw.Node):
         # adding attrs
         num_children_dict = self.__get_num_children_dict()
 
@@ -68,6 +68,13 @@ class NodeData(list):
 
         return num_children_dict
 
+    def __str__(self):
+        return str([str(x) for x in self.node_attr_list])
+    
+    def __iter__(self):
+        for x in self.node_attr_list:
+            yield x
+
 class AttrData:
     def __init__(self, attr_name, attr_type=None, attr_value=None, attr_publish=False, attr_locked=False, attr_keyable=False, attr_alias=None, **add_attr_kwargs):
         self.name = attr_name
@@ -95,6 +102,9 @@ class AttrData:
             elif self.type is not None:
                 raise RuntimeError("type is suppose to be of type string")
             
+    def __str__(self):
+        return f"name-\"{self.name}\" | type-{self.type} | publish-{self.publish} | value-{self.value} | locked-{self.locked} | keyable-{self.keyable} | alias-{self.alias} | attr_kwargs-{self.add_attr_kwargs}"
+
 class HierData:
     hierarchy = "hierarchy"
     hier_name = "hierName"
@@ -104,19 +114,51 @@ class HierData:
     input_xform = "inputXform"
     input_xform_name = "inputXformName" 
     input_init_matrix = "inputInitMatrix"
+    input_init_inv_matrix = "inputInitInvMatrix"
     input_world_matrix = "inputWorldMatrix"
+    input_loc_matrix = "inputLocMatrix"
 
     output_xform = "outputXform"
     output_xform_name = "outputXformName" 
     output_init_matrix = "outputInitMatrix"
+    output_init_inv_matrix = "outputInitInvMatrix"
     output_world_matrix = "outputWorldMatrix"
+    output_loc_matrix = "outputLocMatrix"
 
     @classmethod
-    def is_hier_attr(cls):
-        pass
+    def is_hier_attr(cls, attr:nw.Attr):
+        hier_names = [cls.hier_name, cls.hier_parent_matrix, cls.hier_parent_init_matrix, cls.input_xform]
+        for attr_name in hier_names:
+            if not attr.has_attr(attr_name):
+                return False
+
+        attr = attr[cls.input_xform][0]
+
+        if not cls.is_input_xform_attr(attr):
+            return False
+        
+        return True
+
+    @classmethod
+    def is_input_xform_attr(cls, attr:nw.Attr):
+        xform_names = [cls.input_xform_name, cls.input_init_matrix, cls.input_init_inv_matrix, cls.input_world_matrix, cls.input_loc_matrix]
+        for attr_name in xform_names:
+            if not attr.has_attr(attr_name):
+                return False
+
+        return True
+
+    @classmethod
+    def is_output_xform_attr(cls, attr:nw.Attr):
+        xform_names = [cls.output_xform_name, cls.output_init_matrix, cls.output_init_inv_matrix, cls.output_world_matrix, cls.output_loc_matrix]
+        for attr_name in xform_names:
+            if not attr.has_attr(attr_name):
+                return False
+
+        return True
     
     @classmethod
-    def get_input_attr_data(cls):
+    def get_input_xform_data(cls):
         return NodeData(
             AttrData(cls.hierarchy, attr_type="compound", parent="input"),
             AttrData(cls.hier_name, attr_type="string", parent=cls.hierarchy),
@@ -126,22 +168,32 @@ class HierData:
             AttrData(cls.input_xform, attr_type="compound", parent=cls.hierarchy, multi=True),
             AttrData(cls.input_xform_name, attr_type="string", parent=cls.input_xform),
             AttrData(cls.input_init_matrix, attr_type="matrix", parent=cls.input_xform),
+            AttrData(cls.input_init_inv_matrix, attr_type="matrix", parent=cls.input_xform),
             AttrData(cls.input_world_matrix, attr_type="matrix", parent=cls.input_xform),
+            AttrData(cls.input_loc_matrix, attr_type="matrix", parent=cls.input_xform),
         )
     
     @classmethod
-    def get_output_attr_data(cls):
+    def get_output_xform_data(cls):
         return NodeData(
             AttrData(cls.output_xform, attr_type="compound", parent="output", multi=True),
             AttrData(cls.output_xform_name, attr_type="string", parent=cls.output_xform),
             AttrData(cls.output_init_matrix, attr_type="matrix", parent=cls.output_xform),
+            AttrData(cls.output_init_inv_matrix, attr_type="matrix", parent=cls.output_xform),
             AttrData(cls.output_world_matrix, attr_type="matrix", parent=cls.output_xform),
+            AttrData(cls.output_loc_matrix, attr_type="matrix", parent=cls.output_xform),
         )
-    
-class ComponentAttrData:
-    def __init__(self, attr, attr_value):
-        self.attr = attr
-        self.attr_value = attr_value
+        
+class ControlSetupData():
+    def __init__(self, *attrs, control_class = None, **control_setup):
+        import component.control as control
+        self.control_setup_dict = control_setup
+        if "controlClass" not in control_setup.keys():
+            if control_class is None:
+                control_setup["controlClass"] = control.CircleControl
+            else:
+                control_setup["controlClass"] = control_class
+        self.attrs = list(attrs)
 
-    def __str__(self) -> str:
-        return f"<ComponentAttrData> {self.attr}: {self.attr_value}"
+    def add_attr(self, *attrs):
+        self.attrs.extend(attrs)

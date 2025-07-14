@@ -4,6 +4,7 @@ from typing import Union
 import utils.om as utils_om
 from utils.utils import snake_to_camel
 import utils.apiundo as apiundo
+import re as re
 
 def derive_node(arg):
     node = Node(arg)
@@ -28,6 +29,61 @@ def create_node(node_type:str, name:str=None):
 def exists(node):
     return cmds.objExists(str(node))
 
+def _modify_kwargs_value(value):
+    import system.component_enum as component_enum
+    if component_enum.get_enum_item_class(value) is not None:
+        value = component_enum.get_index_of_item(value)
+
+    elif isinstance(value, type):
+        value = value.__name__
+
+    return value
+
+def _modify_kwargs_key(key):
+    import utils.utils as utils
+    pattern = r'(_|\d+|\[|\])'
+
+    # Use re.split to split by the pattern and keep the delimiters (numbers)
+    key = utils.snake_to_camel(key)
+    return_key = [part for part in re.split(pattern, key) if part not in  ("__", "", "[", "]", ".")]
+    # return_key = [utils.snake_to_camel(part) for part in return_key]
+    
+    new_return_key = [return_key[0]]
+    new_return_key.extend([f"[{utils.uncapitalize(part)}]" for part in return_key[1:]])
+    new_return_key = "".join(new_return_key)
+
+    return new_return_key
+
+def kwargs_set_attrs(attr_parent, modify_key_funct=None, modify_value_funct=None, ignore_data_types=[], **kwargs):
+    import utils.utils as utils
+    
+
+    if modify_key_funct is None:
+        modify_key_funct = _modify_kwargs_key
+    if modify_value_funct is None:
+        modify_value_funct = _modify_kwargs_value
+
+    unested_dict = utils.unnest_dict(kwargs)
+    unused_dict = {}
+
+    for key in unested_dict:
+        
+        value = modify_value_funct(unested_dict[key])
+        key = modify_key_funct(key)
+
+        if not attr_parent.has_attr(key):
+            unused_dict[key] = value
+        elif type(value) in ignore_data_types:
+            unused_dict[key] = value
+        
+
+        elif value is not None:
+                if isinstance(value, Attr):
+                    value >> attr_parent[key]
+                else:
+                    attr_parent[key].set(value)
+
+    return unused_dict
 class Node():
     """
     A Class encapsulating a node
@@ -185,6 +241,12 @@ class Node():
         if container is not None:
             return Container(container)
         return container
+    
+    def get_shapes(self):
+        shapes = cmds.listRelatives(str(self), shapes=True)
+        if shapes is None:
+            return None
+        return [Node(shape) for shape in shapes]
 
     def get_top_level_attribute_list(self, reCache=False):
         """gets a list of top level attr for the node
@@ -457,7 +519,8 @@ class Container(Node):
                 if parent_attr in publish_attr_map.keys():
                     return publish_attr_map[parent_attr][back_attrs]
         return super().__getitem__(attr)
-    
+
+'''
 # class AttrIter():
 #     """
 #     Iterator for attr. Iterates through child attrs at a depth equal
@@ -545,7 +608,8 @@ class Container(Node):
 #             AttrIter: returns itself
 #         """
 #         return self
-    
+'''
+
 class Attr():
     """
     A Class encapsulating an attribute
@@ -692,7 +756,7 @@ class Attr():
             self.set_locked(True)
     
     def has_source_connection(self):
-        if len(self.get_src_connections()) == []:
+        if len(self.get_src_connections()) == 0:
             return False
         return True
 

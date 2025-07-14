@@ -1,7 +1,7 @@
 import utils.utils as utils
 import utils.node_wrapper as nw
 import system.component_enum as component_enum
-import system.component_data as component_data
+import system.component_data as comp_data
 import system.component as sys_component
 import component.control as control
 
@@ -12,7 +12,7 @@ import importlib
 importlib.reload(utils)
 importlib.reload(nw)
 importlib.reload(component_enum)
-importlib.reload(component_data)
+importlib.reload(comp_data)
 importlib.reload(sys_component)
 importlib.reload(control)
 
@@ -36,20 +36,26 @@ def containerSainityCheck():
 
 class TestComponent(sys_component.Component):
     component_type = component_enum.ComponentTypes.setup
-    root_transform_name = "newRoot"
+    # root_transform_name = "newRoot"
     has_hier_attrs = True
     
-    def _get_input_node_attr_data(self) -> component_data.NodeData:
+    def _get_input_node_attr_data(self) -> comp_data.NodeData:
         node_data = super()._get_input_node_attr_data()
         node_data.extend_attr_data(
-            component_data.AttrData(attr_name="testEnum", attr_publish=True, attr_type=component_enum.AxisEnums)
+            comp_data.AttrData(attr_name="testEnum", attr_publish=True, attr_type=component_enum.AxisEnums),
+            comp_data.AttrData(attr_name="testInt", attr_publish=True, attr_type="Int"),
         )
         return node_data
     
     def build_component(self):
         super().build_component()
 
-        self.promote_attr(self.container_node["testEnum"], self.container_node[component_data.HierData.input_xform][0], **utils.kwarg_to_dict(controlClass=control.Control2))
+        # self.promote_attrs_to_cntrl(
+        #     component_data.ControlAttrAttrNameData(
+        #         "testEnum", 
+        #         3,
+        #         self.container_node[component_data.HierData.input_xform][0])
+        #     , **utils.kwargs_to_dict(controlClass=control.Control2))
 
         # self.add_nodes(sys_component.control_setup_node("attr_1"), sys_component.control_setup_node("attr_2"))
         # self.rename_nodes()
@@ -69,38 +75,45 @@ def test():
     containerSainityCheck()
     cmds.file(new=True, force=True)
 
+
     loc1 = nw.Node(cmds.spaceLocator()[0])
-    loc2 = nw.Node(cmds.spaceLocator()[0])
-    loc3 = nw.Node(cmds.spaceLocator()[0])
+
     component_inst = TestComponent()
     component_inst.create_component(
+        test_int = comp_data.ControlSetupData(
+            ("test_int", "test_int_new"),
+            ("test_enum", "new_name"),
+            build_axis = component_enum.AxisEnums.neg_y,
+            controlClass = control.CircleControl,
+            instance_name = "test_int_settings",
+            buildTranslate = [0, 1, 3],
+            shape_color = component_enum.Colors.purple,
+            lockTX=True,
+            lockVis=True
+        ),
         input_xform = [
-            utils.kwarg_to_dict(
+            comp_data.ControlSetupData(
+                control_class = control.DiamondWireControl,
+                shape_color = component_enum.Colors.green,
                 input_xform_name = "hip",
-                input_world_matrix = loc1["worldMatrix"][0],
-                input_init_matrix = loc1["worldMatrix"][0],
+                input_world_matrix = utils.translate_to_matrix([3, 10, 0]),
             ),
-            utils.kwarg_to_dict(
+            comp_data.ControlSetupData(
+                control_class = control.AxisControl,
+                shape_color = component_enum.Colors.purple,
                 input_xform_name = "knee",
-                input_world_matrix = loc1["worldMatrix"][0],
-                input_init_matrix = loc1["worldMatrix"][0],
+                input_world_matrix = utils.translate_to_matrix([3, 5.5, 1]),
             ),
-            utils.kwarg_to_dict(
+            comp_data.ControlSetupData(
+                control_class = control.SphereControl,
                 input_xform_name = "ankle",
-                input_world_matrix = loc1["worldMatrix"][0],
-                input_init_matrix = loc1["worldMatrix"][0],
+                input_world_matrix = utils.translate_to_matrix([3, 1, 0]),
             ),
-            utils.kwarg_to_dict(
+            comp_data.ControlSetupData(
+                control_class = control.GimbalControl,
+                shape_color = component_enum.Colors.light_pink,
                 input_xform_name = "ball",
-                input_world_matrix = loc1["worldMatrix"][0],
-                input_init_matrix = loc1["worldMatrix"][0],
+                input_world_matrix = utils.translate_to_matrix([3, 0, 3]),
             ),
         ],
-        test_enum = component_enum.AxisEnums.neg_z,
     )
-    # component_inst.insert_component(
-    #     TestComponent2
-    # )
-    component_inst.container_node[component_data.HierData.output_xform][0][component_data.HierData.output_world_matrix] >> loc2["offsetParentMatrix"]
-    component_inst.container_node[component_data.HierData.output_xform][1][component_data.HierData.output_world_matrix] >> loc3["offsetParentMatrix"]
-
