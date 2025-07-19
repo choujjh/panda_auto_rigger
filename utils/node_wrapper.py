@@ -6,18 +6,31 @@ from utils.utils import snake_to_camel
 import utils.apiundo as apiundo
 import re as re
 
-def derive_node(arg):
-    node = Node(arg)
+def derive_node(node):
+    """
+    Gets the most specific node type ie. Node, Container
+
+    Args:
+        Node (Node): sets the right class for given class
+
+    Returns:
+        NOde: The most spicific node type
+    """
+    node = Node(node)
     if node.node_type == "container":
         return Container(node)
     return node
 
 def create_node(node_type:str, name:str=None):
-    """create node
+    """
+    Creates node with given name
 
     Args:
-        type (str):
-        name (str):
+        node_type (str): type of node to create
+        name (str): name to be given to created node
+
+    Returns:
+        Node: node that was created wrapped by Node class
     """
     cast_class = Node
     if node_type == "container":
@@ -27,9 +40,29 @@ def create_node(node_type:str, name:str=None):
     return cast_class(cmds.createNode(node_type))
 
 def exists(node):
+    """
+    checks to see if node still exists in the scene
+
+    Args:
+        node (Node, str): node to check
+
+    Returns:
+        bool: if node still exists
+    """
     return cmds.objExists(str(node))
 
 def _modify_kwargs_value(value):
+    """
+    Modifies value for kwargs for use in the rest of the autorigger. 
+    if value is system.component_enum then indexes it. 
+    if value is a class then give the name of it
+
+    Args:
+        value (...): value
+
+    Returns:
+        ...: modified value
+    """
     import system.component_enum as component_enum
     if component_enum.get_enum_item_class(value) is not None:
         value = component_enum.get_index_of_item(value)
@@ -40,6 +73,15 @@ def _modify_kwargs_value(value):
     return value
 
 def _modify_kwargs_key(key):
+    """
+    Modifies key to something that resembles an attribute name
+
+    Args:
+        key (str): key
+
+    Returns:
+        str: modified key
+    """
     import utils.utils as utils
     pattern = r'(_|\d+|\[|\])'
 
@@ -55,6 +97,19 @@ def _modify_kwargs_key(key):
     return new_return_key
 
 def kwargs_set_attrs(attr_parent, modify_key_funct=None, modify_value_funct=None, ignore_data_types=[], **kwargs):
+    """
+    uses keys of the kwargs and sets value on the given node or attribute
+
+    Args:
+        attr_parent (Node, Attr): object to look for child under
+        modify_key_func (func): function to modify key, if key is None then use _modify_kwargs_value
+        modify_value_func (func): function to modify value, if value is None then use _modify_kwargs_value
+        ignore_data_types (list(class)): all classes in value that should be ignored
+        kwargs (dict): dictionary used to add values to node from
+
+    Returns:
+        dict: unused items in the dictionary
+    """
     import utils.utils as utils
     
 
@@ -78,30 +133,36 @@ def kwargs_set_attrs(attr_parent, modify_key_funct=None, modify_value_funct=None
         
 
         elif value is not None:
-                if isinstance(value, Attr):
-                    value >> attr_parent[key]
-                else:
-                    attr_parent[key].set(value)
+            if isinstance(value, Attr):
+                value >> attr_parent[key]
+            else:
+                attr_parent[key].set(value)
 
     return unused_dict
 class Node():
     """
-    A Class encapsulating a node
-    """
-    """
+    A class to wrap around OpenMaya objects (MObject, MFnDependencyNode) and 
+    provides useful functionality such as getting attributes, and other 
+    data not simply extracted from said OpenMaya objects
+
     Attributes:
-    full_name (str): returns full name of node ie. parent2|parent1|name
-    name (str): returns node name ie. name
-    type (str): node type
+        full_name (str): returns full name of node ie. parent2|parent1|name
+        name (str): returns node name ie. name
+        type (str): node type
+        mobject (maya.api.OpenMaya.MObject): MObject
     """
     def __init__(self, node):
-        """_summary_
+        """
+        Initializes wrapped node getting the MFnDependencyNode
 
         Args:
-            node ():
+            Node (Node, str, OpenMaya.MObject, OpenMaya.MPlug): input to get MFnDependencyNode
+
+        Returns:
+            Node: built node 
         """
         if isinstance(node, str):
-            if not cmds.objExists(node):
+            if not exists(node):
                 cmds.error(f"node {node} does not exist")
                 return
         self._dep_node = utils_om.get_dep_node(node)
@@ -111,33 +172,69 @@ class Node():
     # properties
     @property 
     def full_name(self):
+        """
+        Full name of node including all parents with |
+
+        Returns:
+            str: full name
+        """
         # return self._dep_node_.absoluteName()
         return self._dep_node.uniqueName()
     @property 
     def name(self):
+        """
+        Returns full name of node with no parent names included
+
+        Returns:
+            str: name of node    
+        """
         if self.full_name.find("|") != -1:
             return self.full_name.rsplit("|", 1)[1]
         return self.full_name
     @property
     def node_type(self):
+        """
+        returns type of node
+
+        Returns:
+            str: node type    
+        """
         return self._dep_node.typeName
     @property
     def mobject(self):
+        """
+        Returns MObject of this node using the MFnDependencyNode
+
+        Returns:
+            maya.api.OpenMaya.MObject: 
+        """
         return self._dep_node.object()
     
-    
-
     def has_attr(self, attr_name):
+        """
+        Checks if node has attribute
+
+        Returns:
+            bool:
+        """
         try:
             self.__getitem__(attr_name)
             return True
         except:
             return False
 
-    def obj_exists(self):
-        return cmds.objExists(str(self))
-
     def add_attr(self, long_name="", **kwargs):
+        """
+        Adds attribute to node with given kwargs (kwargs from cmds.addAttr).
+        also handles type instead of needing to use \"dataType\" or \"attributeType\"
+
+        Args:
+            long_name (str): name of attribute to be added
+            kwart: added cmds.addAttr arguments
+
+        Returns:
+            Node: built node 
+        """
         if "parent" in kwargs.keys():
             if isinstance(kwargs["parent"], Attr):
                 kwargs["parent"] = kwargs["parent"].attr_name
@@ -164,12 +261,27 @@ class Node():
             new_kwargs[snake_to_camel(key)] = kwargs[key]
 
         cmds.addAttr(str(self), longName=long_name, **new_kwargs)
-        
 
     def delete_attr(self, attr):
+        """
+        Deletes attribute on node
+
+        Args:
+            attr (Attr, str): attribute to delete
+        """
         cmds.deleteAttr(str(self), at=attr)
 
     def get_connection_list(self, as_src, as_dest):
+        """
+        Gets connection list from node
+
+        Args:
+            as_src (bool): get list of connections when node is source
+            as_dest (bool): get list of connections when node is destination
+
+        Returns:
+            list(Attr): list of connected attributes in touples where the first is the source attr and the secound is the destination attr
+        """
         connections = set()
         if as_src:
             connection_list = cmds.listConnections(str(self), connections=True, source=True, destination=False, plugs=True)
@@ -190,6 +302,15 @@ class Node():
         return connections
 
     def _check_node_in_attr_list(self, attribute_list):
+        """
+        Check to see if all attrs in attribute list is in node
+
+        Args:
+            attribute_list (list(str)): attribute list to check
+
+        Returns:
+            list: list of attributes now converted to Attr objects
+        """
         if attribute_list:
             attribute_list = [self[x] for x in attribute_list]
             attribute_list = [x for x in attribute_list if x.node == self]
@@ -197,9 +318,13 @@ class Node():
         return []
 
     def delete_node(self, clean=True):
-        """delete node
         """
-        if not self.obj_exists():
+        Delete node
+
+        Args:
+            clean: only delete node and no connections or children
+        """
+        if not exists(self):
             return
         if not clean:
             cmds.delete(str(self))
@@ -237,27 +362,42 @@ class Node():
             cmds.delete(str(node))
 
     def get_container_node(self):
+        """
+        gets container of node
+
+        Returns:
+            Node: container node. if no container, returns None
+        """
         container = cmds.container(findContainer=self.full_name, query=True)
         if container is not None:
             return Container(container)
         return container
     
     def get_shapes(self):
+        """
+        Get object shapes
+
+        Returns:
+            list(Node): list of shapes wrapped by Node
+        """
         shapes = cmds.listRelatives(str(self), shapes=True)
         if shapes is None:
             return None
         return [Node(shape) for shape in shapes]
 
-    def get_top_level_attribute_list(self, reCache=False):
-        """gets a list of top level attr for the node
+    def get_top_level_attribute_list(self, re_cache=False):
+        """
+        Gets a list of top level attr for the node (no child attributes included)
 
         Args:
-            reCache (bool, optional): reCaches Attributes. Defaults to False.
+            re_cache (int): reCaches Attributes. Defaults to False
 
         Returns:
-            list(Attr):
+            list(Attr): the list of attributes that are the top level
         """
-        if self.__full_attr_list is None or reCache:
+
+        reCach
+        if self.__full_attr_list is None or re_cache:
             attr_count = self._dep_node.attributeCount()
             attributes = [self._dep_node.attribute(x) for x in range(attr_count)]
             self.__full_attr_list = [Attr(self, self._dep_node.findPlug(x, False)) for x in attributes]
@@ -269,18 +409,26 @@ class Node():
         return self.__full_attr_list
     
     def get_dep_node(self):
-        """returns Dependency Node
+        """
+        Returns Dependency Node
 
         Returns:
-            OpenMaya.MFnDependencyNode:
+            OpenMaya.MFnDependencyNode: 
         """
         return self._dep_node
     
     def get_attr_cache(self):
+        """
+        Returns attribute cache
+
+        Returns:
+            dict: 
+        """
         return self.__attr_cache
 
     def rename(self, new_name:str):
-        """renames encapsulated node
+        """
+        Renames wrapped node
 
         Args:
             new_name (str):
@@ -294,20 +442,22 @@ class Node():
 
     # operator overloads
     def __str__(self):
-        """string representation of node. returns self.full_name
+        """
+        String representation of node. returns self.full_name
 
         Returns:
             str:
         """
         return self.full_name
     def __getitem__(self, attr: str):
-        """gets the attr of a node encapsulated in the Attr class
+        """
+        Gets the attr of a node wrapped in the Attr class
 
         Args:
             attr (str): attribute name
 
         Returns:
-            Attr: returns Attr class of node"s attribute
+            Attr: returns Attr class of node's attribute
         """
         attr_instance = None
         
@@ -322,7 +472,8 @@ class Node():
 
         return attr_instance
     def __setitem__(self, attr: str, new_value):
-        """sets the attribute"s value of a given node
+        """
+        Sets the attribute"s value of a given node
 
         Args:
             attr (str): attribute name
@@ -332,8 +483,8 @@ class Node():
         attr.set(new_value)
 
     def _get_cached_attr(self, attr):
-        """checks to see if attr is cached
-        gets the attr of a node encapsulated in the Attr class
+        """
+        Gets and caches the attr locally
 
         Args:
             attr (str): attribute name
@@ -347,7 +498,8 @@ class Node():
         return self.__attr_cache[attr]
     
     def __eq__(self, other):
-        """Returns True if the other object is of type Node and the 
+        """
+        Returns True if the other object is of type Node and the 
         other's plug matches self's plug
 
         Args:
@@ -362,18 +514,55 @@ class Node():
             
         return False
     def __hash__(self):
+        """
+        Hash value using objects full name
+        """
         return hash(self.full_name)
 
 class Container(Node):
+    """
+    A class to wrap around OpenMaya objects (MObject, MFnDependencyNode) 
+    specifically for container objects and provides useful functionality 
+    such as getting attributes, and other data not simply extracted from 
+    said OpenMaya objects. Derived from Node
+
+    Attributes:
+        full_name (str): returns full name of node ie. parent2|parent1|name
+        name (str): returns node name ie. name
+        type (str): node type
+        mobject (maya.api.OpenMaya.MObject): MObject
+    """
     def __init__(self, node):
+        """
+        Initializes wrapped node getting the MFnDependencyNode
+
+        Args:
+            Node (Node, str, OpenMaya.MObject, OpenMaya.MPlug): input to get MFnDependencyNode
+
+        Returns:
+            Node: built container node 
+        """
         super(Container, self).__init__(node)
 
     def get_nodes(self):
+        """
+        Gets nodes inside container
+
+        Returns:
+            list(Node): list of wrapped nodes of all nodes inside container
+        """
         child_nodes = cmds.container(str(self), query=True, nodeList=True)
         if child_nodes:
             return [Node(x) for x in child_nodes]
 
     def lock(self, proprigate=False):
+        """
+        Locks container
+
+        Args:
+            propigate (bool): if True, locks all containers that are the parents of this container
+            y (int): The second number.
+        """
         if proprigate:
             container_list = []
             current_container = self
@@ -387,6 +576,14 @@ class Container(Node):
             cmds.lockNode(str(container), lock=True, lockUnpublished=True)
 
     def unlock(self, proprigate=False):
+        """
+        Unlocks container
+
+        Args:
+            propigate (bool): if True, unlocks all containers that are the parents of this container
+            y (int): The second number.
+        """
+
         if proprigate:
             container_list = []
             current_container = self
@@ -402,13 +599,29 @@ class Container(Node):
             cmds.lockNode(str(container), lock=False, lockUnpublished=False)
 
     def __enter__(self):
+        """
+        unlocks when keyword with is used
+        """
         self.unlock()
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
+        """
+        locked when exited
+        """
         self.lock()
 
     def add_nodes(self, *args, include_network=False, include_hierarchy_above=False, include_hierarchy_below=False, force=False):
+        """
+        Adds nodes to container
+
+        Args:
+            args (list(Node)): the nodes to be added
+            include_network (bool): include network of nodes to be added
+            include_hierarchy_above (bool): include above hierarchy of nodes to be added
+            include_hierarchy_below (bool): includes child hierarchy of nodes to be added
+            force (bool): forces adding of nodes
+        """
         args = [str(x) for x in args]
         conversionNodes = []
         for node in args:
@@ -419,12 +632,24 @@ class Container(Node):
         cmds.container(str(self), addNode=args, edit=True, iha=include_hierarchy_above, ihb=include_hierarchy_below, inc=include_network, force=force)
 
     def get_container_node(self):
+        """
+        overidden get container command
+
+        Returns:
+            Node: parent Container. None if no container found
+        """
         containers = cmds.container(str(self),  query=True, parentContainer=True)
         if containers is not None:
             return Container(containers[0])
         return containers
 
     def remove_nodes(self, *args):
+        """
+        Removes specified nodes from container
+
+        Args:
+            args (list): nodes to be removed from container
+        """
         args = [str(x) for x in args]
         remove_list = args.copy()
         for node in args:
@@ -434,15 +659,35 @@ class Container(Node):
         cmds.container(str(self), edit=True, removeNode=remove_list, force=True)
 
     def publish_attr(self, attr, attr_bind_name:str):
+        """
+        Publish attributes to container
+
+        Args:
+            attr (Attr): Attribute to be published
+            attr_bind_name (str): Attribute published name
+        """
         if attr.node in self.get_nodes():
             cmds.container(str(self), edit=True, publishAndBind=[str(attr), attr_bind_name])
         else:
             raise RuntimeError(f"{attr.node} is not a node of container {str(self)}")
 
     def unpublish_attr(self, attr):
+        """
+        Unpublish attr
+
+        Args:
+            attr (Attr): attribute to be unpublished
+        """
         cmds.container(str(self), edit=True, unbindAndUnpublish=str(attr))
 
     def get_published_attr_map(self):
+        """
+        get published attributes in a map with the key being the attribute name 
+        and value being the Attrs
+
+        Returns:
+            dict(str:Attr): dict where the attribute name is the key and Attr is the value
+        """
 
         m_object = self.mobject
         if m_object.hasFn(om2.MFn.kContainer):
@@ -452,6 +697,12 @@ class Container(Node):
         return {}
 
     def get_published_attrs(self):
+        """
+        Get published attributes
+
+        Returns:
+            list(Attr): list of attrs that are published
+        """
         m_object = self.mobject
         if m_object.hasFn(om2.MFn.kContainer):
             mfn_container = om2.MFnContainerNode(m_object)
@@ -460,6 +711,12 @@ class Container(Node):
         return []
 
     def get_external_connection_list(self):
+        """
+        gets all connections that are from outside the container to inside the container
+
+        Returns:
+            list(Attr): gets connection list touple where first attr is the source and second is the destination
+        """
         container_nodes = self.get_nodes()
         connection_list = []
 
@@ -483,6 +740,15 @@ class Container(Node):
         return connection_list
 
     def get_child_containers(self, all=False):
+        """
+        gets children containers all goes through the hierarchy of containers
+
+        Args:
+            all (bool): gets all children in hierarchy not just top level
+
+        Returns:
+            list(Container): list of child containers
+        """
         sub_containers = [x for x in self.get_nodes() if x.node_type == "container"]
         return_child_containers = []
         if not all:
@@ -494,6 +760,13 @@ class Container(Node):
         return return_child_containers
 
     def __setitem__(self, attr: str, new_value):
+        """
+        Sets attribute on container. overriden so that values could be set on published attributes
+
+        Args:
+            attr (str): Attribute name to search for.
+            new_value (_value_): new value to set.
+        """
         publish_attr_map = self.get_published_attr_map()
         if attr in publish_attr_map.keys():
             attr = publish_attr_map[attr]
@@ -502,6 +775,15 @@ class Container(Node):
             super().__setitem__(attr, new_value)
 
     def __getitem__(self, attr: str):
+        """
+        Gets attribute on container. overriden so that attributes found can be published attributes
+
+        Args:
+            attr (str): Attribute name to search for.
+
+        Returns:
+            Attr: attribute found with attr as the key
+        """
         publish_attr_map = self.get_published_attr_map()
         if attr in publish_attr_map.keys():
             return publish_attr_map[attr]
@@ -519,96 +801,6 @@ class Container(Node):
                 if parent_attr in publish_attr_map.keys():
                     return publish_attr_map[parent_attr][back_attrs]
         return super().__getitem__(attr)
-
-'''
-# class AttrIter():
-#     """
-#     Iterator for attr. Iterates through child attrs at a depth equal
-#     to max depth
-#     """
-#     """
-#     Attributes:
-#     parent_attr (Attr): 
-#     current_attr (Attr): current child of parent attr
-#     depth (int): depth of search
-#     curr_index (int): index of the current elements
-#     max_depth (int): max depth to stop at (and include)
-
-#     """
-#     def __init__(self, attr, max_depth:int=-1):
-#         """initializes data to iterate through AttrIter
-
-#         Args:
-#             attr (Attr): starting attribute to iterate through
-#             max_depth (int, optional): max depth to search of attr. 
-#             Defaults to -1.
-#         """
-#         self.__original_attr__ = attr
-#         self.__current_attr__ = None
-#         self.__max_depth__ = max_depth
-#         self.__depth__ = 0
-
-#     def _reached_max_depth(self):
-#         return self.__depth__ + 1 > self.__max_depth__ and self.__max_depth__ >= 0
-#     def __next__(self):
-#         """gets next attr
-
-#         Raises:
-#             StopIteration: stops the iterator
-
-#         Returns:
-#             Attr: 
-#         """
-#         # when to stop iteration
-#         if not self.__original_attr__.has_children() and len(self.__original_attr__) > 0:
-#             raise StopIteration
-        
-
-        
-#         # to get the starting one
-#         if self.__current_attr__ is None:
-#             self.__current_attr__ = self.__original_attr__[0]
-#             self.__depth__ += 1
-#             return self.__current_attr__
-        
-#         # if attr has children
-#         elif self.__current_attr__.has_children() and len(self.__current_attr__) > 0 and not self._reached_max_depth():
-#             self.__current_attr__ = self.__current_attr__[0]
-#             self.__depth__ += 1
-#             return self.__current_attr__
-        
-#         # if at the end of list of attributes
-#         elif self.__current_attr__.index + 1 >= len(self.__current_attr__.parent):
-#             for x in range(100):
-#                 if self.__current_attr__.index + 1 >= len(self.__current_attr__.parent):
-#                     self.__current_attr__ = self.__current_attr__.parent
-#                     self.__depth__ -= 1
-#                     if self.__current_attr__ == self.__original_attr__:
-#                         raise StopIteration
-#                     continue
-
-#             index = self.__current_attr__.index
-#             parent = self.__current_attr__.parent
-#             self.__current_attr__ = parent[index + 1]
-#             return self.__current_attr__
-            
-
-#         # go to sibling
-#         elif self.__current_attr__.index + 1 < len(self.__current_attr__.parent):
-#             index = self.__current_attr__.index
-#             parent = self.__current_attr__.parent
-#             self.__current_attr__ = parent[index + 1]
-#             return self.__current_attr__
-        
-#         raise StopIteration
-#     def __iter__(self):
-#         """returns self as it"s iterator
-
-#         Returns:
-#             AttrIter: returns itself
-#         """
-#         return self
-'''
 
 class Attr():
     """
