@@ -20,7 +20,6 @@ def derive_node(node):
     if node.node_type == "container":
         return Container(node)
     return node
-
 def create_node(node_type:str, name:str=None):
     """
     Creates node with given name
@@ -38,7 +37,6 @@ def create_node(node_type:str, name:str=None):
     if name:
         return cast_class(cmds.createNode(node_type, name=name))
     return cast_class(cmds.createNode(node_type))
-
 def exists(node):
     """
     checks to see if node still exists in the scene
@@ -50,6 +48,7 @@ def exists(node):
         bool: if node still exists
     """
     return cmds.objExists(str(node))
+
 
 def _modify_kwargs_value(value):
     """
@@ -71,7 +70,6 @@ def _modify_kwargs_value(value):
         value = value.__name__
 
     return value
-
 def _modify_kwargs_key(key):
     """
     Modifies key to something that resembles an attribute name
@@ -95,7 +93,6 @@ def _modify_kwargs_key(key):
     new_return_key = "".join(new_return_key)
 
     return new_return_key
-
 def kwargs_set_attrs(attr_parent, modify_key_funct=None, modify_value_funct=None, ignore_data_types=[], **kwargs):
     """
     uses keys of the kwargs and sets value on the given node or attribute
@@ -139,6 +136,8 @@ def kwargs_set_attrs(attr_parent, modify_key_funct=None, modify_value_funct=None
                 attr_parent[key].set(value)
 
     return unused_dict
+
+
 class Node():
     """
     A class to wrap around OpenMaya objects (MObject, MFnDependencyNode) and 
@@ -230,7 +229,7 @@ class Node():
 
         Args:
             long_name (str): name of attribute to be added
-            kwart: added cmds.addAttr arguments
+            kwarg: added cmds.addAttr arguments
 
         Returns:
             Node: built node 
@@ -286,12 +285,12 @@ class Node():
         if as_src:
             connection_list = cmds.listConnections(str(self), connections=True, source=True, destination=False, plugs=True)
             if connection_list is not None:
-                connection_list = [(Attr(None, x), Attr(self, y)) for x, y in zip(connection_list[1::2], connection_list[::2])]
+                connection_list = [(Attr(x), Attr(y, self)) for x, y in zip(connection_list[1::2], connection_list[::2])]
                 connections.update(connection_list)
         if as_dest:
             connection_list = cmds.listConnections(str(self), connections=True, source=False, destination=True, plugs=True)
             if connection_list is not None:
-                connection_list = [(Attr(self, x), Attr(None, y)) for x, y in zip(connection_list[::2], connection_list[1::2])]
+                connection_list = [(Attr(x, self), Attr(y)) for x, y in zip(connection_list[::2], connection_list[1::2])]
                 connections.update(connection_list)
         if self.node_type == "container":
             self_container = Container(self)
@@ -400,7 +399,7 @@ class Node():
         if self.__full_attr_list is None or re_cache:
             attr_count = self._dep_node.attributeCount()
             attributes = [self._dep_node.attribute(x) for x in range(attr_count)]
-            self.__full_attr_list = [Attr(self, self._dep_node.findPlug(x, False)) for x in attributes]
+            self.__full_attr_list = [Attr(self._dep_node.findPlug(x, False), self) for x in attributes]
 
             for attr in self.__full_attr_list:
                 attr_name = attr.attr_name
@@ -493,8 +492,8 @@ class Node():
             Attr: returns Attr class of nodes attribute
         """
         if attr not in self.__attr_cache.keys():
-            self.__attr_cache[attr] = Attr(self, utils_om.get_plug(
-                self._dep_node, attr))
+            self.__attr_cache[attr] = Attr(utils_om.get_plug(
+                self._dep_node, attr), self)
         return self.__attr_cache[attr]
     
     def __eq__(self, other):
@@ -518,7 +517,6 @@ class Node():
         Hash value using objects full name
         """
         return hash(self.full_name)
-
 class Container(Node):
     """
     A class to wrap around OpenMaya objects (MObject, MFnDependencyNode) 
@@ -693,7 +691,7 @@ class Container(Node):
         if m_object.hasFn(om2.MFn.kContainer):
             mfn_container = om2.MFnContainerNode(m_object)
             plug_list, attr_list = mfn_container.getPublishedPlugs()
-            return {x:Attr(None, y) for x, y in zip(attr_list, plug_list)}
+            return {x:Attr(y, None) for x, y in zip(attr_list, plug_list)}
         return {}
 
     def get_published_attrs(self):
@@ -707,7 +705,7 @@ class Container(Node):
         if m_object.hasFn(om2.MFn.kContainer):
             mfn_container = om2.MFnContainerNode(m_object)
             plug_list, _ = mfn_container.getPublishedPlugs()
-            return [Attr(None, x) for x in plug_list]
+            return [Attr(x, None) for x in plug_list]
         return []
 
     def get_external_connection_list(self):
@@ -724,7 +722,7 @@ class Container(Node):
         if external_connection_list is None:
             external_connection_list = []
         for attr in external_connection_list:
-            curr_attr = Attr(None, attr)
+            curr_attr = Attr(attr)
 
             if curr_attr.attr_type not in ["compound", "double3", "double2"] and curr_attr.__len__() is not None:
                 curr_attr = curr_attr[0]
@@ -801,22 +799,23 @@ class Container(Node):
                 if parent_attr in publish_attr_map.keys():
                     return publish_attr_map[parent_attr][back_attrs]
         return super().__getitem__(attr)
-
 class Attr():
     """
-    A Class encapsulating an attribute
-    """
-    """
+    A class to wrap around MPlug object and 
+    provides useful functionality such as getting child attributes, and other 
+    data not simply extracted from said OpenMaya objects
+    
     Attributes:
-    dep_node (Node): node that"s the parent of this attr
-    plug (str): plug of the given attribute
-    name(str): attr name with node name ie. node.attr
-    attr_name(str): attr name ie. attr
-    attr_type(str): plug"s attribute type
-    index(int): the index of the attribute. returns -1 if not a child of 
-    another attribute
-    parent(Attr): returns the parent of the attribute. returns None if
-    not a child of another attribute
+        __attr_data_map__ (dict): map to get or set the attribute
+        dep_node (Node): node that"s the node of this plug
+        plug (str): plug of the given attribute
+        name(str): attr name with node name ie. node.attr
+        attr_name(str): attr name ie. attr
+        attr_type(str): plug"s attribute type
+        index(int): the index of the attribute. returns -1 if not a child of 
+        another attribute
+        parent(Attr): returns the parent of the attribute. returns None if
+        not a child of another attribute
     """
     
 
@@ -830,13 +829,12 @@ class Attr():
         #"kTypedAttribute":          {"get": None,                                   "set": None},
     }
     
-    def __init__(self, node:Node, attr: Union[om2.MPlug, str]):
-        """initializes Attr data
+    def __init__(self, attr: Union[om2.MPlug, str], node:Node = None):
+        """Initializes Attr data by getting MPlug and setting it's Node
 
         Args:
             node (Node): plug's node
             attr (Union[om2.MPlug, str]):
-            depth (int): used for iterating through Attr
         """
         self.node = node
         
@@ -881,11 +879,14 @@ class Attr():
     @property
     def parent(self):
         if self.plug.isElement:
-            return Attr(self.node, self.plug.array())
+            return Attr(self.plug.array(), self.node)
         elif self.plug.isChild:
-            return Attr(self.node, self.plug.parent())
+            return Attr(self.plug.parent(), self.node)
         else:
             return None
+    @property
+    def attr_type(self):
+        return cmds.getAttr(str(self), type=True)
     # helper functions
     @staticmethod
     def _plug_attr_type(plug: om2.MPlug):
@@ -970,7 +971,7 @@ class Attr():
         Returns:
             om2.MPlug:
         """
-        return [Attr(None, x) for x in self.plug.connectedTo(as_dest, as_src)]
+        return [Attr(x, None) for x in self.plug.connectedTo(as_dest, as_src)]
     def get_src_connections(self):
         """Gets a list of all the Attr that are connected to this Attr
 
@@ -1029,9 +1030,6 @@ class Attr():
             return True
         except:
             return False
-    @property
-    def attr_type(self):
-        return cmds.getAttr(str(self), type=True)
     def _set_value(self, plug: om2.MPlug, value):
         """Sets value on plug. is recurrsive when plug is has children or
         elements. 
@@ -1209,7 +1207,7 @@ class Attr():
                 return self.node.get_attr_cache()[full_attr_name]
 
             plug = utils_om.get_plug(self.plug, attr)
-            return Attr(self.node, plug)
+            return Attr(plug, self.node)
         except:
             error_str = f"{self.node} does not have attribute \"{self.attr_short_name}.{attr}\""
             raise RuntimeError(error_str)
