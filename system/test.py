@@ -4,6 +4,8 @@ import system.component_enum as component_enum
 import system.component_data as comp_data
 import system.component as sys_component
 import component.control as control
+import component.setup as setup
+import component.motion as motion
 
 import maya.cmds as cmds
 
@@ -15,6 +17,8 @@ importlib.reload(component_enum)
 importlib.reload(comp_data)
 importlib.reload(sys_component)
 importlib.reload(control)
+importlib.reload(setup)
+importlib.reload(motion)
 
 def containerSainityCheck():
     """
@@ -35,6 +39,9 @@ def containerSainityCheck():
         cmds.outlinerEditor(outlinerPanel, e=True, showContainedOnly=0)
 
 class TestComponent(sys_component.Component):
+    """
+
+    """
     component_type = component_enum.ComponentTypes.setup
     # root_transform_name = "newRoot"
     has_hier_attrs = True
@@ -78,6 +85,14 @@ def test():
 
     loc1 = nw.Node(cmds.spaceLocator()[0])
 
+    # motion.FK()
+    setup_inst = setup.Setup()
+    setup_inst.create_component(
+        num_xforms = 3
+    )
+    setup_inst.container_node["numXforms"] = 3
+    return
+
     component_inst = TestComponent()
     component_inst.create_component(
         test_int = comp_data.ControlSetupData(
@@ -100,7 +115,6 @@ def test():
             ),
             comp_data.ControlSetupData(
                 control_class = control.AxisControl,
-                shape_color = component_enum.Colors.purple,
                 input_xform_name = "knee",
                 input_world_matrix = utils.translate_to_matrix([3, 5.5, 1]),
             ),
@@ -111,10 +125,8 @@ def test():
             ),
             comp_data.ControlSetupData(
                 control_class = control.GimbalControl,
-                shape_color = component_enum.Colors.light_pink,
                 input_xform_name = "ball",
                 input_world_matrix = utils.translate_to_matrix([3, 0, 3]),
             ),
         ],
     )
-    #testing git
