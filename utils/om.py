@@ -8,7 +8,7 @@ import utils.node_wrapper as nw
 import utils.apiundo as apiundo
 
 def get_dep_node(node: Union[om2.MObject, om2.MPlug, str]):
-    """converts to dependency node using input. if none found None 
+    """Converts to dependency node using input. if none found None 
     will be returned
 
     Args:
@@ -45,7 +45,7 @@ def get_dep_node(node: Union[om2.MObject, om2.MPlug, str]):
     return om2.MFnDependencyNode(dep_node)
 
 def get_child_plug(plug: om2.MPlug, attr: str):
-    """returns the child plug of "plug" given a child attribute. 
+    """Returns the child plug of "plug" given a child attribute. 
     returns all child plugs in a dict{attribute:plug} if "attr" is None
 
     Args:
@@ -65,7 +65,7 @@ def get_child_plug(plug: om2.MPlug, attr: str):
 
 def get_plug(attr_parent: Union[om2.MPlug, om2.MFnDependencyNode, str],
              attr: Union[om2.MPlug, str]): 
-    """returns the given attribute as a plug. If attr_parent is 
+    """Returns the given attribute as a plug. If attr_parent is 
     provided it finds the attribute under that parent (either a 
     dependency node or another plug) as a plug
 
@@ -111,25 +111,25 @@ def get_plug(attr_parent: Union[om2.MPlug, om2.MFnDependencyNode, str],
         return get_plug(plug, split_attr[1])
     
 def connect_plugs(src_plug: om2.MPlug, dest_plug: om2.MPlug):
-        """connects source plug to destination plug
+    """Connects source plug to destination plug
 
-        Args:
-            src_plug (om2.MPlug):
-            dest_plug (om2.MPlug):
-        """
-        def redo(src_plug, dest_plug):
-            dgMod = om2.MDGModifier()
-            dgMod.connect(src_plug, dest_plug)
-            dgMod.doIt()
-        def undo(src_plug, dest_plug):
-            dgMod = om2.MDGModifier()
-            dgMod.disconnect(src_plug, dest_plug)
-            dgMod.doIt()
-        try:
-            redo(src_plug, dest_plug)
-            apiundo.commit(
-                redo = lambda: redo(src_plug, dest_plug),
-                undo = lambda: undo(src_plug, dest_plug)
-            )
-        except:
-            cmds.connectAttr(str(src_plug), str(dest_plug), force=True)
+    Args:
+        src_plug (om2.MPlug):
+        dest_plug (om2.MPlug):
+    """
+    def redo(src_plug, dest_plug):
+        dgMod = om2.MDGModifier()
+        dgMod.connect(src_plug, dest_plug)
+        dgMod.doIt()
+    def undo(src_plug, dest_plug):
+        dgMod = om2.MDGModifier()
+        dgMod.disconnect(src_plug, dest_plug)
+        dgMod.doIt()
+    try:
+        redo(src_plug, dest_plug)
+        apiundo.commit(
+            redo = lambda: redo(src_plug, dest_plug),
+            undo = lambda: undo(src_plug, dest_plug)
+        )
+    except:
+        cmds.connectAttr(str(src_plug), str(dest_plug), force=True)
