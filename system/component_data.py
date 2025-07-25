@@ -2,12 +2,28 @@ import utils.node_wrapper as nw
 import system.component_enum as component_enum
 
 class NodeData():
+    """Class to encapsulate node data to add attributes, publish attributes etc
+
+    Attributes:
+        node_attr_list (list): node attribute list
+    """
+
     def __init__(self, *args):
+        """takes args and add them to node_attr_list
+
+        Args:
+            args (): list to add to node_attr_list
+        """
         self.node_attr_list = []
 
         self.extend_attr_data(*args)
 
     def extend_attr_data(self, *args):
+        """Takes args and adds them to node_attr_list checking for AttrData
+        
+        Args:
+            args (): list to add to node_attr_list
+        """
         if len(args) > 0 and isinstance(args[0], NodeData):
             args = args[0].node_attr_list
         else:
@@ -15,6 +31,12 @@ class NodeData():
         self.node_attr_list.extend(args)
 
     def add_attrs_to_node(self, node:nw.Node):
+        """Takes node_attr_list AttrData and processes data to add, set value, 
+        and locked
+
+        Args:
+            node (nw.Node): node that the data will affect
+        """
         # adding attrs
         num_children_dict = self.__get_num_children_dict()
 
@@ -43,6 +65,12 @@ class NodeData():
                 node[data.name].set_locked(True)
 
     def publish_attr_data_attributes(self, node:nw.Node):
+        """Takes node_attr_list AttrData and publishes attributes to it's parent
+        container
+
+        Args:
+            node (nw.Node): node that the data will affect
+        """
         container_node = node.get_container_node()
 
         if container_node is None:
@@ -56,6 +84,13 @@ class NodeData():
                         container_node.publish_attr(node[data.name], data.name)
 
     def __get_num_children_dict(self):
+        """Takes the attribute data and adds up how many children each attribute
+        has (the child will have a parent:"{parent}" entry that is checked). used
+        to set the numberOfChildren field when adding the attribute
+
+        Returns:
+            dict:
+        """
         num_children_dict = {}
         for data in self.node_attr_list:
             attr_kwargs = data.add_attr_kwargs
@@ -69,21 +104,55 @@ class NodeData():
         return num_children_dict
 
     def __str__(self):
-        return str([str(x) for x in self.node_attr_list])
+        """Returns string list of all data in list
+
+        Returns:
+            str:
+        """
+        return "\n".join([str(x) for x in self.node_attr_list])
     
     def __iter__(self):
+        """Iterates through AttrData
+
+        Yields:
+            AttrData:
+        """
         for x in self.node_attr_list:
             yield x
 
 class AttrData:
-    def __init__(self, attr_name, attr_type=None, attr_value=None, attr_publish=False, attr_locked=False, attr_keyable=False, attr_alias=None, **add_attr_kwargs):
-        self.name = attr_name
-        self.type = attr_type
-        self.publish = attr_publish
-        self.value = attr_value
-        self.locked = attr_locked
-        self.keyable = attr_keyable
-        self.alias = attr_alias
+    """Class to define attributes
+
+    Attributes:
+        name (str): attribute name
+        type (str): attribute type
+        publish (bool, str): publish to container. if string publishes with new name
+        value (Any): value of the attribute
+        locked (bool): lock attribute
+        keyable (bool): keyable attribute
+        alias (str): new attribute alias
+        add_attr_kwargs (): kwarg of all addAttr fields
+        do_add_attr(bool): variable to see if attr should be added
+    """
+    def __init__(self, name:str, type:str=None, value=None, publish=False, locked:bool=False, keyable:bool=False, alias:str=None, **add_attr_kwargs):
+        """Initializes AttrData
+
+        Args:
+            name (str): attribute name
+            type (str, optional):  Defaults to None.
+            value (Any, optional): Defaults to None.
+            publish (bool, optional): Defaults to False.
+            locked (bool, optional): Defaults to False.
+            keyable (bool, optional): Defaults to False.
+            alias (str, optional): Defaults to None.
+        """
+        self.name = name
+        self.type = type
+        self.publish = publish
+        self.value = value
+        self.locked = locked
+        self.keyable = keyable
+        self.alias = alias
         self.do_add_attr = self.type is not None
 
         self.add_attr_kwargs = add_attr_kwargs
@@ -98,41 +167,72 @@ class AttrData:
                 index = component_enum.get_index_of_item(enum_data)
                 if index is not None:
                     self.value = index
-
-            elif self.type is not None:
-                raise RuntimeError("type is suppose to be of type string")
             
     def __str__(self):
+        """Str of all the data and their values
+
+        Returns:
+            str:
+        """
         return f"name-\"{self.name}\" | type-{self.type} | publish-{self.publish} | value-{self.value} | locked-{self.locked} | keyable-{self.keyable} | alias-{self.alias} | attr_kwargs-{self.add_attr_kwargs}"
 
 class HierData:
-    hierarchy = "hierarchy"
-    hier_name = "hierName"
-    hier_parent_matrix = "hierParentMatrix"
-    hier_parent_init_matrix = "hierParentInitMatrix"
+    """Class with constants and checks for Hierarchy class
+    
+    Attributes:
+        HIERARCHY (str):
+        HIER_NAME (str):
+        HIER_PARENT_MATRIX (str):
+        HIER_PARENT_INIT_MATRIX (str):
+        INPUT_XFORM (str):
+        INPUT_XFORM_NAME (str):
+        INPUT_INIT_MATRIX (str):
+        INPUT_INIT_INV_MATRIX (str):
+        INPUT_WORLD_MATRIX (str):
+        INPUT_LOC_MATRIX (str):
+        OUTPUT_XFORM (str):
+        OUTPUT_XFORM_NAME (str):
+        OUTPUT_INIT_MATRIX (str):
+        OUTPUT_INIT_INV_MATRIX (str):
+        OUTPUT_WORLD_MATRIX (str):
+        OUTPUT_LOC_MATRIX (str):
+        """
 
-    input_xform = "inputXform"
-    input_xform_name = "inputXformName" 
-    input_init_matrix = "inputInitMatrix"
-    input_init_inv_matrix = "inputInitInvMatrix"
-    input_world_matrix = "inputWorldMatrix"
-    input_loc_matrix = "inputLocMatrix"
+    HIERARCHY = "hierarchy"
+    HIER_NAME = "hierName"
+    HIER_PARENT_MATRIX = "hierParentMatrix"
+    HIER_PARENT_INIT_MATRIX = "hierParentInitMatrix"
 
-    output_xform = "outputXform"
-    output_xform_name = "outputXformName" 
-    output_init_matrix = "outputInitMatrix"
-    output_init_inv_matrix = "outputInitInvMatrix"
-    output_world_matrix = "outputWorldMatrix"
-    output_loc_matrix = "outputLocMatrix"
+    INPUT_XFORM = "inputXform"
+    INPUT_XFORM_NAME = "inputXformName" 
+    INPUT_INIT_MATRIX = "inputInitMatrix"
+    INPUT_INIT_INV_MATRIX = "inputInitInvMatrix"
+    INPUT_WORLD_MATRIX = "inputWorldMatrix"
+    INPUT_LOC_MATRIX = "inputLocMatrix"
+
+    OUTPUT_XFORM = "outputXform"
+    OUTPUT_XFORM_NAME = "outputXformName" 
+    OUTPUT_INIT_MATRIX = "outputInitMatrix"
+    OUTPUT_INIT_INV_MATRIX = "outputInitInvMatrix"
+    OUTPUT_WORLD_MATRIX = "outputWorldMatrix"
+    OUTPUT_LOC_MATRIX = "outputLocMatrix"
 
     @classmethod
     def is_hier_attr(cls, attr:nw.Attr):
-        hier_names = [cls.hier_name, cls.hier_parent_matrix, cls.hier_parent_init_matrix, cls.input_xform]
+        """Checks if attribute is a hier attribute
+
+        Args:
+            attr (nw.Attr):
+
+        Returns:
+            bool:
+        """
+        hier_names = [cls.HIER_NAME, cls.HIER_PARENT_MATRIX, cls.HIER_PARENT_INIT_MATRIX, cls.INPUT_XFORM]
         for attr_name in hier_names:
             if not attr.has_attr(attr_name):
                 return False
 
-        attr = attr[cls.input_xform][0]
+        attr = attr[cls.INPUT_XFORM][0]
 
         if not cls.is_input_xform_attr(attr):
             return False
@@ -141,7 +241,15 @@ class HierData:
 
     @classmethod
     def is_input_xform_attr(cls, attr:nw.Attr):
-        xform_names = [cls.input_xform_name, cls.input_init_matrix, cls.input_init_inv_matrix, cls.input_world_matrix, cls.input_loc_matrix]
+        """Checks to see if attribute is an input xform attribute
+
+        Args:
+            attr (nw.Attr):
+
+        Returns:
+            bool:
+        """
+        xform_names = [cls.INPUT_XFORM_NAME, cls.INPUT_INIT_MATRIX, cls.INPUT_INIT_INV_MATRIX, cls.INPUT_WORLD_MATRIX, cls.INPUT_LOC_MATRIX]
         for attr_name in xform_names:
             if not attr.has_attr(attr_name):
                 return False
@@ -150,7 +258,15 @@ class HierData:
 
     @classmethod
     def is_output_xform_attr(cls, attr:nw.Attr):
-        xform_names = [cls.output_xform_name, cls.output_init_matrix, cls.output_init_inv_matrix, cls.output_world_matrix, cls.output_loc_matrix]
+        """Checks to see if attribute is an output xform attribute
+
+        Args:
+            attr (nw.Attr):
+
+        Returns:
+            bool:
+        """
+        xform_names = [cls.OUTPUT_XFORM_NAME, cls.OUTPUT_INIT_MATRIX, cls.OUTPUT_INIT_INV_MATRIX, cls.OUTPUT_WORLD_MATRIX, cls.OUTPUT_LOC_MATRIX]
         for attr_name in xform_names:
             if not attr.has_attr(attr_name):
                 return False
@@ -159,33 +275,58 @@ class HierData:
     
     @classmethod
     def get_input_xform_data(cls):
-        return NodeData(
-            AttrData(cls.hierarchy, attr_type="compound", parent="input"),
-            AttrData(cls.hier_name, attr_type="string", parent=cls.hierarchy),
-            AttrData(cls.hier_parent_matrix, attr_type="matrix", parent=cls.hierarchy),
-            AttrData(cls.hier_parent_init_matrix, attr_type="matrix", parent=cls.hierarchy),
+        """Returns NodeData for an input xform
 
-            AttrData(cls.input_xform, attr_type="compound", parent=cls.hierarchy, multi=True),
-            AttrData(cls.input_xform_name, attr_type="string", parent=cls.input_xform),
-            AttrData(cls.input_init_matrix, attr_type="matrix", parent=cls.input_xform),
-            AttrData(cls.input_init_inv_matrix, attr_type="matrix", parent=cls.input_xform),
-            AttrData(cls.input_world_matrix, attr_type="matrix", parent=cls.input_xform),
-            AttrData(cls.input_loc_matrix, attr_type="matrix", parent=cls.input_xform),
+        Returns:
+            NodeData:
+        """
+        return NodeData(
+            AttrData(cls.HIERARCHY, type="compound", parent="input"),
+            AttrData(cls.HIER_NAME, type="string", parent=cls.HIERARCHY),
+            AttrData(cls.HIER_PARENT_MATRIX, type="matrix", parent=cls.HIERARCHY),
+            AttrData(cls.HIER_PARENT_INIT_MATRIX, type="matrix", parent=cls.HIERARCHY),
+
+            AttrData(cls.INPUT_XFORM, type="compound", parent=cls.HIERARCHY, multi=True),
+            AttrData(cls.INPUT_XFORM_NAME, type="string", parent=cls.INPUT_XFORM),
+            AttrData(cls.INPUT_INIT_MATRIX, type="matrix", parent=cls.INPUT_XFORM),
+            AttrData(cls.INPUT_INIT_INV_MATRIX, type="matrix", parent=cls.INPUT_XFORM),
+            AttrData(cls.INPUT_WORLD_MATRIX, type="matrix", parent=cls.INPUT_XFORM),
+            AttrData(cls.INPUT_LOC_MATRIX, type="matrix", parent=cls.INPUT_XFORM),
         )
     
     @classmethod
     def get_output_xform_data(cls):
+        """Returns NodeData for an output xform
+
+        Returns:
+            NodeData:
+        """
         return NodeData(
-            AttrData(cls.output_xform, attr_type="compound", parent="output", multi=True),
-            AttrData(cls.output_xform_name, attr_type="string", parent=cls.output_xform),
-            AttrData(cls.output_init_matrix, attr_type="matrix", parent=cls.output_xform),
-            AttrData(cls.output_init_inv_matrix, attr_type="matrix", parent=cls.output_xform),
-            AttrData(cls.output_world_matrix, attr_type="matrix", parent=cls.output_xform),
-            AttrData(cls.output_loc_matrix, attr_type="matrix", parent=cls.output_xform),
+            AttrData(cls.OUTPUT_XFORM, type="compound", parent="output", multi=True),
+            AttrData(cls.OUTPUT_XFORM_NAME, type="string", parent=cls.OUTPUT_XFORM),
+            AttrData(cls.OUTPUT_INIT_MATRIX, type="matrix", parent=cls.OUTPUT_XFORM),
+            AttrData(cls.OUTPUT_INIT_INV_MATRIX, type="matrix", parent=cls.OUTPUT_XFORM),
+            AttrData(cls.OUTPUT_WORLD_MATRIX, type="matrix", parent=cls.OUTPUT_XFORM),
+            AttrData(cls.OUTPUT_LOC_MATRIX, type="matrix", parent=cls.OUTPUT_XFORM),
         )
         
 class ControlSetupData():
+    """A class that takes Control data and saves it to be inputed into a control
+    setup node
+
+    Attributes:
+        attrs (list): attributes to be promoted on this control and the override names accompanying them
+        control_setup (dict): dict to apply to control setup node later
+    """
+
     def __init__(self, *attrs, control_class = None, **control_setup):
+        """_summary_
+
+        Args:
+            attrs (list(set)): [("attr_name", "control_attr_name")]
+            control_class (type, optional): _description_. Defaults to None.
+            control_setup (dict): control setup kwargs to apply data to later
+        """
         import component.control as control
         self.control_setup_dict = control_setup
         if "controlClass" not in control_setup.keys():
@@ -196,4 +337,10 @@ class ControlSetupData():
         self.attrs = list(attrs)
 
     def add_attr(self, *attrs):
+        """Adds attrs to the attrs list
+
+        Args:
+            attrs (): attrs to add
+
+        """
         self.attrs.extend(attrs)

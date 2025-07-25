@@ -7,60 +7,72 @@ import utils.utils as utils
 
 import maya.cmds as cmds
 
-"""get the component type of the currently selected container
-"""
-def get_component(container_node):
+def get_component(container_node:nw.Node):
+    """Gets component from a container
+
+    Args:
+        container_node (nw.Node):
+
+    Returns:
+        Component: 
+    """
     if container_node is None:
         return None
     if container_node.has_attr("componentClass"):
         component_class = utils.string_to_class(container_node["componentClass"].value)
         return component_class(container_node)
 
-"""control setup node creates a network node that houses all the build data for controls
-"""
-def control_setup_node(name="controlSetup") -> nw.Node:
+def create_control_setup_node(name="controlSetup") -> nw.Node:
+    """Creates control setup node
+
+    Args:
+        name (str, optional): name of control. Defaults to "controlSetup".
+
+    Returns:
+        nw.Node:
+    """
     import component.control as control
     control_setup_node = nw.create_node("network", name)
 
     setup_node_data = comp_data.NodeData(
-        comp_data.AttrData(attr_name="containerNode", attr_type="message"),
-        comp_data.AttrData(attr_name="controlComponent", attr_type="message"),
-        comp_data.AttrData(attr_name="controlClass", attr_type="enum", enum_name=":".join(utils.get_classes_from_package(control)[0])),
-        comp_data.AttrData(attr_name="instanceName", attr_type="string"),
-        comp_data.AttrData(attr_name="shapeColor", attr_type="enum", enum_name=component_enum.Colors.maya_enum_str()),
+        comp_data.AttrData(name="containerNode", type="message"),
+        comp_data.AttrData(name="controlComponent", type="message"),
+        comp_data.AttrData(name="controlClass", type="enum", enum_name=":".join(utils.get_classes_from_package(control)[0])),
+        comp_data.AttrData(name="instanceName", type="string"),
+        comp_data.AttrData(name="shapeColor", type="enum", enum_name=component_enum.Colors.maya_enum_str()),
         comp_data.AttrData(
-            attr_name="nodeType", 
-            attr_type="enum", 
+            name="nodeType", 
+            type="enum", 
             enum_name=component_enum.ComponentTypes.maya_enum_str(), 
-            attr_value=component_enum.ComponentTypes.control_setup.value, 
-            attr_locked=True),
-        comp_data.AttrData(attr_name="attrInfo", attr_type="compound", multi=True),
-        comp_data.AttrData(attr_name="attrMessage", attr_type="message", parent="attrInfo"),
-        comp_data.AttrData(attr_name="attrName", attr_type="string", parent="attrInfo"),
-        comp_data.AttrData(attr_name="lockAttrs", attr_type="compound"),
-        comp_data.AttrData(attr_name="lockTX", attr_type="bool", parent="lockAttrs"),
-        comp_data.AttrData(attr_name="lockTY", attr_type="bool", parent="lockAttrs"),
-        comp_data.AttrData(attr_name="lockTZ", attr_type="bool", parent="lockAttrs"),
-        comp_data.AttrData(attr_name="lockRX", attr_type="bool", parent="lockAttrs"),
-        comp_data.AttrData(attr_name="lockRY", attr_type="bool", parent="lockAttrs"),
-        comp_data.AttrData(attr_name="lockRZ", attr_type="bool", parent="lockAttrs"),
-        comp_data.AttrData(attr_name="lockSX", attr_type="bool", parent="lockAttrs"),
-        comp_data.AttrData(attr_name="lockSY", attr_type="bool", parent="lockAttrs"),
-        comp_data.AttrData(attr_name="lockSZ", attr_type="bool", parent="lockAttrs"),
-        comp_data.AttrData(attr_name="lockVis", attr_type="bool", parent="lockAttrs", attr_value=False),
-        comp_data.AttrData(attr_name="buildAxis", attr_type="enum", enum_name=component_enum.AxisEnums.maya_enum_str(), attr_value=1),
-        comp_data.AttrData(attr_name="buildTranslate", attr_type="double3"),
-        comp_data.AttrData(attr_name="buildTranslateX", attr_type="double", parent="buildTranslate"),
-        comp_data.AttrData(attr_name="buildTranslateY", attr_type="double", parent="buildTranslate"),
-        comp_data.AttrData(attr_name="buildTranslateZ", attr_type="double", parent="buildTranslate"),
-        comp_data.AttrData(attr_name="buildRotate", attr_type="double3"),
-        comp_data.AttrData(attr_name="buildRotateX", attr_type="double", parent="buildRotate"),
-        comp_data.AttrData(attr_name="buildRotateY", attr_type="double", parent="buildRotate"),
-        comp_data.AttrData(attr_name="buildRotateZ", attr_type="double", parent="buildRotate"),
-        comp_data.AttrData(attr_name="buildScale", attr_type="double3"),
-        comp_data.AttrData(attr_name="buildScaleX", attr_type="double", parent="buildScale", attr_value=1),
-        comp_data.AttrData(attr_name="buildScaleY", attr_type="double", parent="buildScale", attr_value=1),
-        comp_data.AttrData(attr_name="buildScaleZ", attr_type="double", parent="buildScale", attr_value=1),
+            value=component_enum.ComponentTypes.control_setup.value, 
+            locked=True),
+        comp_data.AttrData(name="attrInfo", type="compound", multi=True),
+        comp_data.AttrData(name="attrMessage", type="message", parent="attrInfo"),
+        comp_data.AttrData(name="attrName", type="string", parent="attrInfo"),
+        comp_data.AttrData(name="lockAttrs", type="compound"),
+        comp_data.AttrData(name="lockTX", type="bool", parent="lockAttrs"),
+        comp_data.AttrData(name="lockTY", type="bool", parent="lockAttrs"),
+        comp_data.AttrData(name="lockTZ", type="bool", parent="lockAttrs"),
+        comp_data.AttrData(name="lockRX", type="bool", parent="lockAttrs"),
+        comp_data.AttrData(name="lockRY", type="bool", parent="lockAttrs"),
+        comp_data.AttrData(name="lockRZ", type="bool", parent="lockAttrs"),
+        comp_data.AttrData(name="lockSX", type="bool", parent="lockAttrs"),
+        comp_data.AttrData(name="lockSY", type="bool", parent="lockAttrs"),
+        comp_data.AttrData(name="lockSZ", type="bool", parent="lockAttrs"),
+        comp_data.AttrData(name="lockVis", type="bool", parent="lockAttrs", value=False),
+        comp_data.AttrData(name="buildAxis", type="enum", enum_name=component_enum.AxisEnums.maya_enum_str(), value=1),
+        comp_data.AttrData(name="buildTranslate", type="double3"),
+        comp_data.AttrData(name="buildTranslateX", type="double", parent="buildTranslate"),
+        comp_data.AttrData(name="buildTranslateY", type="double", parent="buildTranslate"),
+        comp_data.AttrData(name="buildTranslateZ", type="double", parent="buildTranslate"),
+        comp_data.AttrData(name="buildRotate", type="double3"),
+        comp_data.AttrData(name="buildRotateX", type="double", parent="buildRotate"),
+        comp_data.AttrData(name="buildRotateY", type="double", parent="buildRotate"),
+        comp_data.AttrData(name="buildRotateZ", type="double", parent="buildRotate"),
+        comp_data.AttrData(name="buildScale", type="double3"),
+        comp_data.AttrData(name="buildScaleX", type="double", parent="buildScale", value=1),
+        comp_data.AttrData(name="buildScaleY", type="double", parent="buildScale", value=1),
+        comp_data.AttrData(name="buildScaleZ", type="double", parent="buildScale", value=1),
     )
 
     setup_node_data.add_attrs_to_node(control_setup_node)
@@ -68,60 +80,141 @@ def control_setup_node(name="controlSetup") -> nw.Node:
     return control_setup_node
 
 class Component():
+    """A Base class for all autorigging components
+
+    Attributes:
+        component_type (component_enum.ComponentTypes): the component type
+        root_transform_name (str): name of root transform. Defaults to None. 
+        if true, the input node is a transform node instead of a network node
+        class_namespace (str): gives the classes namespace
+        has_hier_attrs (bool): creates hier attributes
+        container_node (nw.Node): Container node that contains all component nodes
+        input_node (nw.Node): Node that all incoming connections come through this node
+        output_node (nw.Node): Node that all outgoing connections go through this node
+        transform_node (nw.Node): Transform node (also input node). if no transform node 
+        is created returns None
+        is_built (bool): True if the component is already built
+        full_namespace (str): namespace with all parent namespaces included
+        short_namespace (str): components full namespace (without parent namespaces)
+        instance_namespace (str): instance name + side
+    """
     component_type = component_enum.ComponentTypes.component
     root_transform_name = None
     class_namespace = "component"
     has_hier_attrs = False
 
-    def __init__(self, container_node=None, parent_container_node=None):
-        # self.container_node = container_node
+    def __init__(self, container_node:nw.Node=None, parent_container_node:nw.Node=None):
+        """initializes component with container nodes
+
+        Args:
+            container_node (nw.Node, optional): container to initialize with 
+            (incase component is already existing). Defaults to None.
+            parent_container_node (nw.Node, optional): container to be parented
+            under. Defaults to None.
+        """
         self.parent_container_node = parent_container_node
         self.__node_data_cache = {}
         self.__namespace_cache = {"full_namespace":"", "short_namespace":"", "instance_namespace":"", "hier_side":"", "instance_name":""}
         self.class_name = utils.class_type_to_str(type(self))
         if container_node is not None:
             self.__node_data_cache["container_node"] = container_node
-    def _get_node_data_from_cache(self, key):
+    def _get_node_data_from_cache(self, key:str) -> nw.Node:
+        """Caching function for all saved nodes so connections don't have to be 
+        queried every time. if not cached yet, node is saved
+
+        Args:
+            key (str): node key
+
+        Returns:
+            nw.Node: node from cache
+        """
         if key not in self.__node_data_cache.keys():
-            self.__node_data_cache[key] = utils.get_first_connected_node(self.container_node[key], as_source=True)
+            if self.container_node.has_attr(key):
+                self.__node_data_cache[key] = self.container_node[key].get_dest_connections()[0].node
+            else:
+                cmds.warning(f"{key} does not exist on component")
+                return
         
         return self.__node_data_cache[key]
 
     # node attr
     @property 
     def container_node(self)->nw.Container:
+        """Container node that contains all component nodes
+
+        Returns:
+            nw.Container:
+        """
         if "container_node" in self.__node_data_cache.keys():
             return self.__node_data_cache["container_node"]
     @property 
     def input_node(self)->nw.Node:
+        """Node that all incoming connections come through this node
+
+        Returns:
+            nw.Node:
+        """
         if self.container_node is not None:
             return self._get_node_data_from_cache("input_node")
     @property 
     def output_node(self)->nw.Node:
+        """Node that all outgoing connections go through this node
+
+        Returns:
+            nw.Node:
+        """
         if self.container_node is not None:
             return self._get_node_data_from_cache("output_node")
     @property 
     def transform_node(self)->nw.Node:
+        """Transform node (also input node). if no transform node is created 
+        returns None
+
+        Returns:
+            nw.Node:
+        """
         if type(self).root_transform_name is not None:
             return self.input_node
     @property
-    def is_locked(self):
+    def is_built(self):
+        """True if the component is already built
+
+        Returns:
+            _type_: _description_
+        """
         return self.container_node["built"].value
 
     #namespace functions
     @property
     def full_namespace(self):
+        """namespace with all parent namespaces included
+
+        Returns:
+            str:
+        """
         self.__update_full_namespace()
         return self.__namespace_cache["full_namespace"]
     @property
     def short_namespace(self):
+        """components full namespace (without parent namespaces)
+
+        Returns:
+            str:
+        """
         self.__update_short_namespace()
         return self.__namespace_cache["short_namespace"]
     @property
     def instance_namespace(self):
+        """instance name + side
+
+        Returns:
+            str:
+        """
         self.__update_instance_namespace()
         return self.__namespace_cache["instance_namespace"]
     def __update_full_namespace(self):
+        """Updates full_namespace"""
+
         parent_container = None
         if self.container_node is not None:
             parent_container = self.container_node.get_container_node()
@@ -143,6 +236,8 @@ class Component():
         if full_namespace != "":
             self.__namespace_cache["full_namespace"] = full_namespace
     def __update_short_namespace(self):
+        """Updates short_namespace"""
+
         instance_namespace = self.instance_namespace
         short_namespace = ""
 
@@ -156,6 +251,8 @@ class Component():
         if short_namespace != "":
             self.__namespace_cache["short_namespace"] = short_namespace
     def __update_instance_namespace(self):
+        """Update instance namespace"""
+
         instance_namespace = ""
 
         if self.input_node is None:
@@ -184,39 +281,59 @@ class Component():
 
     # node add attr data
     def _get_input_node_attr_data(self) -> comp_data.NodeData:
+        """Defines all the added, published, or modified attributes for the input node
+
+        Returns:
+            comp_data.NodeData:
+        """
         node_data =  comp_data.NodeData(
-            comp_data.AttrData(attr_name="input", attr_type="compound", attr_publish=True),
-            comp_data.AttrData(attr_name="buildData", attr_type="compound", attr_publish=True),
-            comp_data.AttrData(attr_name="componentClass", attr_type="string", attr_value=self.class_name, attr_locked=True, parent="buildData"),
-            comp_data.AttrData(attr_name="componentType", attr_type=type(self).component_type, attr_locked=True, parent="buildData"),
-            comp_data.AttrData(attr_name="instanceName", attr_type="string", parent="buildData"),
+            comp_data.AttrData(name="input", type="compound", publish=True),
+            comp_data.AttrData(name="buildData", type="compound", publish=True),
+            comp_data.AttrData(name="componentClass", type="string", value=self.class_name, locked=True, parent="buildData"),
+            comp_data.AttrData(name="componentType", type=type(self).component_type, locked=True, parent="buildData"),
+            comp_data.AttrData(name="instanceName", type="string", parent="buildData"),
         )
         
         if type(self).has_hier_attrs:
             node_data.extend_attr_data(comp_data.HierData.get_input_xform_data())
         return node_data
     def _get_output_node_attr_data(self) -> comp_data.NodeData:
+        """Defines all the added, published, or modified attributes for the output node
+
+        Returns:
+            comp_data.NodeData:
+        """
         node_data = comp_data.NodeData(
-            comp_data.AttrData(attr_name="output", attr_type="compound", attr_publish=True),
+            comp_data.AttrData(name="output", type="compound", publish=True),
         )
         if type(self).has_hier_attrs:
             node_data.extend_attr_data(comp_data.HierData.get_output_xform_data())
         
         return node_data
     def _get_container_node_attr_data(self) -> comp_data.NodeData:
+        """Defines all the added, published, or modified attributes for the container node
+
+        Returns:
+            comp_data.NodeData:
+        """
         return comp_data.NodeData(
-            comp_data.AttrData(attr_name="built", attr_type="bool", attr_locked=True),
-            comp_data.AttrData(attr_name="controlSetups", attr_type="message"),
-            comp_data.AttrData(attr_name="parentComponent", attr_type="message"),
-            comp_data.AttrData(attr_name="childComponents", attr_type="message", multi=True),
+            comp_data.AttrData(name="built", type="bool", locked=True),
+            comp_data.AttrData(name="controlSetups", type="message"),
+            comp_data.AttrData(name="parentComponent", type="message"),
+            comp_data.AttrData(name="childComponents", type="message", multi=True),
         )
 
     # creating nodes
     def create_component(self, **initial_attr_kwargs):
+        """Creates component. initializes and builds component"""
+
         if self.container_node is None:
             self.initialize_component(**initial_attr_kwargs)
             self.build_component()
     def initialize_component(self, **initial_attr_kwargs):
+        """Initializes component. sets everything up before the full build occurs.
+        Used as a step to initialize so values can be modified before building"""
+
         if self.container_node is None:
             self.__create_base_nodes()
             initial_attr_kwargs = utils.unnest_dict(initial_attr_kwargs)
@@ -272,16 +389,19 @@ class Component():
             
             # renaming to nodes
             self.rename_nodes()
-
     def build_component(self):
+        """Builds component after it has been initialized"""
         if type(self).has_hier_attrs:
             self.xform_output_function()
         self.container_node["built"] = True
         # renaming to nodes
-        self.rename_nodes()
         self.build_controls()
+        self.rename_nodes()
 
     def __create_base_nodes(self):
+        """Creates the base node (input, output, container) in the initialization
+        phase
+        """
         # input node
         if type(self).root_transform_name is not None:
             input_node = nw.create_node("transform", type(self).root_transform_name)
@@ -321,31 +441,43 @@ class Component():
         
         input_node_attr_data.publish_attr_data_attributes(input_node)
         container_node_attr_data.publish_attr_data_attributes(self.container_node)
+        self.rename_nodes()
 
     def xform_output_function(self):
-        for index, attr in enumerate(self.input_node[comp_data.HierData.input_xform]):
-            attr[comp_data.HierData.input_xform_name] >> self.output_node[comp_data.HierData.output_xform][index][comp_data.HierData.output_xform_name]
-            attr[comp_data.HierData.input_init_matrix] >> self.output_node[comp_data.HierData.output_xform][index][comp_data.HierData.output_init_matrix]
+        """Overriden function to connect up all output xforms
+        """
+        for index, attr in enumerate(self.input_node[comp_data.HierData.INPUT_XFORM]):
+            attr[comp_data.HierData.INPUT_XFORM_NAME] >> self.output_node[comp_data.HierData.OUTPUT_XFORM][index][comp_data.HierData.OUTPUT_XFORM_NAME]
+            attr[comp_data.HierData.INPUT_INIT_MATRIX] >> self.output_node[comp_data.HierData.OUTPUT_XFORM][index][comp_data.HierData.OUTPUT_INIT_MATRIX]
     
     # other functions
-    def insert_component(self, component, parent_transform = None, **component_kwargs):
+    def insert_component(self, component, transform_parent = None, **component_kwargs):
+        """inserts a component into this component. uses may include adding controls
+        and adding subcomponents
+
+        Args:
+            component (type):
+            parent_transform (nw.Node, optional): Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
         component_inst = component(parent_container_node=self.container_node)
         component_inst.create_component(**component_kwargs)
 
-        if parent_transform is None and self.transform_node is not None:
-            parent_transform = self.transform_node
+        if transform_parent is None and self.transform_node is not None:
+            transform_parent = self.transform_node
 
-        if component_inst.transform_node is not None and parent_transform is not None:
-            cmds.parent(str(component_inst.transform_node), str(parent_transform), relative=True)
+        if component_inst.transform_node is not None and transform_parent is not None:
+            cmds.parent(str(component_inst.transform_node), str(transform_parent), relative=True)
 
         return component_inst
-    def add_nodes(self, *nodes):
-        self.container_node.add_nodes(*nodes)
-        self.rename_nodes()
     def rename_nodes(self):
+        """Renames all nodes found in the container with the component namespace"""
+
         def rename_node(node, full_namespace):
             if not node.name.startswith(full_namespace):
-                strip_namespace_node = utils.short_name(utils.Namespace.strip_namespace(str(node)))
+                strip_namespace_node = utils.Namespace.strip_namespace(node.name)
                 node.rename(f"{full_namespace}:{strip_namespace_node}")
         full_namespace = self.full_namespace
         prev_namespace = utils.Namespace.get_namespace(self.container_node.name)
@@ -362,7 +494,7 @@ class Component():
                 # getting just the instance_namespace portion of children namespaces
                 child_namespaces = [x.split("__", 1)[0] for x in child_namespaces if x.startswith(utils.strip_trailing_numbers(self.instance_namespace))]
                 if child_namespaces != []:
-                    highest_trailing_number = utils.get_max_trailing_numbers(child_namespaces)
+                    highest_trailing_number = utils.get_max_trailing_number(child_namespaces)
                     instance_name = utils.strip_trailing_numbers(self.input_node["instanceName"].value)
                     self.input_node["instanceName"] = f"{instance_name}{int(highest_trailing_number + 1)}"
 
@@ -374,7 +506,7 @@ class Component():
         rename_node(self.container_node, full_namespace)
         for node in self.container_node.get_nodes():
             # TODO replace later with if it's a component not just a container
-            if node.node_type != "container":
+            if node.type != "container":
                 rename_node(node, full_namespace)
 
         # check if nothing else in namespace delete
@@ -382,6 +514,12 @@ class Component():
             utils.Namespace.delete(prev_namespace)
 
     def promote_attrs_to_cntrl_setup(self, setup_control_data:comp_data.ControlSetupData):
+        """Connects up an attribute to setup control data so it can be promoted
+        to an attribute on the control later
+
+        Args:
+            setup_control_data (comp_data.ControlSetupData):
+        """
         def promote_check_attrs(*attrs):
             checked_attrs = []
             for attr_data in attrs:
@@ -407,7 +545,7 @@ class Component():
                         continue
 
                 if name is None:
-                    name = attr.attr_short_name
+                    name = attr.short_name
                     name = utils.make_valid_maya_name(name)
 
                 checked_attrs.append((attr, name))
@@ -433,7 +571,7 @@ class Component():
             return connection_checked_list
 
         attrs = promote_check_attrs(*setup_control_data.attrs)
-        # print([str(x) for x in attrs])
+        
         # using instance name
         instance_name = "controlSetup"
         if "instance_name" in setup_control_data.control_setup_dict:
@@ -444,8 +582,8 @@ class Component():
             instance_name = f"{instance_name}_ControlSetup"
         instance_name = utils.make_valid_maya_name(instance_name)
         control_kwargs = setup_control_data.control_setup_dict
-        control_setup = control_setup_node(utils.make_valid_maya_name(instance_name))
-        self.add_nodes(control_setup)
+        control_setup = create_control_setup_node(utils.make_valid_maya_name(instance_name))
+        self.container_node.add_nodes(control_setup)
 
         #TODO
         # xform attrs
@@ -468,7 +606,15 @@ class Component():
 
         return extra_kwargs
 
-    def build_controls(self, control_setup_node:nw.Node = None, attr_indexs = []):
+    def build_controls(self, control_setup_node:nw.Node = None):
+        """Given a control setup, builds a control according to it's specifications.
+        used in the build step
+
+        Args:
+            control_setup_node (nw.Node, optional): Defaults to None. if None 
+            finds all control setups in the component
+            attr_indexs (list, optional): Defaults to [].
+        """
         import component.control as control
 
         if control_setup_node is None:
@@ -490,28 +636,28 @@ class Component():
                 attr = promote_attr["attrMessage"].get_src_connections()[0]
                 
                 if comp_data.HierData.is_input_xform_attr(attr):
-                    name = attr[comp_data.HierData.input_xform_name].value
+                    name = attr[comp_data.HierData.INPUT_XFORM_NAME].value
                     if name is not None:
                         # control_setup_node["instanceName"] = name
                         control_inst.container_node["instanceName"] = name
                         control_inst.rename_nodes()
 
-                    attr[comp_data.HierData.input_world_matrix] >> control_inst.container_node["offsetMatrix"]
+                    attr[comp_data.HierData.INPUT_WORLD_MATRIX] >> control_inst.container_node["offsetMatrix"]
                     ~control_inst.container_node["offsetMatrix"]
 
-                    control_inst.container_node["worldMatrix"] >> attr[comp_data.HierData.input_world_matrix]
-                    control_inst.container_node["localMatrix"] >> attr[comp_data.HierData.input_loc_matrix]
+                    control_inst.container_node["worldMatrix"] >> attr[comp_data.HierData.INPUT_WORLD_MATRIX]
+                    control_inst.container_node["localMatrix"] >> attr[comp_data.HierData.INPUT_LOC_MATRIX]
 
                 elif comp_data.HierData.is_hier_attr(attr):
-                    name = attr[comp_data.HierData.hier_name].value
+                    name = attr[comp_data.HierData.HIER_NAME].value
                     if name is not None:
                         # control_setup_node["instanceName"] = name
                         control_inst.container_node["instanceName"] = name
                         control_inst.rename_nodes()
-                    attr[comp_data.HierData.hier_parent_matrix] >> control_inst.container_node["offsetMatrix"]
+                    attr[comp_data.HierData.HIER_PARENT_MATRIX] >> control_inst.container_node["offsetMatrix"]
                     ~control_inst.container_node["offsetMatrix"]
 
-                    control_inst.container_node["worldMatrix"] >> attr[comp_data.HierData.hier_parent_matrix]
+                    control_inst.container_node["worldMatrix"] >> attr[comp_data.HierData.HIER_PARENT_MATRIX]
 
                 elif attr.attr_type == "matrix":
                     attr >> control_inst.container_node["offsetMatrix"]
@@ -530,6 +676,11 @@ class Component():
         # re publish if needs be
 
 class Control(Component):
+    """A Base class for all control autorigging components. Derived from Component
+
+    Attributes:
+        can_set_color (bool): can set color of component
+    """
     component_type = component_enum.ComponentTypes.component
     root_transform_name = "control"
     class_namespace = "cntrl"
@@ -538,10 +689,20 @@ class Control(Component):
 
     @ property
     def control_setup_node(self):
+        """control setup node used to create this control
+
+        Returns:
+            nw.Node:
+        """
         if self.container_node is not None:
             return self._get_node_data_from_cache("controlSetupNode")
     @property
     def axis_vec(self):
+        """axis to build control on
+
+        Returns:
+            str:
+        """
         axis_vec = component_enum.AxisEnums.y.value
         if self.control_setup_node is not None:
             axis_vec = component_enum.AxisEnums.get(self.control_setup_node["buildAxis"].value).value
@@ -550,14 +711,14 @@ class Control(Component):
         node_data = super()._get_input_node_attr_data()
 
         node_data.extend_attr_data(
-            comp_data.AttrData(attr_name="offsetParentMatrix", attr_publish="offsetMatrix"),
-            comp_data.AttrData(attr_name="worldMatrix[0]", attr_publish="worldMatrix"),
-            comp_data.AttrData(attr_name="matrix", attr_publish="localMatrix"),
-            comp_data.AttrData(attr_name="worldInverseMatrix[0]", attr_publish="worldInverseMatrix"),
+            comp_data.AttrData(name="offsetParentMatrix", publish="offsetMatrix"),
+            comp_data.AttrData(name="worldMatrix[0]", publish="worldMatrix"),
+            comp_data.AttrData(name="matrix", publish="localMatrix"),
+            comp_data.AttrData(name="worldInverseMatrix[0]", publish="worldInverseMatrix"),
 
-            comp_data.AttrData(attr_name="overrideEnabled", attr_publish="hasColor", attr_locked=not type(self).can_set_color),
-            comp_data.AttrData(attr_name="overrideColorRGB", attr_publish="color", attr_locked=not type(self).can_set_color),
-            comp_data.AttrData(attr_name="overrideRGBColors", attr_value=1),
+            comp_data.AttrData(name="overrideEnabled", publish="hasColor", locked=not type(self).can_set_color),
+            comp_data.AttrData(name="overrideColorRGB", publish="color", locked=not type(self).can_set_color),
+            comp_data.AttrData(name="overrideRGBColors", value=1),
         )
 
         return node_data
@@ -565,7 +726,7 @@ class Control(Component):
         node_data =  super()._get_container_node_attr_data()
     
         node_data.extend_attr_data(
-            comp_data.AttrData(attr_name="controlSetupNode", attr_type="message"),
+            comp_data.AttrData(name="controlSetupNode", type="message"),
         )
 
         return node_data
@@ -605,7 +766,7 @@ class Control(Component):
                 else:
                     self.container_node["hasColor"] = 1
                     shape_color_enum = self.control_setup_node["shapeColor"].value
-                    rgb = utils.get_index_rgb(component_enum.Colors.get(shape_color_enum).value)
+                    rgb = utils.get_rgb_from_index(component_enum.Colors.get(shape_color_enum).value)
                     self.container_node["color"] = rgb
             
             # set lock attrs
@@ -632,8 +793,19 @@ class Control(Component):
     
     # control specific functions
     def _create_shapes(self) -> list:
-        pass
+        """Creates shapes and returns a list of the shapes transforms. these 
+        shapes will be parented to the transform node later
+
+        Returns:
+            list(nw.Node):
+        """
+        
     def _apply_shape_to_cntrl(self, shapes_transforms:list):
+        """applys transform shapes to control
+
+        Args:
+            shapes_transforms (list):
+        """
         for transform in shapes_transforms:
             if not isinstance(transform, nw.Node):
                 transform = nw.Node(transform)
@@ -658,9 +830,16 @@ class Control(Component):
             shape.rename(f"{transform_stripped_name}Shape{index+1}")
 
         # add shapes to container
-        self.add_nodes(*shapes_list)
+        self.container_node.add_nodes(*shapes_list)
 
     def promote_attr_to_keyable(self, attr:nw.Attr, name=None, **kwargs):
+        """Turns attribute given into a controllable attribute by the control
+
+        Args:
+            attr (nw.Attr): attribute to be driven by control
+            name (str, optional): new name of controllable attribute.
+            Defaults to None.
+        """
         
         def get_num_min_max_kwargs(attr:nw.Attr):
             # has max and mins
@@ -671,19 +850,19 @@ class Control(Component):
                     ["softMax", "softMin", "maximum", "minimum"],
                     ["softMaxValue", "softMinValue", "maxValue", "minValue"]):
 
-                    if cmds.attributeQuery(attr.attr_short_name, node=str(attr.node), **{attr_exists:True}):
-                        kwargs[attr_add_key] = cmds.attributeQuery(attr.attr_short_name, node=str(attr.node), **{attr_query_key:True})[0]
+                    if cmds.attributeQuery(attr.short_name, node=str(attr.node), **{attr_exists:True}):
+                        kwargs[attr_add_key] = cmds.attributeQuery(attr.short_name, node=str(attr.node), **{attr_query_key:True})[0]
 
             return kwargs
 
         transform_node = self.transform_node
         if kwargs == {}:
-            attr_type = attr.attr_type
+            attr_type = attr.type
             if attr_type == "compound":
                 raise RuntimeError("{} of type compound. compound type not supported".format(attr))
 
             if name is None:
-                name = attr.attr_short_name
+                name = attr.short_name
 
             # non settable
             if attr_type in ["string", "nurbsCurve", "nurbsSurface","mesh", "matrix", "message"]:
@@ -698,7 +877,7 @@ class Control(Component):
 
             # enum
             if attr_type == "enum":
-                enum_string = cmds.attributeQuery(attr.attr_short_name, node=str(attr.node), listEnum=True)
+                enum_string = cmds.attributeQuery(attr.short_name, node=str(attr.node), listEnum=True)
                 kwargs["enumName"] = enum_string[0]
 
             # compound attrs
@@ -707,7 +886,7 @@ class Control(Component):
                 for child_attr in attr:
                     child_kwargs = get_num_min_max_kwargs(child_attr)
                     child_name = child_attr.attr_name.replace(attr.attr_name, name)
-                    transform_node.add_attr(child_name, parent=name, type=child_attr.attr_type, **kwargs, **child_kwargs)
+                    transform_node.add_attr(child_name, parent=name, type=child_attr.type, **kwargs, **child_kwargs)
             
             else:
                 transform_node.add_attr(name, type=attr_type, **kwargs)
