@@ -6,19 +6,19 @@ from utils.utils import snake_to_camel
 import utils.apiundo as apiundo
 import re as re
 
-def derive_node(node):
+def wrap_node(node:str):
     """Gets the most specific node type ie. Node, Container
 
     Args:
-        Node (Node): sets the right class for given class
+        Node (str): sets the right class for given class
 
     Returns:
-        NOde: The most spicific node type
+        Node: The most spicific node type
     """
-    node = Node(node)
-    if node.type == "container":
-        return Container(node)
-    return node
+    node_class = Node
+    if cmds.nodeType(node) == "container":
+        node_class = Container
+    return node_class(node)
 def create_node(node_type:str, name:str=None):
     """Creates node with given name
 
@@ -29,12 +29,7 @@ def create_node(node_type:str, name:str=None):
     Returns:
         Node: node that was created wrapped by Node class
     """
-    cast_class = Node
-    if node_type == "container":
-        cast_class = Container
-    if name:
-        return cast_class(cmds.createNode(node_type, name=name))
-    return cast_class(cmds.createNode(node_type))
+    return wrap_node(cmds.createNode(node_type, name=name))
 def exists(node):
     """Checks to see if node still exists in the scene
 
@@ -45,92 +40,6 @@ def exists(node):
         bool: if node still exists
     """
     return cmds.objExists(str(node))
-
-
-def _modify_kwargs_value(value):
-    """Modifies value for kwargs for use in the rest of the autorigger. 
-    if value is system.component_enum then indexes it. 
-    if value is a class then give the name of it
-
-    Args:
-        value (Any): value
-
-    Returns:
-        Any: modified value
-    """
-    import system.component_enum as component_enum
-    if component_enum.get_enum_item_class(value) is not None:
-        value = component_enum.get_index_of_item(value)
-
-    elif isinstance(value, type):
-        value = value.__name__
-
-    return value
-def _modify_kwargs_key(key):
-    """Modifies key to something that resembles an attribute name
-
-    Args:
-        key (str): key
-
-    Returns:
-        str: modified key
-    """
-    import utils.utils as utils
-    pattern = r'(_|\d+|\[|\])'
-
-    # Use re.split to split by the pattern and keep the delimiters (numbers)
-    key = utils.snake_to_camel(key)
-    return_key = [part for part in re.split(pattern, key) if part not in  ("__", "", "[", "]", ".")]
-    # return_key = [utils.snake_to_camel(part) for part in return_key]
-    
-    new_return_key = [return_key[0]]
-    new_return_key.extend([f"[{utils.uncapitalize(part)}]" for part in return_key[1:]])
-    new_return_key = "".join(new_return_key)
-
-    return new_return_key
-def kwargs_set_attrs(attr_parent, modify_key_funct=None, modify_value_funct=None, ignore_data_types=[], **kwargs):
-    """Uses keys of the kwargs and sets value on the given node or attribute
-
-    Args:
-        attr_parent (Node, Attr): object to look for child under
-        modify_key_func (func): function to modify key, if key is None then use _modify_kwargs_value
-        modify_value_func (func): function to modify value, if value is None then use _modify_kwargs_value
-        ignore_data_types (list(class)): all classes in value that should be ignored
-        kwargs (dict): dictionary used to add values to node from
-
-    Returns:
-        dict: unused items in the dictionary
-    """
-    import utils.utils as utils
-    
-
-    if modify_key_funct is None:
-        modify_key_funct = _modify_kwargs_key
-    if modify_value_funct is None:
-        modify_value_funct = _modify_kwargs_value
-
-    unested_dict = utils.unnest_dict(kwargs)
-    unused_dict = {}
-
-    for key in unested_dict:
-        
-        value = modify_value_funct(unested_dict[key])
-        key = modify_key_funct(key)
-
-        if not attr_parent.has_attr(key):
-            unused_dict[key] = value
-        elif type(value) in ignore_data_types:
-            unused_dict[key] = value
-        
-
-        elif value is not None:
-            if isinstance(value, Attr):
-                value >> attr_parent[key]
-            else:
-                attr_parent[key].set(value)
-
-    return unused_dict
-
 
 class Node():
     """A class to wrap around OpenMaya objects (MObject, MFnDependencyNode) and 
@@ -361,7 +270,7 @@ class Node():
         """
         shapes = cmds.listRelatives(str(self), shapes=True)
         if shapes is None:
-            return None
+            return []
         return [Node(shape) for shape in shapes]
 
     def get_top_level_attribute_list(self, re_cache=False):

@@ -1,5 +1,5 @@
 import system.component as component
-import system.component_data as comp_data
+import system.component_data as component_data
 
 class Setup(component.Component):
     
@@ -7,7 +7,7 @@ class Setup(component.Component):
         node_data = super()._get_input_node_attr_data()
 
         node_data.extend_attr_data(
-            comp_data.AttrData(name="numXforms", type="long", publish=True),
+            component_data.AttrData(name="numXforms", type="long", publish=True),
         )
 
         return node_data

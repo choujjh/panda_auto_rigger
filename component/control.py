@@ -15,9 +15,9 @@ class AxisControl(component.Control):
         super(AxisControl, self).__init__(container_node, parent_container_node)
     
     def _create_shapes(self):
-        x_axis = nw.Node(cmds.curve(degree=1, point=[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]))
-        y_axis = nw.Node(cmds.curve(degree=1, point=[[0.0, 0.0, 0.0], [0.0, 1.0, 0.0]]))
-        z_axis = nw.Node(cmds.curve(degree=1, point=[[0.0, 0.0, 0.0], [0.0, 0.0, 1.0]]))
+        x_axis = nw.wrap_node(cmds.curve(degree=1, point=[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]))
+        y_axis = nw.wrap_node(cmds.curve(degree=1, point=[[0.0, 0.0, 0.0], [0.0, 1.0, 0.0]]))
+        z_axis = nw.wrap_node(cmds.curve(degree=1, point=[[0.0, 0.0, 0.0], [0.0, 0.0, 1.0]]))
 
         # utils.set_color()
         utils.set_color(x_axis.get_shapes()[0], component_enum.Colors.red)
@@ -101,9 +101,9 @@ class GimbalControl(component.Control):
     can_set_color = False
 
     def _create_shapes(self):
-        circle1 = nw.Node(cmds.circle(normal=[1.0, 0.0, 0.0])[0])
-        circle2 = nw.Node(cmds.circle(normal=[0.0, 1.0, 0.0])[0])
-        circle3 = nw.Node(cmds.circle(normal=[0.0, 0.0, 1.0])[0])
+        circle1 = nw.wrap_node(cmds.circle(normal=[1.0, 0.0, 0.0])[0])
+        circle2 = nw.wrap_node(cmds.circle(normal=[0.0, 1.0, 0.0])[0])
+        circle3 = nw.wrap_node(cmds.circle(normal=[0.0, 0.0, 1.0])[0])
 
         utils.set_color(circle1.get_shapes()[0], component_enum.Colors.red)
         utils.set_color(circle2.get_shapes()[0], component_enum.Colors.green)
@@ -124,3 +124,7 @@ class SphereControl(component.Control):
     def _create_shapes(self):
         sphere = cmds.sphere(axis=self.axis_vec)[0]
         return [sphere]
+    
+class LocatorControl(component.Control):
+    def _create_shapes(self):
+        return [cmds.spaceLocator()[0]]

@@ -225,7 +225,7 @@ def get_transform_locked_attrs(transform_node):
     transform_attrs = ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "visibility"]
 
     if not isinstance(transform_node, nw.Node):
-        transform_node = nw.Node(transform_node)
+        transform_node = nw.wrap_node(transform_node)
 
     return [transform_node[attr] for attr in transform_attrs if transform_node[attr].is_locked()]
 
@@ -244,7 +244,7 @@ def freeze_transform(transform:nw.Node):
     cmds.makeIdentity(str(transform), apply=True)
 
     if scale[0] * scale[1] * scale[2] < 0:
-        shapes = [nw.Node(x) for x in cmds.listRelatives(str(transform), shapes=True)]
+        shapes = [nw.wrap_node(x) for x in cmds.listRelatives(str(transform), shapes=True)]
         for x in shapes:
             if x.type == "nurbsSurface":
                 cmds.reverseSurface(str(x))
