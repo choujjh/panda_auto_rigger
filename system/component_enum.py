@@ -1,8 +1,7 @@
 from enum import Enum
 import maya.cmds as cmds
-# import maya.api.OpenMaya as om2
 import utils.node_wrapper as nw
-import utils.utils as utils
+import inspect as inspect
 
 class MayaEnumAttr(Enum):
     """Class to give some nice functionality to help with enums in maya"""
@@ -133,12 +132,11 @@ def get_enum_item_class(item)->MayaEnumAttr:
     Returns:
         MayaEnumAttr:
     """
-    import system.component_enum as component_enum
-    for curr_enum_class in utils.get_classes_from_package(component_enum)[0]:
-        curr_enum_class = getattr(component_enum, curr_enum_class)
-        if isinstance(item, curr_enum_class) or item == curr_enum_class:
-            return curr_enum_class
-
+    if item is None:
+        return None
+    elif inspect.isclass(item) and issubclass(item, MayaEnumAttr):
+        return item
+    return type(item)
 def get_index_of_item(item)->int:
     """gets index of item
 
@@ -152,7 +150,6 @@ def get_index_of_item(item)->int:
     if curr_enum_class == item:
         return None
     return curr_enum_class.index_of(item)
-        
 def get_item_long_name(item)->str:
     """Gets long name of item
 
@@ -167,8 +164,6 @@ def get_item_long_name(item)->str:
         return None
     return curr_enum_class.long_name(item)
 
-
-
 class ComponentTypes(MayaEnumAttr):
     """Enum of different component types in the autorigger"""
     anim = 0
@@ -180,8 +175,6 @@ class ComponentTypes(MayaEnumAttr):
     matrix = 6
     motion = 7
     setup = 8
-
-
 class Colors(MayaEnumAttr):
     """Enum of colors in the autorigger"""
     none = -1
@@ -238,7 +231,6 @@ class Colors(MayaEnumAttr):
             remap_node["value[{}].value_Interp".format(index)] = 1
 
         return remap_node
-        
 class CharacterSide(MayaEnumAttr):
     """Enum of different sides in the autorigger"""
     none = "none"
@@ -296,7 +288,6 @@ class CharacterSide(MayaEnumAttr):
     @classmethod
     def create_remap(cls, node_name):
         return super().create_remap(node_name, enum_dict=cls.opposite_mapping())
-
 class AxisEnums(MayaEnumAttr):
     """Enum of different axis"""
     x = [1.0, 0.0, 0.0]
@@ -369,7 +360,6 @@ class AxisEnums(MayaEnumAttr):
     def create_remap(cls, node_name):
         enum_dict = {data.name: cls.index_of(cls.opposite(data)) for data in cls}
         return super().create_remap(node_name, enum_dict)
-
 class SelectorWeightTypes(MayaEnumAttr):
     """Enum for different interpolations"""
     wave = 0

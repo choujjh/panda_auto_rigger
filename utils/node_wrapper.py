@@ -29,6 +29,8 @@ def create_node(node_type:str, name:str=None):
     Returns:
         Node: node that was created wrapped by Node class
     """
+    if name is None:
+        return wrap_node(cmds.createNode(node_type))
     return wrap_node(cmds.createNode(node_type, name=name))
 def exists(node):
     """Checks to see if node still exists in the scene
@@ -49,7 +51,7 @@ class Node():
     Attributes:
         full_name (str): returns full name of node ie. parent2|parent1|name
         name (str): returns node name ie. name
-        type (str): node type
+        type_ (str): node type
         mobject (maya.api.OpenMaya.MObject): MObject
     """
     def __init__(self, node):
@@ -90,7 +92,7 @@ class Node():
             return self.full_name.rsplit("|", 1)[1]
         return self.full_name
     @property
-    def type(self):
+    def type_(self):
         """Returns type of node
 
         Returns:
@@ -185,7 +187,7 @@ class Node():
             if connection_list is not None:
                 connection_list = [(Attr(x, self), Attr(y)) for x, y in zip(connection_list[::2], connection_list[1::2])]
                 connections.update(connection_list)
-        if self.type == "container":
+        if self.type_ == "container":
             self_container = Container(self)
             published_attrs = self_container.get_published_attrs()
 
@@ -238,7 +240,7 @@ class Node():
         # loop from child to parent
         for node in all_children[::-1]:
             # if container delete outside connections
-            if node.type == "container":
+            if node.type_ == "container":
                 self_container = Container(node=node)
                 connections = self_container.get_external_connection_list()
                 for _, dest in connections:
@@ -587,7 +589,7 @@ class Container(Node):
         for attr in external_connection_list:
             curr_attr = Attr(attr)
 
-            if curr_attr.type not in ["compound", "double3", "double2"] and curr_attr.__len__() is not None:
+            if curr_attr.type_ not in ["compound", "double3", "double2"] and curr_attr.__len__() is not None:
                 curr_attr = curr_attr[0]
 
             input_connections = curr_attr.get_src_connections()
@@ -609,7 +611,7 @@ class Container(Node):
         Returns:
             list(Container): list of child containers
         """
-        sub_containers = [x for x in self.get_nodes() if x.type == "container"]
+        sub_containers = [x for x in self.get_nodes() if x.type_ == "container"]
         return_child_containers = []
         if not all:
             return sub_containers
@@ -670,7 +672,9 @@ class Attr():
         plug (str): plug of the given attribute
         name(str): attr name with node name ie. node.attr
         attr_name(str): attr name ie. attr
-        attr_type(str): plug"s attribute type
+        short_name(str): short name of attribute
+        type_(str): plug"s attribute type
+        value(Any): value that is stored in attribute
         index(int): the index of the attribute. returns -1 if not a child of 
         another attribute
         parent(Attr): returns the parent of the attribute. returns None if
@@ -731,7 +735,7 @@ class Attr():
         """
         return str(self.plug.partialName())
     @property
-    def type(self):
+    def type_(self):
         """Returns attribute type name
 
         Returns:
@@ -840,13 +844,13 @@ class Attr():
         if locked:
             self.set_locked(True)
     
-    def has_source_connection(self):
+    def has_src_connection(self):
         """Returns if attribute has source connection
 
         Returns:
             bool:
         """
-        if len(self.get_src_connections()) == 0:
+        if self.get_src_connection() is None:
             return False
         return True
 
@@ -869,13 +873,17 @@ class Attr():
             om2.MPlug:
         """
         return [Attr(x, None) for x in self.plug.connectedTo(as_dest, as_src)]
-    def get_src_connections(self):
+    def get_src_connection(self):
         """Gets a list of all the Attr that are connected to this Attr
 
         Returns:
             list(Attr): 
         """
-        return self.get_connections(False, True)
+        connection_list = self.get_connections(False, True)
+        if connection_list == []:
+            return None
+        else:
+            return connection_list[0]
     def get_dest_connections(self):
         """Gets a list of all the Attr that this Attr is connected to (this 
         Attr being the source)
@@ -976,7 +984,7 @@ class Attr():
             ValueError: if number of children is mismatched by length of
             value
         """
-        attr_type = self.type
+        attr_type = self.type_
         locked = self.is_locked()
         if locked:
             self.set_locked(False)

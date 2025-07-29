@@ -188,6 +188,9 @@ class Component():
 
         if short_namespace != "":
             self.__namespace_cache["short_namespace"] = short_namespace
+        if type(self).class_namespace == None or type(self).class_namespace == "":
+            self.__namespace_cache["short_namespace"] = short_namespace.replace("__", "")
+
     def __update_instance_namespace(self):
         """Update instance namespace"""
 
@@ -226,11 +229,11 @@ class Component():
             comp_data.NodeData:
         """
         node_data =  component_data.NodeData(
-            component_data.AttrData(name="input", type="compound", publish=True),
-            component_data.AttrData(name="buildData", type="compound", publish=True),
-            component_data.AttrData(name="componentClass", type="string", value=self.class_name, locked=True, parent="buildData"),
-            component_data.AttrData(name="componentType", type=type(self).component_type, locked=True, parent="buildData"),
-            component_data.AttrData(name="instanceName", type="string", parent="buildData"),
+            component_data.AttrData(name="input", type_="compound", publish=True),
+            component_data.AttrData(name="buildData", type_="compound", publish=True),
+            component_data.AttrData(name="componentClass", type_="string", value=self.class_name, locked=True, parent="buildData"),
+            component_data.AttrData(name="componentType", type_=type(self).component_type, locked=True, parent="buildData"),
+            component_data.AttrData(name="instanceName", type_="string", parent="buildData"),
         )
         return node_data
     def _get_output_node_attr_data(self) -> component_data.NodeData:
@@ -241,7 +244,7 @@ class Component():
             comp_data.NodeData:
         """
         node_data = component_data.NodeData(
-            component_data.AttrData(name="output", type="compound", publish=True),
+            component_data.AttrData(name="output", type_="compound", publish=True),
         )        
         return node_data
     def _get_container_node_attr_data(self) -> component_data.NodeData:
@@ -252,35 +255,35 @@ class Component():
             comp_data.NodeData:
         """
         return component_data.NodeData(
-            component_data.AttrData(name="built", type="bool", locked=True),
-            component_data.AttrData(name="controlSetups", type="message"),
-            component_data.AttrData(name="parentComponent", type="message"),
-            component_data.AttrData(name="childComponents", type="message", multi=True),
+            component_data.AttrData(name="built", type_="bool", locked=True),
+            component_data.AttrData(name="controlSetups", type_="message"),
+            component_data.AttrData(name="parentComponent", type_="message"),
+            component_data.AttrData(name="childComponents", type_="message", multi=True),
         )
 
     @classmethod
-    def create(cls, instance_name:str=None, parent=None, **kwargs):
+    def create(cls, instance_name:Union[str, nw.Attr]=None, parent=None, **kwargs):
         """class method to create component
 
         Args:
-            instance_name (str, optional): name of component. Defaults to None.
+            instance_name (str, nw.Attr, optional): name of component. Defaults to None.
             parent (nw.Container, Component, optional): Defaults to None.
 
         Returns:
             cls: returns created 
         """
         component_inst = cls()
-        component_inst.__pre_build(instance_name=instance_name, parent=parent)
+        component_inst._pre_build(instance_name=instance_name, parent=parent)
         component_inst._override_build(**kwargs)
-        component_inst.__post_build()
+        component_inst._post_build()
 
         return component_inst
     
-    def __pre_build(self, instance_name:str=None, parent=None):
+    def _pre_build(self, instance_name:Union[str, nw.Attr]=None, parent=None):
         """handles creation and connection of initial nodes and 
 
         Args:
-            instance_name (str, optional): component instance name. Defaults to None.
+            instance_name (str, nw.Attr, optional): component instance name. Defaults to None.
             parent (nw.Container, Component, optional): Defaults to None.
         """
         if parent is not None and isinstance(parent, Component):
@@ -289,7 +292,14 @@ class Component():
         if self.container_node is None:
             self.__create_base_nodes(parent_container=parent)
             if instance_name is not None:
-                self.input_node["instanceName"]= instance_name
+                if isinstance(instance_name, nw.Attr):
+                    if instance_name.type_ != "string":
+                        input_node_name = self.input_node["instanceName"]
+                        cmds.warning(f"{instance_name} is not a string attribute. Not connectiong to {input_node_name}")
+                    else:
+                        instance_name >> self.input_node["instanceName"]
+                else:
+                    self.input_node["instanceName"]=instance_name
             
             # connecting parent and child components
             if parent is not None:
@@ -313,7 +323,7 @@ class Component():
         """
         raise NotImplementedError
 
-    def __post_build(self):
+    def _post_build(self):
         """Build cleanup. sets build to true and renames nodes
         """
         self.container_node["built"] = True
@@ -398,7 +408,7 @@ class Component():
         rename_node(self.container_node, full_namespace)
         for node in self.container_node.get_nodes():
             # TODO replace later with if it's a component not just a container
-            if node.type != "container":
+            if node.type_ != "container":
                 rename_node(node, full_namespace)
 
         # check if nothing else in namespace delete
@@ -409,7 +419,7 @@ class Component():
         # connect it up
         # re publish if needs be
 
-class HierComponent(Component):
+class Hierarchy(Component):
     """A Class meant to be inherited for all hierarchy classes. hierarchy in this
     case is defined as a chain of matricies 
 
@@ -419,16 +429,217 @@ class HierComponent(Component):
     """
     HIER_DATA = component_data.HierData
     class_namespace = "hier"
+    component_type = component_enum.ComponentTypes.hier
 
     def _get_input_node_attr_data(self):
         node_data = super()._get_input_node_attr_data()
+        node_data.extend_attr_data(self.HIER_DATA.get_hier_data())
         node_data.extend_attr_data(self.HIER_DATA.get_input_xform_data())
         return node_data
-    
     def _get_output_node_attr_data(self):
         node_data = super()._get_output_node_attr_data()
         node_data.extend_attr_data(self.HIER_DATA.get_output_xform_data())
         return node_data
+    
+    def _post_build(self):
+        super()._post_build()
+        self.__populate_output_xforms()
+        self.rename_nodes()
+        self.__check_xforms()
+    
+    def __populate_output_xforms(self):
+        """Goes through the output xform attributes and tries to connect name, local matrix, and init matricies"""
+        added_nodes = []
+        for index in range(len(self.output_node[self.HIER_DATA.OUTPUT_XFORM])):
+            # init inverse matrix
+            self.__populate_name(index)
+            added_nodes.extend(self.__populate_init_matrix(index))
+            added_nodes.extend(self.__populate_loc_matrix(index))
+
+        # add nodes to container
+        self.container_node.add_nodes(*added_nodes)
+
+    def __populate_name(self, index:int):
+        """Given the index tries to connect or set the output name
+
+        Args:
+            index (int): xform index
+        """
+        # set variables
+        input_name = self.input_node[self.HIER_DATA.INPUT_XFORM][index][self.HIER_DATA.INPUT_XFORM_NAME]
+        output_name = self.output_node[self.HIER_DATA.OUTPUT_XFORM][index][self.HIER_DATA.OUTPUT_XFORM_NAME]
+        output_ws_src = self.output_node[self.HIER_DATA.OUTPUT_XFORM][index][self.HIER_DATA.OUTPUT_WORLD_MATRIX].get_src_connection()
+        
+        # check if needs to be set
+        if output_name.value is not None and output_name.value != "":
+            pass
+
+        # if input and output xform match
+        elif (len(self.input_node[self.HIER_DATA.INPUT_XFORM]) ==
+            len(self.output_node[self.HIER_DATA.OUTPUT_XFORM])):
+            input_name >> output_name
+        
+        elif output_ws_src is not None:
+            if output_ws_src.node.has_attr("instanceName"):
+                output_ws_src.node["instanceName"] >> output_name
+    def __populate_init_matrix(self, index:int):
+        """Given the index tries to connect or set the output init matrix and output inverse init matrix
+
+        Args:
+            index (int): xform index
+        """
+        input_xform_dict = self._get_input_xform_attrs(index)
+        output_xform_dict = self._get_output_xform_attrs(index)
+
+        # storing matrix attributes
+        input_init_matrix = input_xform_dict[self.HIER_DATA.INPUT_INIT_MATRIX]
+        input_init_inv_matrix = input_xform_dict[self.HIER_DATA.INPUT_INIT_INV_MATRIX]
+        output_init_matrix = output_xform_dict[self.HIER_DATA.OUTPUT_INIT_MATRIX]
+        output_init_inv_matrix = output_xform_dict[self.HIER_DATA.OUTPUT_INIT_INV_MATRIX]
+
+        # output src  connection
+        output_init_src = output_init_matrix.get_src_connection()
+
+        # if output init inverse matrix is connected then return
+        if output_init_inv_matrix.get_src_connection() is not None:
+            return []
+
+        # if connected to transform
+        if (output_init_src.attr_name == "worldMatrix[0]" and 
+            output_init_src.node.has_attr("worldInverseMatrix[0]")):
+            output_init_src.node["worldInverseMatrix[0]"] >> output_init_inv_matrix
+
+        # if output init connected to input init
+        elif output_init_src == input_init_matrix:
+            input_init_inv_matrix >> output_init_inv_matrix
+
+        # if output init is connected to
+        elif output_init_src is not None:
+            inverse_matrix_node = nw.create_node("inverseMatrix", f"xform{index}_inverse_mat")
+            output_init_src >> inverse_matrix_node["inputMatrix"]
+            inverse_matrix_node["outputMatrix"] >> output_init_inv_matrix
+            return [inverse_matrix_node]
+        
+        # if lengths match
+        elif len(input_init_matrix.parent) == len(output_init_matrix.parent):
+            input_init_matrix >> output_init_matrix
+            input_init_inv_matrix >> output_init_inv_matrix
+
+        return []
+    def __populate_loc_matrix(self, index:int):
+        """Given the index tries to connect or set the output local matrix
+
+        Args:
+            index (int): xform index
+        """
+        output_xform_attrs = self._get_output_xform_attrs(index)
+        output_loc_matrix = output_xform_attrs[self.HIER_DATA.OUTPUT_LOC_MATRIX]
+        output_world_matrix_src = output_xform_attrs[self.HIER_DATA.OUTPUT_WORLD_MATRIX].get_src_connection()
+        
+        added_nodes = []
+
+        # if world matrix isn't connected return
+        if output_world_matrix_src is None:
+            return []
+        # has no parent
+        elif index <= 0:
+            output_world_matrix_src >> output_loc_matrix
+        
+        # connect to parent
+        else:
+            prev_world_matrix_src = self.output_node[self.HIER_DATA.OUTPUT_XFORM][index-1][self.HIER_DATA.OUTPUT_WORLD_MATRIX]
+            prev_world_matrix_src = prev_world_matrix_src.get_src_connection()
+            if prev_world_matrix_src is None:
+                return []
+            inverse_attr = None
+            # of connected ws are translates
+            if (prev_world_matrix_src.node.has_attr("worldInverseMatrix[0]") and 
+                  output_world_matrix_src.attr_name == "worldMatrix[0]"
+                  ):
+                inverse_attr = prev_world_matrix_src.node["worldInverseMatrix"][0]
+            # if inverse node needed
+            if inverse_attr is None:
+                inverse_matrix_node = nw.create_node("inverseMatrix", f"xform{index-1}_out_world_inverse_mat")
+                prev_world_matrix_src >> inverse_matrix_node["inputMatrix"]
+                inverse_attr = inverse_matrix_node["outputMatrix"]
+
+                added_nodes = [inverse_attr]
+
+            # adding matrix mult
+            mat_mult = nw.create_node("multMatrix", f"xform{index}_loc_output_mat_mult")
+            output_world_matrix_src >> mat_mult["matrixIn"][0]
+            inverse_attr >> mat_mult["matrixIn"][1]
+            mat_mult["matrixSum"] >> output_loc_matrix
+
+            added_nodes.append(mat_mult)
+
+            return added_nodes
+        return added_nodes
+
+    def __check_xforms(self):
+        """After component is built, checks to see if xforms were properly set"""
+        input_xform_len = len(self.input_node[self.HIER_DATA.INPUT_XFORM])
+        output_xform_len = len(self.output_node[self.HIER_DATA.OUTPUT_XFORM])
+        if output_xform_len == 0:
+            cmds.warning(f"{self.container_node} component has no xform output")
+
+        if input_xform_len > output_xform_len:
+            cmds.warning(f"input xform (len {input_xform_len}) longer than output xform (len {output_xform_len})")
+        
+        for attr in self.output_node[self.HIER_DATA.OUTPUT_XFORM]:
+            for sub_attr in self.HIER_DATA.OUTPUT_DATA_NAMES:
+                if attr[sub_attr].type_ == "string":
+                    if attr[sub_attr].value == None or attr[sub_attr].value == "":
+                        cmds.warning(f"{attr[sub_attr]} not set")
+                elif not attr[sub_attr].has_src_connection():
+                    cmds.warning(f"{attr[sub_attr]} does not have connection")
+    def _get_input_xform_attrs(self, index:int):
+        """Gets the input attributes of an index
+
+        Args:
+            index (int):
+
+        Returns:
+            dict: dict of input attributes
+        """
+        return {key: self.input_node[self.HIER_DATA.INPUT_XFORM][index][key] for key in self.HIER_DATA.INPUT_DATA_NAMES}
+    def _get_output_xform_attrs(self, index:int):
+        """Gets the output attributes of an index
+
+        Args:
+            index (int):
+
+        Returns:
+            dict: dict of output attributes
+        """
+        return {key: self.output_node[self.HIER_DATA.OUTPUT_XFORM][index][key] for key in self.HIER_DATA.OUTPUT_DATA_NAMES}
+    def _set_output_xform_attrs(
+            self, 
+            index:int, 
+            output_xform_name:Union[nw.Attr, str]=None, 
+            output_init_matrix:nw.Attr=None, 
+            output_init_inv_matrix:nw.Attr=None, 
+            output_world_matrix:nw.Attr=None, 
+            output_loc_matrix:nw.Attr=None
+        ):
+        """Connects up attributes to output xform
+
+        Args:
+            index (int):
+            output_name (Union[nw.Attr, str], optional): Defaults to None.
+            output_init_matrix (nw.Attr, optional): Defaults to None.
+            output_init_inv_matrix (nw.Attr, optional): Defaults to None.
+            output_world_matrix (nw.Attr, optional): Defaults to None.
+            output_loc_matrix (nw.Attr, optional): Defaults to None.
+        """
+        output_xform_matricies = self._get_output_xform_attrs(index)
+        source_attr_list = [output_xform_name, output_init_matrix, output_init_inv_matrix, output_world_matrix, output_loc_matrix]
+        for source_attr, output_attr in zip(source_attr_list, self.HIER_DATA.OUTPUT_DATA_NAMES):
+            if isinstance(source_attr, str):
+                output_xform_matricies[output_attr].set(source_attr)
+            elif source_attr is not None:
+                source_attr >> output_xform_matricies[output_attr]
+        
 
 class Control(Component):
     """A Base class for all control autorigging components. Derived from Component
@@ -436,9 +647,9 @@ class Control(Component):
     Attributes:
         can_set_color (bool): can set color of component
     """
-    component_type = component_enum.ComponentTypes.component
-    root_transform_name = "control"
-    class_namespace = "cntrl"
+    component_type = component_enum.ComponentTypes.control
+    root_transform_name = "cntrl"
+    class_namespace = ""
     can_set_color = True
 
     @ property
@@ -550,7 +761,7 @@ class Control(Component):
 
         transform_node = self.transform_node
         if kwargs == {}:
-            attr_type = attr.type
+            attr_type = attr.type_
             if attr_type == "compound":
                 raise RuntimeError("{} of type compound. compound type not supported".format(attr))
 
@@ -579,7 +790,7 @@ class Control(Component):
                 for child_attr in attr:
                     child_kwargs = get_num_min_max_kwargs(child_attr)
                     child_name = child_attr.attr_name.replace(attr.attr_name, name)
-                    transform_node.add_attr(child_name, parent=name, type=child_attr.type, **kwargs, **child_kwargs)
+                    transform_node.add_attr(child_name, parent=name, type=child_attr.type_, **kwargs, **child_kwargs)
             
             else:
                 transform_node.add_attr(name, type=attr_type, **kwargs)
@@ -602,6 +813,6 @@ class Control(Component):
             kwargs["keyable"] = True
 
             transform_node.add_attr(**kwargs)
-            if attr.has_source_connection():
+            if attr.has_src_connection():
                 ~attr
-            transform_node[name] >> attr
+            transform_node[name] >> attr           

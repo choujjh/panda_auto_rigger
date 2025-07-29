@@ -46,10 +46,10 @@ class NodeData():
                 if data.name in num_children_dict.keys():
                     data.add_attr_kwargs["numberOfChildren"] = num_children_dict[data.name]
 
-                if data.type == "compound" and not data.name in num_children_dict.keys():
+                if data.type_ == "compound" and not data.name in num_children_dict.keys():
                     continue
 
-                node.add_attr(long_name=data.name, type=data.type, **data.add_attr_kwargs)
+                node.add_attr(long_name=data.name, type=data.type_, **data.add_attr_kwargs)
 
         # setting attrs and locking
         for data in self.node_attr_list:
@@ -134,7 +134,7 @@ class AttrData:
         add_attr_kwargs (): kwarg of all addAttr fields
         do_add_attr(bool): variable to see if attr should be added
     """
-    def __init__(self, name:str, type:str=None, value=None, publish=False, locked:bool=False, keyable:bool=False, alias:str=None, **add_attr_kwargs):
+    def __init__(self, name:str, type_:str=None, value=None, publish=False, locked:bool=False, keyable:bool=False, alias:str=None, **add_attr_kwargs):
         """Initializes AttrData
 
         Args:
@@ -147,21 +147,24 @@ class AttrData:
             alias (str, optional): Defaults to None.
         """
         self.name = name
-        self.type = type
+        self.type_ = type_
         self.publish = publish
         self.value = value
         self.locked = locked
         self.keyable = keyable
         self.alias = alias
-        self.do_add_attr = self.type is not None
+        self.do_add_attr = self.type_ is not None
 
         self.add_attr_kwargs = add_attr_kwargs
         
-        if not isinstance(self.type, str):
-            enum_class = component_enum.get_enum_item_class(self.type)
+        if not isinstance(self.type_, str) and self.type_ is not None:
+            enum_class = component_enum.get_enum_item_class(self.type_)
             if enum_class is not None:
-                enum_data = self.type
-                self.type = "enum"
+                enum_data = self.type_
+                self.type_ = "enum"
+                
+
+
                 self.add_attr_kwargs["enumName"] = enum_class.maya_enum_str()
 
                 index = component_enum.get_index_of_item(enum_data)
@@ -174,10 +177,10 @@ class AttrData:
         Returns:
             str:
         """
-        return f"name-\"{self.name}\" | type-{self.type} | publish-{self.publish} | value-{self.value} | locked-{self.locked} | keyable-{self.keyable} | alias-{self.alias} | attr_kwargs-{self.add_attr_kwargs}"
+        return f"name-\"{self.name}\" | type-{self.type_} | publish-{self.publish} | value-{self.value} | locked-{self.locked} | keyable-{self.keyable} | alias-{self.alias} | attr_kwargs-{self.add_attr_kwargs}"
 
 class HierData:
-    """Class with constants and checks for Hierarchy class
+    """Class with constants and checks for Hierarchy in Autorigger
     
     Attributes:
         HIERARCHY (str):
@@ -196,6 +199,9 @@ class HierData:
         OUTPUT_INIT_INV_MATRIX (str):
         OUTPUT_WORLD_MATRIX (str):
         OUTPUT_LOC_MATRIX (str):
+        __HIER_DATA_NAMES (list(str)):
+        __INPUT_DATA_NAMES (list(str))
+        __OUTPUT_DATA_NAMES (list(str))
         """
 
     HIERARCHY = "hierarchy"
@@ -211,11 +217,31 @@ class HierData:
     INPUT_LOC_MATRIX = "inputLocMatrix"
 
     OUTPUT_XFORM = "outputXform"
-    OUTPUT_XFORM_NAME = "outputXformName" 
+    OUTPUT_XFORM_NAME = "outputXformName"
     OUTPUT_INIT_MATRIX = "outputInitMatrix"
     OUTPUT_INIT_INV_MATRIX = "outputInitInvMatrix"
     OUTPUT_WORLD_MATRIX = "outputWorldMatrix"
     OUTPUT_LOC_MATRIX = "outputLocMatrix"
+
+    HIER_DATA_NAMES = [
+        HIER_NAME,
+        HIER_PARENT_MATRIX,
+        HIER_PARENT_INIT_MATRIX
+    ]
+    INPUT_DATA_NAMES = [
+        INPUT_XFORM_NAME,
+        INPUT_INIT_MATRIX,
+        INPUT_INIT_INV_MATRIX,
+        INPUT_WORLD_MATRIX,
+        INPUT_LOC_MATRIX
+    ]
+    OUTPUT_DATA_NAMES = [
+        OUTPUT_XFORM_NAME,
+        OUTPUT_INIT_MATRIX,
+        OUTPUT_INIT_INV_MATRIX,
+        OUTPUT_WORLD_MATRIX,
+        OUTPUT_LOC_MATRIX
+    ]
 
     @classmethod
     def is_hier_attr(cls, attr:nw.Attr):
@@ -227,18 +253,16 @@ class HierData:
         Returns:
             bool:
         """
-        hier_names = [cls.HIER_NAME, cls.HIER_PARENT_MATRIX, cls.HIER_PARENT_INIT_MATRIX, cls.INPUT_XFORM]
+        hier_names = cls.HIER_DATA_NAMES()
         for attr_name in hier_names:
             if not attr.has_attr(attr_name):
                 return False
 
         attr = attr[cls.INPUT_XFORM][0]
 
-        if not cls.is_input_xform_attr(attr):
+        if not cls.is_input_xform_attr(attr[cls.INPUT_XFORM][0]):
             return False
-        
         return True
-
     @classmethod
     def is_input_xform_attr(cls, attr:nw.Attr):
         """Checks to see if attribute is an input xform attribute
@@ -249,13 +273,12 @@ class HierData:
         Returns:
             bool:
         """
-        xform_names = [cls.INPUT_XFORM_NAME, cls.INPUT_INIT_MATRIX, cls.INPUT_INIT_INV_MATRIX, cls.INPUT_WORLD_MATRIX, cls.INPUT_LOC_MATRIX]
+        xform_names = cls.INPUT_DATA_NAMES()
         for attr_name in xform_names:
             if not attr.has_attr(attr_name):
                 return False
 
         return True
-
     @classmethod
     def is_output_xform_attr(cls, attr:nw.Attr):
         """Checks to see if attribute is an output xform attribute
@@ -266,7 +289,7 @@ class HierData:
         Returns:
             bool:
         """
-        xform_names = [cls.OUTPUT_XFORM_NAME, cls.OUTPUT_INIT_MATRIX, cls.OUTPUT_INIT_INV_MATRIX, cls.OUTPUT_WORLD_MATRIX, cls.OUTPUT_LOC_MATRIX]
+        xform_names = cls.OUTPUT_DATA_NAMES()
         for attr_name in xform_names:
             if not attr.has_attr(attr_name):
                 return False
@@ -274,25 +297,44 @@ class HierData:
         return True
     
     @classmethod
+    def __gen_hier_nodeData(cls, parent_name:str, attr_names, multi=True):
+        """Given a parent name and attribute names generates the Node Data to build
+        it. only sets attributes to string or matrix. (string if "Name" is in the 
+        name)
+
+        Args:
+            parent_name (str):
+            attr_names (list(str)):
+
+        Returns:
+            component_data.NodeData:
+        """
+        attr_data = [AttrData(parent_name, type_="compound", publish=True, multi=multi)]
+        for attr_name in attr_names:
+            attr_type = "matrix"
+            if attr_name.find("Name") >= 0:
+                attr_type ="string"
+            attr_data.append(AttrData(attr_name, type_=attr_type, parent=parent_name))
+
+        return NodeData(*attr_data)
+    
+    @classmethod
+    def get_hier_data(cls):
+        """Returns NodeData for hier
+
+        Returns:
+            NodeData:
+        """
+        return cls.__gen_hier_nodeData(cls.HIERARCHY, cls.HIER_DATA_NAMES)
+
+    @classmethod
     def get_input_xform_data(cls):
         """Returns NodeData for an input xform
 
         Returns:
             NodeData:
         """
-        return NodeData(
-            AttrData(cls.HIERARCHY, type="compound", parent="input"),
-            AttrData(cls.HIER_NAME, type="string", parent=cls.HIERARCHY),
-            AttrData(cls.HIER_PARENT_MATRIX, type="matrix", parent=cls.HIERARCHY),
-            AttrData(cls.HIER_PARENT_INIT_MATRIX, type="matrix", parent=cls.HIERARCHY),
-
-            AttrData(cls.INPUT_XFORM, type="compound", parent=cls.HIERARCHY, multi=True),
-            AttrData(cls.INPUT_XFORM_NAME, type="string", parent=cls.INPUT_XFORM),
-            AttrData(cls.INPUT_INIT_MATRIX, type="matrix", parent=cls.INPUT_XFORM),
-            AttrData(cls.INPUT_INIT_INV_MATRIX, type="matrix", parent=cls.INPUT_XFORM),
-            AttrData(cls.INPUT_WORLD_MATRIX, type="matrix", parent=cls.INPUT_XFORM),
-            AttrData(cls.INPUT_LOC_MATRIX, type="matrix", parent=cls.INPUT_XFORM),
-        )
+        return cls.__gen_hier_nodeData(cls.INPUT_XFORM, cls.INPUT_DATA_NAMES, multi=True)
     
     @classmethod
     def get_output_xform_data(cls):
@@ -301,14 +343,7 @@ class HierData:
         Returns:
             NodeData:
         """
-        return NodeData(
-            AttrData(cls.OUTPUT_XFORM, type="compound", parent="output", multi=True),
-            AttrData(cls.OUTPUT_XFORM_NAME, type="string", parent=cls.OUTPUT_XFORM),
-            AttrData(cls.OUTPUT_INIT_MATRIX, type="matrix", parent=cls.OUTPUT_XFORM),
-            AttrData(cls.OUTPUT_INIT_INV_MATRIX, type="matrix", parent=cls.OUTPUT_XFORM),
-            AttrData(cls.OUTPUT_WORLD_MATRIX, type="matrix", parent=cls.OUTPUT_XFORM),
-            AttrData(cls.OUTPUT_LOC_MATRIX, type="matrix", parent=cls.OUTPUT_XFORM),
-        )
+        return cls.__gen_hier_nodeData(cls.OUTPUT_XFORM, cls.OUTPUT_DATA_NAMES, multi=True)
         
 class ControlSetupData():
     """A class that takes Control data and saves it to be inputed into a control

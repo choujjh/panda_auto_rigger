@@ -246,10 +246,10 @@ def freeze_transform(transform:nw.Node):
     if scale[0] * scale[1] * scale[2] < 0:
         shapes = [nw.wrap_node(x) for x in cmds.listRelatives(str(transform), shapes=True)]
         for x in shapes:
-            if x.type == "nurbsSurface":
+            if x.type_ == "nurbsSurface":
                 cmds.reverseSurface(str(x))
                 x["opposite"] = False
-            elif x.type == "mesh":
+            elif x.type_ == "mesh":
                 cmds.polyNormal(str(x), normalMode=0, constructionHistory=False)
                 x["opposite"] = False
 
