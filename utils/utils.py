@@ -212,53 +212,6 @@ def unnest_dict(curr_dict:dict):
 
     return return_dict
 
-def get_transform_locked_attrs(transform_node):
-    """Get's the transforms important attributes. Filtered by if the attribute 
-    is locked
-
-    Args:
-        transform_node (nw.Node):
-
-    Returns:
-        list(Attr): Returns list of all attrs that are locked
-    """
-    transform_attrs = ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "visibility"]
-
-    if not isinstance(transform_node, nw.Node):
-        transform_node = nw.wrap_node(transform_node)
-
-    return [transform_node[attr] for attr in transform_attrs if transform_node[attr].is_locked()]
-
-def freeze_transform(transform:nw.Node):
-    """Freezes the transforms of the given node
-
-    Args:
-        transform (nw.Node):
-    """
-    transform_locked_attrs = get_transform_locked_attrs(str(transform))
-
-    for locked_attrs in transform_locked_attrs:
-        locked_attrs.set_locked(False)
-    scale = transform["scale"].value
-    
-    cmds.makeIdentity(str(transform), apply=True)
-
-    if scale[0] * scale[1] * scale[2] < 0:
-        shapes = [nw.wrap_node(x) for x in cmds.listRelatives(str(transform), shapes=True)]
-        for x in shapes:
-            if x.type_ == "nurbsSurface":
-                cmds.reverseSurface(str(x))
-                x["opposite"] = False
-            elif x.type_ == "mesh":
-                cmds.polyNormal(str(x), normalMode=0, constructionHistory=False)
-                x["opposite"] = False
-
-    for locked_attrs in transform_locked_attrs:
-        locked_attrs.set_locked(True)
-
-    transform["rotatePivot"] = [0.0, 0.0, 0.0]
-    transform["scalePivot"] = [0.0, 0.0, 0.0]
-
 def get_rgb_from_index(index:int):
     """Gets rgb from maya's color index
 
@@ -268,7 +221,6 @@ def get_rgb_from_index(index:int):
     Returns:
         list(float): 3 values making up the rgb of the color
     """
-
     return cmds.colorIndex(index, query=True)
 
 def make_valid_maya_name(name:str):
@@ -281,17 +233,6 @@ def make_valid_maya_name(name:str):
         str: 
     """
     return name.replace("[", "_").replace("]", "").replace(" ", "_")
-
-import system.component_enum as component_enum
-def set_color(node:nw.Node, color:component_enum.Colors):
-    """Sets color on node using Colors class
-
-    Args:
-        node (nw.Node): 
-        color (component_enum.Colors):
-    """
-    node["overrideEnabled"] = True
-    node["overrideColor"] = color.value
 
 class Namespace:
     """Class of static functions to handle namespaces"""

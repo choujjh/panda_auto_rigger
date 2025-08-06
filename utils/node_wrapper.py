@@ -6,18 +6,26 @@ from utils.utils import snake_to_camel
 import utils.apiundo as apiundo
 import re as re
 
-def wrap_node(node:str):
+def wrap_node(node):
     """Gets the most specific node type ie. Node, Container
 
     Args:
-        Node (str): sets the right class for given class
+        Node (str, Node): sets the right class for given class
 
     Returns:
         Node: The most spicific node type
     """
     node_class = Node
-    if cmds.nodeType(node) == "container":
-        node_class = Container
+    if issubclass(type(node), Node):
+        if node.type_ == "container":
+            node_class = Container
+        elif node.type_ == "transform":
+            node_class = Transform
+    elif isinstance(node, str):
+        if cmds.nodeType(node) == "container":
+            node_class = Container
+        elif cmds.nodeType(node) == "transform":
+            node_class = Transform
     return node_class(node)
 def create_node(node_type:str, name:str=None):
     """Creates node with given name
@@ -264,17 +272,6 @@ class Node():
             return Container(container)
         return container
     
-    def get_shapes(self):
-        """Get object shapes
-
-        Returns:
-            list(Node): list of shapes wrapped by Node
-        """
-        shapes = cmds.listRelatives(str(self), shapes=True)
-        if shapes is None:
-            return []
-        return [Node(shape) for shape in shapes]
-
     def get_top_level_attribute_list(self, re_cache=False):
         """Gets a list of top level attr for the node (no child attributes included)
 
@@ -661,6 +658,52 @@ class Container(Node):
                 if parent_attr in publish_attr_map.keys():
                     return publish_attr_map[parent_attr][back_attrs]
         return super().__getitem__(attr)
+class Transform(Node):
+    def get_shapes(self):
+        """Get object shapes
+
+        Returns:
+            list(Node): list of shapes wrapped by Node
+        """
+        shapes = cmds.listRelatives(str(self), shapes=True)
+        if shapes is None:
+            return []
+        return [Node(shape) for shape in shapes]
+    def freeze_transforms(self):
+        """Freezes the transforms of the given node"""
+        transform_locked_attrs = self.get_transform_locked_attrs()
+
+        for locked_attrs in transform_locked_attrs:
+            locked_attrs.set_locked(False)
+        scale = self["scale"].value
+        
+        cmds.makeIdentity(str(self), apply=True)
+
+        if scale[0] * scale[1] * scale[2] < 0:
+            shapes = [wrap_node(x) for x in cmds.listRelatives(str(self), shapes=True)]
+            for x in shapes:
+                if x.type_ == "nurbsSurface":
+                    cmds.reverseSurface(str(x))
+                    x["opposite"] = False
+                elif x.type_ == "mesh":
+                    cmds.polyNormal(str(x), normalMode=0, constructionHistory=False)
+                    x["opposite"] = False
+
+        for locked_attrs in transform_locked_attrs:
+            locked_attrs.set_locked(True)
+
+        self["rotatePivot"] = [0.0, 0.0, 0.0]
+        self["scalePivot"] = [0.0, 0.0, 0.0]
+    def get_transform_locked_attrs(self):
+        """Get's the transforms important attributes. Filtered by if the attribute 
+        is locked
+
+        Returns:
+            list(Attr): Returns list of all attrs that are locked
+        """
+        transform_attrs = ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "visibility"]
+
+        return [self[attr] for attr in transform_attrs if self[attr].is_locked()]
 class Attr():
     """A class to wrap around MPlug object and 
     provides useful functionality such as getting child attributes, and other 
@@ -699,16 +742,16 @@ class Attr():
             attr (Union[om2.MPlug, str]):
             node (Node): plug's node
         """
-        self.node = node
+        self.node = None
+        if node is not None:
+            self.node = wrap_node(node)
         
         self.plug = utils_om.get_plug(None, attr)
         if self.plug is None:
             cmds.error(f"{attr} attribute\"s plug not found")
 
         if self.node == None:
-            self.node = Node(self.plug)
-        if self.node == None:
-            cmds.error(f"{attr} attribute\"s node not found")
+            self.node = wrap_node(Node(self.plug))
 
     @property
     def name(self):

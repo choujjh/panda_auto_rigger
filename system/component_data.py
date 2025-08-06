@@ -1,5 +1,5 @@
 import utils.node_wrapper as nw
-import system.component_enum as component_enum
+import system.component_enum_data as component_enum_data
 
 class NodeData():
     """Class to encapsulate node data to add attributes, publish attributes etc
@@ -158,7 +158,7 @@ class AttrData:
         self.add_attr_kwargs = add_attr_kwargs
         
         if not isinstance(self.type_, str) and self.type_ is not None:
-            enum_class = component_enum.get_enum_item_class(self.type_)
+            enum_class = component_enum_data.get_enum_item_class(self.type_)
             if enum_class is not None:
                 enum_data = self.type_
                 self.type_ = "enum"
@@ -167,7 +167,7 @@ class AttrData:
 
                 self.add_attr_kwargs["enumName"] = enum_class.maya_enum_str()
 
-                index = component_enum.get_index_of_item(enum_data)
+                index = component_enum_data.get_index_of_item(enum_data)
                 if index is not None:
                     self.value = index
             
@@ -366,7 +366,7 @@ class ControlSetupData():
         self.control_setup_dict = control_setup
         if "controlClass" not in control_setup.keys():
             if control_class is None:
-                control_setup["controlClass"] = control.CircleControl
+                control_setup["controlClass"] = control.Circle
             else:
                 control_setup["controlClass"] = control_class
         self.attrs = list(attrs)

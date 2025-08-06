@@ -1,18 +1,16 @@
-import system.component_enum as component_enum
+import system.component_enum_data as component_enum_data
 import maya.cmds as cmds
 import system.component as component
 import utils.node_wrapper as nw
-import utils.utils as utils
+import component.enum_manager as enum_manager
 
-class CircleControl(component.Control):
+class Circle(component.Control):
+    """A circle nurbs curve control"""
     def _create_shapes(self):
         return [cmds.circle(normal = self.axis_vec)[0]]
-    
-class AxisControl(component.Control):
+class Axis(component.Control):
+    """A axis nurbs curve control with a red, green, and blue axis pointers"""
     can_set_color = False
-
-    def __init__(self, container_node=None, parent_container_node=None):
-        super(AxisControl, self).__init__(container_node, parent_container_node)
     
     def _create_shapes(self):
         x_axis = nw.wrap_node(cmds.curve(degree=1, point=[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]))
@@ -20,13 +18,13 @@ class AxisControl(component.Control):
         z_axis = nw.wrap_node(cmds.curve(degree=1, point=[[0.0, 0.0, 0.0], [0.0, 0.0, 1.0]]))
 
         # utils.set_color()
-        utils.set_color(x_axis.get_shapes()[0], component_enum.Colors.red)
-        utils.set_color(y_axis.get_shapes()[0], component_enum.Colors.green)
-        utils.set_color(z_axis.get_shapes()[0], component_enum.Colors.blue)
+        enum_manager.Color.apply_color(x_axis.get_shapes()[0], component_enum_data.Color.red, connect=False)
+        enum_manager.Color.apply_color(y_axis.get_shapes()[0], component_enum_data.Color.green, connect=False)
+        enum_manager.Color.apply_color(z_axis.get_shapes()[0], component_enum_data.Color.blue, connect=False)
         
         return [x_axis, y_axis, z_axis]
-    
-class BoxControl(component.Control):    
+class BoxControl(component.Control):
+    """A box nurbs curve control"""
     def _create_shapes(self):
         x = 1.0
         y = 1.0
@@ -41,13 +39,13 @@ class BoxControl(component.Control):
         ])
         
         return [box]
-
 class DiamondControl(component.Control):
+    """A diamond nurbs surface control"""
     def _create_shapes(self):
         diamond = cmds.sphere(axis=self.axis_vec, sections=4, spans=2, degree=1)[0]
         return [diamond]
-
 class DiamondWireControl(component.Control):
+    """A diamond nurbs curve control"""
     def _create_shapes(self):
         diamond = cmds.curve(degree=1, point=[
             [0, 1, 0], [1, 0, 0], [0, -1, 0],
@@ -58,8 +56,8 @@ class DiamondWireControl(component.Control):
             [0, 1, 0]
         ])
         return [diamond]
-
-class GearControl(component.Control):
+class Gear(component.Control):
+    """A gear nurbs curve control"""
     def _create_shapes(self):
         outer_shape = cmds.curve(degree=3, point=[
             [0.303359, 0, 0.940211], [0.662567, 0, 0.732822], [0.707107, 0, 0.720888], [0.751647, 0, 0.732822],
@@ -96,8 +94,7 @@ class GearControl(component.Control):
         ])
         
         return [inner_shape, outer_shape]
-    
-class GimbalControl(component.Control):
+class Gimbal(component.Control):
     can_set_color = False
 
     def _create_shapes(self):
@@ -105,13 +102,13 @@ class GimbalControl(component.Control):
         circle2 = nw.wrap_node(cmds.circle(normal=[0.0, 1.0, 0.0])[0])
         circle3 = nw.wrap_node(cmds.circle(normal=[0.0, 0.0, 1.0])[0])
 
-        utils.set_color(circle1.get_shapes()[0], component_enum.Colors.red)
-        utils.set_color(circle2.get_shapes()[0], component_enum.Colors.green)
-        utils.set_color(circle3.get_shapes()[0], component_enum.Colors.blue)
+        enum_manager.Color.apply_color(circle1.get_shapes()[0], component_enum_data.Color.red)
+        enum_manager.Color.apply_color(circle2.get_shapes()[0], component_enum_data.Color.green)
+        enum_manager.Color.apply_color(circle3.get_shapes()[0], component_enum_data.Color.blue)
         
         return [circle1, circle2, circle3]
-
-class Pyramid4Control(component.Control):
+class Pyramid4(component.Control):
+    """A pyramid nurbs curve control"""
     def _create_shapes(self):
         pyramid = cmds.curve(degree=1, point=[
             [1, 0, 1], [1, 0, -1], [0, 1.4, 0], [1, 0, 1],
@@ -119,12 +116,12 @@ class Pyramid4Control(component.Control):
             [-1, 0, -1], [1, 0, -1]
         ])
         return [pyramid]
-
-class SphereControl(component.Control):
+class Sphere(component.Control):
+    """A sphere nurbs surface control"""
     def _create_shapes(self):
         sphere = cmds.sphere(axis=self.axis_vec)[0]
         return [sphere]
-    
-class LocatorControl(component.Control):
+class Locator(component.Control):
+    """A locator control"""
     def _create_shapes(self):
         return [cmds.spaceLocator()[0]]

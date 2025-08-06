@@ -1,6 +1,6 @@
 import utils.node_wrapper as nw
 import system.component_data as component_data
-import system.component_enum as component_enum
+import system.component_enum_data as component_enum_data
 from typing import Union
 
 import utils.utils as utils
@@ -40,7 +40,7 @@ class Component():
         short_namespace (str): components full namespace (without parent namespaces)
         instance_namespace (str): instance name + side
     """
-    component_type = component_enum.ComponentTypes.component
+    component_type = component_enum_data.ComponentType.component
     root_transform_name = None
     class_namespace = "component"
 
@@ -206,7 +206,7 @@ class Component():
                 self.__namespace_cache["hier_side"] = side
                 
                 if side is not None and side != "":
-                    instance_namespace = f"{component_enum.CharacterSide.get(side).value}_"
+                    instance_namespace = f"{component_enum_data.CharacterSide.get(side).value}_"
 
         instance_name = None
         if self.input_node.has_attr("instanceName"):
@@ -369,10 +369,9 @@ class Component():
             utils.map_to_container(output_node, node_message_name="output_node")
             
             output_node_attr_data.publish_attr_data_attributes(output_node)
-        
+
         input_node_attr_data.publish_attr_data_attributes(input_node)
         container_node_attr_data.publish_attr_data_attributes(self.container_node)
-        self.rename_nodes()
 
     def rename_nodes(self):
         """Renames all nodes found in the container with the component namespace"""
@@ -429,7 +428,7 @@ class Hierarchy(Component):
     """
     HIER_DATA = component_data.HierData
     class_namespace = "hier"
-    component_type = component_enum.ComponentTypes.hier
+    component_type = component_enum_data.ComponentType.hier
 
     def _get_input_node_attr_data(self):
         node_data = super()._get_input_node_attr_data()
@@ -639,7 +638,6 @@ class Hierarchy(Component):
                 output_xform_matricies[output_attr].set(source_attr)
             elif source_attr is not None:
                 source_attr >> output_xform_matricies[output_attr]
-        
 
 class Control(Component):
     """A Base class for all control autorigging components. Derived from Component
@@ -647,31 +645,17 @@ class Control(Component):
     Attributes:
         can_set_color (bool): can set color of component
     """
-    component_type = component_enum.ComponentTypes.control
-    root_transform_name = "cntrl"
-    class_namespace = ""
+    component_type = component_enum_data.ComponentType.control
+    root_transform_name = "control"
+    class_namespace = "cntrl"
     can_set_color = True
 
-    @ property
-    def control_setup_node(self):
-        """control setup node used to create this control
+    @classmethod
+    def create(cls, instance_name = None, parent=None, axis_vec:component_enum_data.AxisEnum=component_enum_data.AxisEnum.y,**kwargs):
+        kwargs["axis_vec"] = axis_vec
 
-        Returns:
-            nw.Node:
-        """
-        if self.container_node is not None:
-            return self._get_node_data_from_cache("controlSetupNode")
-    @property
-    def axis_vec(self):
-        """axis to build control on
+        return super().create(instance_name, parent, **kwargs)
 
-        Returns:
-            str:
-        """
-        axis_vec = component_enum.AxisEnums.y.value
-        if self.control_setup_node is not None:
-            axis_vec = component_enum.AxisEnums.get(self.control_setup_node["buildAxis"].value).value
-        return axis_vec
     def _get_input_node_attr_data(self) -> component_data.NodeData:
         node_data = super()._get_input_node_attr_data()
 
@@ -685,9 +669,10 @@ class Control(Component):
             component_data.AttrData(name="overrideColorRGB", publish="color", locked=not type(self).can_set_color),
             component_data.AttrData(name="overrideRGBColors", value=1),
         )
-
         return node_data
+
     def _override_build(self, **kwargs):
+        self.axis_vec = kwargs["axis_vec"].value
         # set visibility to hidden in channel box
         self.transform_node["visibility"].set_keyable(False)
 
@@ -716,7 +701,7 @@ class Control(Component):
             cmds.delete(str(transform), constructionHistory=True)
 
             # freeze all controls
-            utils.freeze_transform(transform)
+            transform.freeze_transforms()
 
             # apply to transform
             for x in cmds.listRelatives(str(transform), shapes=True):
@@ -816,3 +801,26 @@ class Control(Component):
             if attr.has_src_connection():
                 ~attr
             transform_node[name] >> attr           
+
+class SingletonComponent(Component):
+    """Has instance method. only one of each singleton component exists in a character.
+    usually used for enum conversion data (enum->vec)
+
+    Attributes:
+        __cls_instance (cls):
+    """
+    component_type = component_enum_data.ComponentType.manager
+    __cls_instance = None
+
+    @classmethod
+    def instance(cls):
+        """Gets the instance of class. create one of not created
+
+        Returns:
+            cls:
+        """
+        if cls.__cls_instance is None:
+            cls.__cls_instance = cls.create()
+            return cls.__cls_instance
+        else:
+            return cls.__cls_instance
