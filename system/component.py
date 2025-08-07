@@ -104,7 +104,7 @@ class Component():
         if self.container_node is not None:
             return self._get_node_data_from_cache("output_node")
     @property 
-    def transform_node(self)->nw.Node:
+    def transform_node(self)->nw.Transform:
         """Transform node (also input node). if no transform node is created 
         returns None
 
@@ -651,8 +651,14 @@ class Control(Component):
     can_set_color = True
 
     @classmethod
-    def create(cls, instance_name = None, parent=None, axis_vec:component_enum_data.AxisEnum=component_enum_data.AxisEnum.y,**kwargs):
+    def create(cls, instance_name = None, parent=None, axis_vec:component_enum_data.AxisEnum=component_enum_data.AxisEnum.y, 
+               build_tx=0.0, build_ty=0.0, build_tz=0.0,
+               build_rx=0.0, build_ry=0.0, build_rz=0.0,
+               build_sx=1.0, build_sy=1.0, build_sz=1.0, **kwargs):
         kwargs["axis_vec"] = axis_vec
+        kwargs["build_t"] = [build_tx, build_ty, build_tz]
+        kwargs["build_r"] = [build_rx, build_ry, build_rz]
+        kwargs["build_s"] = [build_sx, build_sy, build_sz]
 
         return super().create(instance_name, parent, **kwargs)
 
@@ -678,6 +684,12 @@ class Control(Component):
 
         # add shapes
         self._apply_shape_to_cntrl()
+
+        # add build transforms
+        self.transform_node["translate"] = kwargs["build_t"]
+        self.transform_node["rotate"] = kwargs["build_r"]
+        self.transform_node["scale"] = kwargs["build_s"]
+        self.transform_node.freeze_transforms()
 
     def _create_shapes(self) -> list:
         """Creates shapes and returns a list of the shapes transforms. these 

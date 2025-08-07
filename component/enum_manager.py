@@ -7,6 +7,7 @@ import system.component_data as component_data
 import utils.utils as utils
 import maya.cmds as cmds
 
+
 def axis_vec_choice_node(choice_node_name):
     """creates a choice node for axis vectors. allows enum to generate a vector
 
@@ -135,6 +136,10 @@ class Color(component.SingletonComponent):
         Raises:
             RuntimeError: _description_
         """
+        if color == component_enum_data.Color.none:
+            cls.get_shader(color=color)
+            cmds.warning(f"not applying color to {obj} because color is None")
+            return
         # switch obj from control component to transform node
         shapes_list = []
         if issubclass(type(obj), component.Control):
