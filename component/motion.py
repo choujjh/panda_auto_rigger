@@ -1,4 +1,4 @@
-import system.component as component
+import system.base_component as base_component
 
-class FK(component.Component):
+class FK(base_component.Component):
     pass

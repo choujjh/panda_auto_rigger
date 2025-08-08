@@ -1,14 +1,15 @@
 import system.component_enum_data as component_enum_data
+import system.component_data as component_data
 import maya.cmds as cmds
-import system.component as component
+import system.base_component as base_component
 import utils.node_wrapper as nw
 import component.enum_manager as enum_manager
 
-class Circle(component.Control):
+class Circle(base_component.Control):
     """A circle nurbs curve control"""
     def _create_shapes(self):
         return [cmds.circle(normal = self.axis_vec)[0]]
-class Axis(component.Control):
+class Axis(base_component.Control):
     """A axis nurbs curve control with a red, green, and blue axis pointers"""
     can_set_color = False
     
@@ -23,7 +24,7 @@ class Axis(component.Control):
         enum_manager.Color.apply_color(z_axis.get_shapes()[0], component_enum_data.Color.blue, connect=False)
         
         return [x_axis, y_axis, z_axis]
-class BoxControl(component.Control):
+class BoxControl(base_component.Control):
     """A box nurbs curve control"""
     def _create_shapes(self):
         x = 1.0
@@ -39,12 +40,12 @@ class BoxControl(component.Control):
         ])
         
         return [box]
-class DiamondControl(component.Control):
+class DiamondControl(base_component.Control):
     """A diamond nurbs surface control"""
     def _create_shapes(self):
         diamond = cmds.sphere(axis=self.axis_vec, sections=4, spans=2, degree=1)[0]
         return [diamond]
-class DiamondWireControl(component.Control):
+class DiamondWireControl(base_component.Control):
     """A diamond nurbs curve control"""
     def _create_shapes(self):
         diamond = cmds.curve(degree=1, point=[
@@ -56,7 +57,7 @@ class DiamondWireControl(component.Control):
             [0, 1, 0]
         ])
         return [diamond]
-class Gear(component.Control):
+class Gear(base_component.Control):
     """A gear nurbs curve control"""
     def _create_shapes(self):
         outer_shape = cmds.curve(degree=3, point=[
@@ -94,7 +95,7 @@ class Gear(component.Control):
         ])
         
         return [inner_shape, outer_shape]
-class Gimbal(component.Control):
+class Gimbal(base_component.Control):
     can_set_color = False
 
     def _create_shapes(self):
@@ -107,7 +108,7 @@ class Gimbal(component.Control):
         enum_manager.Color.apply_color(circle3.get_shapes()[0], component_enum_data.Color.blue)
         
         return [circle1, circle2, circle3]
-class Pyramid4(component.Control):
+class Pyramid4(base_component.Control):
     """A pyramid nurbs curve control"""
     def _create_shapes(self):
         pyramid = cmds.curve(degree=1, point=[
@@ -116,12 +117,28 @@ class Pyramid4(component.Control):
             [-1, 0, -1], [1, 0, -1]
         ])
         return [pyramid]
-class Sphere(component.Control):
+class Sphere(base_component.Control):
     """A sphere nurbs surface control"""
     def _create_shapes(self):
         sphere = cmds.sphere(axis=self.axis_vec)[0]
         return [sphere]
-class Locator(component.Control):
+class Locator(base_component.Control):
     """A locator control"""
+    def _get_input_node_build_attr_data(self):
+        node_data = super()._get_input_node_build_attr_data()
+        node_data.extend_attr_data(
+            component_data.AttrData("locScale", type_="double", value=1.0, min=0.1, publish=True)
+        )
+
+        return node_data
+
+    def _override_build(self, **kwargs):
+        super()._override_build(**kwargs)
+
+        loc_shape = self.transform_node.get_shapes()[0]
+        self.input_node["locScale"] >> loc_shape["localScaleX"]
+        self.input_node["locScale"] >> loc_shape["localScaleY"]
+        self.input_node["locScale"] >> loc_shape["localScaleZ"]
+
     def _create_shapes(self):
         return [cmds.spaceLocator()[0]]

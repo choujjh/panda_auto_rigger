@@ -1,14 +1,14 @@
 from typing import Union
 
 import system.component_enum_data as component_enum_data
-import system.component as component
+import system.base_component as base_component
 import utils.node_wrapper as nw
 import system.component_data as component_data
 import utils.utils as utils
 import maya.cmds as cmds
 
 
-def axis_vec_choice_node(choice_node_name):
+def axis_vec_choice_node(choice_node_name, enum_attr:nw.Attr=None):
     """creates a choice node for axis vectors. allows enum to generate a vector
 
     Args:
@@ -23,18 +23,20 @@ def axis_vec_choice_node(choice_node_name):
     for index, item in enumerate(component_enum_data.AxisEnum):
         
         axis_vec_container["axis"][item.name] >> choice_node["input"][index]
+    if enum_attr is not None:
+        enum_attr >> choice_node["selector"]
 
     return choice_node
 
-class AxisVector(component.SingletonComponent):
+class AxisVector(base_component.SingletonComponent):
     """Component of axis vectors that creates vectors from the enum"""
     class_namespace="axis_vec_manager"
     def __init__(self, container_node = None):
         super().__init__(container_node)
         self.self_component = None
     
-    def _get_output_node_attr_data(self):
-        node_data = super()._get_output_node_attr_data()
+    def _get_output_node_build_attr_data(self):
+        node_data = super()._get_output_node_build_attr_data()
 
         attr_data = [component_data.AttrData("axis", type_="compound", parent="output")]
         for item in component_enum_data.AxisEnum:
@@ -52,11 +54,11 @@ class AxisVector(component.SingletonComponent):
 
         self.output_node["axis"].set_locked(True)
 
-class Color(component.SingletonComponent):
+class Color(base_component.SingletonComponent):
     """Component of colors that creates shaders from color enum"""
     class_namespace="color_manager"
-    def _get_output_node_attr_data(self):
-        node_data = super()._get_output_node_attr_data()
+    def _get_output_node_build_attr_data(self):
+        node_data = super()._get_output_node_build_attr_data()
 
         attr_data = [component_data.AttrData("color", type_="compound", parent="output")]
         for item in component_enum_data.Color:
@@ -126,7 +128,7 @@ class Color(component.SingletonComponent):
         
     
     @classmethod
-    def apply_color(cls, obj:Union[nw.Transform, component.Control, nw.Node], color:component_enum_data.Color, connect=True):
+    def apply_color(cls, obj:Union[nw.Transform, base_component.Control, nw.Node], color:component_enum_data.Color, connect=True):
         """Apply color to 
 
         Args:
@@ -142,7 +144,7 @@ class Color(component.SingletonComponent):
             return
         # switch obj from control component to transform node
         shapes_list = []
-        if issubclass(type(obj), component.Control):
+        if issubclass(type(obj), base_component.Control):
             transform = obj.transform_node
             if transform is None:
                 cmds.warning(f"transform is None. did not apply color")

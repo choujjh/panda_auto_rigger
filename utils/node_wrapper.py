@@ -1048,8 +1048,7 @@ class Attr():
             cmds.setAttr(str(self), value, type='matrix')
         elif attr_type == "enum":
             if not hasattr(self, "enum_list"):
-                self.enum_list = cmds.addAttr(str(self), query=True, enumName=True).split(":")
-            
+                self.enum_list = cmds.attributeQuery(self.short_name, node=str(self.node), listEnum=True)[0].split(":")
             if isinstance(value, str):
                 index = self.enum_list.index(value)
                 if index != -1:

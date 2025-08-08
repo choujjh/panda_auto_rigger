@@ -7,7 +7,7 @@ import utils.utils as utils
 
 import maya.cmds as cmds
 
-def get_component(container_node:nw.Node):
+def get_component(container_node:nw.Container):
     """Gets component from a container
 
     Args:
@@ -221,7 +221,7 @@ class Component():
             self.__namespace_cache["instance_namespace"] = instance_namespace
 
     # node add attr data
-    def _get_input_node_attr_data(self) -> component_data.NodeData:
+    def _get_input_node_build_attr_data(self) -> component_data.NodeData:
         """Defines all the added, published, or modified attributes for the 
         input node. Can be added onto by inherited classes
 
@@ -236,7 +236,7 @@ class Component():
             component_data.AttrData(name="instanceName", type_="string", parent="buildData"),
         )
         return node_data
-    def _get_output_node_attr_data(self) -> component_data.NodeData:
+    def _get_output_node_build_attr_data(self) -> component_data.NodeData:
         """Defines all the added, published, or modified attributes for the 
         output node. Can be added onto by inherited classes
 
@@ -247,7 +247,7 @@ class Component():
             component_data.AttrData(name="output", type_="compound", publish=True),
         )        
         return node_data
-    def _get_container_node_attr_data(self) -> component_data.NodeData:
+    def _get_container_node_build_attr_data(self) -> component_data.NodeData:
         """Defines all the added, published, or modified attributes for the
         container node. Can be added onto by inherited classes
 
@@ -338,20 +338,20 @@ class Component():
             input_node = nw.create_node("transform", type(self).root_transform_name)
         else:
             input_node = nw.create_node("network", "input")
-        input_node_attr_data = self._get_input_node_attr_data()
+        input_node_attr_data = self._get_input_node_build_attr_data()
         input_node_attr_data.add_attrs_to_node(input_node)
 
         # output node
-        output_node_attr_data = self._get_output_node_attr_data()
+        output_node_attr_data = self._get_output_node_build_attr_data()
         has_output_node = len(output_node_attr_data.node_attr_list) > 1
         if has_output_node:
             output_node = nw.create_node("network", "output")
-            output_node_attr_data = self._get_output_node_attr_data()
+            output_node_attr_data = self._get_output_node_build_attr_data()
             output_node_attr_data.add_attrs_to_node(output_node)
 
         # container node
         self.__node_data_cache["container_node"] = nw.create_node("container", "component_container")
-        container_node_attr_data = self._get_container_node_attr_data()
+        container_node_attr_data = self._get_container_node_build_attr_data()
         container_node_attr_data.add_attrs_to_node(self.container_node)
         if parent_container is not None:
             parent_container.add_nodes(self.container_node)
@@ -430,13 +430,13 @@ class Hierarchy(Component):
     class_namespace = "hier"
     component_type = component_enum_data.ComponentType.hier
 
-    def _get_input_node_attr_data(self):
-        node_data = super()._get_input_node_attr_data()
+    def _get_input_node_build_attr_data(self):
+        node_data = super()._get_input_node_build_attr_data()
         node_data.extend_attr_data(self.HIER_DATA.get_hier_data())
         node_data.extend_attr_data(self.HIER_DATA.get_input_xform_data())
         return node_data
-    def _get_output_node_attr_data(self):
-        node_data = super()._get_output_node_attr_data()
+    def _get_output_node_build_attr_data(self):
+        node_data = super()._get_output_node_build_attr_data()
         node_data.extend_attr_data(self.HIER_DATA.get_output_xform_data())
         return node_data
     
@@ -534,9 +534,11 @@ class Hierarchy(Component):
         output_xform_attrs = self._get_output_xform_attrs(index)
         output_loc_matrix = output_xform_attrs[self.HIER_DATA.OUTPUT_LOC_MATRIX]
         output_world_matrix_src = output_xform_attrs[self.HIER_DATA.OUTPUT_WORLD_MATRIX].get_src_connection()
-        
-        added_nodes = []
 
+        # if loc matrix already has connection
+        if output_loc_matrix.has_src_connection:
+            return []
+        added_nodes = []
         # if world matrix isn't connected return
         if output_world_matrix_src is None:
             return []
@@ -638,6 +640,32 @@ class Hierarchy(Component):
                 output_xform_matricies[output_attr].set(source_attr)
             elif source_attr is not None:
                 source_attr >> output_xform_matricies[output_attr]
+    def _set_input_xform_attrs(
+            self, 
+            index:int, 
+            input_xform_name:Union[nw.Attr, str]=None, 
+            input_init_matrix:nw.Attr=None, 
+            input_init_inv_matrix:nw.Attr=None, 
+            input_world_matrix:nw.Attr=None, 
+            input_loc_matrix:nw.Attr=None
+        ):
+        """Connects up attributes to output xform
+
+        Args:
+            index (int):
+            input_name (Union[nw.Attr, str], optional): Defaults to None.
+            input_init_matrix (nw.Attr, optional): Defaults to None.
+            input_init_inv_matrix (nw.Attr, optional): Defaults to None.
+            input_world_matrix (nw.Attr, optional): Defaults to None.
+            input_loc_matrix (nw.Attr, optional): Defaults to None.
+        """
+        input_xform_matricies = self._get_input_xform_attrs(index)
+        source_attr_list = [input_xform_name, input_init_matrix, input_init_inv_matrix, input_world_matrix, input_loc_matrix]
+        for source_attr, input_attr in zip(source_attr_list, self.HIER_DATA.INPUT_DATA_NAMES):
+            if isinstance(source_attr, str):
+                input_xform_matricies[input_attr].set(source_attr)
+            elif source_attr is not None:
+                source_attr >> input_xform_matricies[input_attr]
 
 class Control(Component):
     """A Base class for all control autorigging components. Derived from Component
@@ -662,8 +690,8 @@ class Control(Component):
 
         return super().create(instance_name, parent, **kwargs)
 
-    def _get_input_node_attr_data(self) -> component_data.NodeData:
-        node_data = super()._get_input_node_attr_data()
+    def _get_input_node_build_attr_data(self) -> component_data.NodeData:
+        node_data = super()._get_input_node_build_attr_data()
 
         node_data.extend_attr_data(
             component_data.AttrData(name="offsetParentMatrix", publish="offsetMatrix"),
