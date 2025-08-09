@@ -5,7 +5,8 @@ import maya.cmds as cmds
 
 
 class VisualizeHier(base_component.Hierarchy):
-    root_transform_name = "locator_grp"
+    """Helps visualize and debug hierarchies by creating chains for world space and local visualization"""
+    root_transform_name = "vis_grp"
 
     @classmethod
     def create(cls, source_component:base_component.Hierarchy, instance_name = None, parent=None, **kwargs):
@@ -22,12 +23,10 @@ class VisualizeHier(base_component.Hierarchy):
 
         prev_loc_transform = None
 
-        for index, src_output_xform in enumerate(source_component.container_node[HIER_DATA.OUTPUT_XFORM]):
-            input_xform = self._get_input_xform_attrs(index)
+        self._connect_source_hier_component(source_component=source_component)
 
-            # connecting src output to component input
-            for output_name, input_name in zip(HIER_DATA.OUTPUT_DATA_NAMES, HIER_DATA.INPUT_DATA_NAMES):
-                src_output_xform[output_name] >> input_xform[input_name]
+        for index in range(len(source_component.container_node[HIER_DATA.OUTPUT_XFORM])):
+            input_xform = self._get_input_xform_attrs(index)
             
             # making controls
             control_ws_inst = control.Axis.create(instance_name=f"{input_xform[HIER_DATA.INPUT_XFORM_NAME].value}_ws", parent=self)

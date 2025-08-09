@@ -4,16 +4,51 @@ import maya.cmds as cmds
 import system.base_component as base_component
 import utils.node_wrapper as nw
 import component.enum_manager as enum_manager
+from typing import Union
+
+def swap_control(to_replace: Union[nw.Container, nw.Transform, base_component.Control], replace_component:type):
+    """Replaces the shape of one control with another
+
+    Args:
+        to_replace (Union[nw.Container, nw.Transform, base_component.Control]):
+        replace_component (type):
+
+    Raises:
+        RuntimeError: if no control class detected for replace component
+        RuntimeError: if to_replace is a transform and has no container
+        RuntimeError: if no component found
+    """
+    if not issubclass(replace_component, base_component.Control):
+        raise RuntimeError(f"{replace_component} is not a control class")
+        
+    if isinstance(to_replace, nw.Container):
+        to_replace = base_component.get_component(to_replace)
+    elif isinstance(to_replace, nw.Transform):
+        container = to_replace.get_container_node()
+        if container is None:
+            raise RuntimeError(f"{to_replace} does not have component")
+        to_replace = base_component.get_component(container)
+    if to_replace is None:
+        raise RuntimeError(f"no source component found")
+    
+    # replace component class
+    to_replace.container_node["componentClass"] = replace_component.get_class_name()
+    # delete shapes
+    cmds.delete([str(x) for x in to_replace.transform_node.get_shapes()])
+
+    replace_component._apply_shape_to_cntrl(to_replace.transform_node, to_replace.container_node)
 
 class Circle(base_component.Control):
     """A circle nurbs curve control"""
-    def _create_shapes(self):
-        return [cmds.circle(normal = self.axis_vec)[0]]
+    @classmethod
+    def _create_shapes(cls):
+        return [cmds.circle(normal=[0, 1, 0])[0]]
 class Axis(base_component.Control):
     """A axis nurbs curve control with a red, green, and blue axis pointers"""
     can_set_color = False
     
-    def _create_shapes(self):
+    @classmethod
+    def _create_shapes(cls):
         x_axis = nw.wrap_node(cmds.curve(degree=1, point=[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]))
         y_axis = nw.wrap_node(cmds.curve(degree=1, point=[[0.0, 0.0, 0.0], [0.0, 1.0, 0.0]]))
         z_axis = nw.wrap_node(cmds.curve(degree=1, point=[[0.0, 0.0, 0.0], [0.0, 0.0, 1.0]]))
@@ -26,7 +61,8 @@ class Axis(base_component.Control):
         return [x_axis, y_axis, z_axis]
 class BoxControl(base_component.Control):
     """A box nurbs curve control"""
-    def _create_shapes(self):
+    @classmethod
+    def _create_shapes(cls):
         x = 1.0
         y = 1.0
         z = 1.0
@@ -42,12 +78,14 @@ class BoxControl(base_component.Control):
         return [box]
 class DiamondControl(base_component.Control):
     """A diamond nurbs surface control"""
-    def _create_shapes(self):
-        diamond = cmds.sphere(axis=self.axis_vec, sections=4, spans=2, degree=1)[0]
+    @classmethod
+    def _create_shapes(cls):
+        diamond = cmds.sphere(axis=[0, 1, 0], sections=4, spans=2, degree=1)[0]
         return [diamond]
 class DiamondWireControl(base_component.Control):
     """A diamond nurbs curve control"""
-    def _create_shapes(self):
+    @classmethod
+    def _create_shapes(cls):
         diamond = cmds.curve(degree=1, point=[
             [0, 1, 0], [1, 0, 0], [0, -1, 0],
             [0, 0, 1], [0, 1, 0],
@@ -59,7 +97,8 @@ class DiamondWireControl(base_component.Control):
         return [diamond]
 class Gear(base_component.Control):
     """A gear nurbs curve control"""
-    def _create_shapes(self):
+    @classmethod
+    def _create_shapes(cls):
         outer_shape = cmds.curve(degree=3, point=[
             [0.303359, 0, 0.940211], [0.662567, 0, 0.732822], [0.707107, 0, 0.720888], [0.751647, 0, 0.732822],
             [0.925336, 0, 0.833101], [0.973133, 0, 0.839394], [1.011381, 0, 0.810046], [1.20721, 0, 0.470859],
@@ -97,8 +136,8 @@ class Gear(base_component.Control):
         return [inner_shape, outer_shape]
 class Gimbal(base_component.Control):
     can_set_color = False
-
-    def _create_shapes(self):
+    @classmethod
+    def _create_shapes(cls):
         circle1 = nw.wrap_node(cmds.circle(normal=[1.0, 0.0, 0.0])[0])
         circle2 = nw.wrap_node(cmds.circle(normal=[0.0, 1.0, 0.0])[0])
         circle3 = nw.wrap_node(cmds.circle(normal=[0.0, 0.0, 1.0])[0])
@@ -110,7 +149,8 @@ class Gimbal(base_component.Control):
         return [circle1, circle2, circle3]
 class Pyramid4(base_component.Control):
     """A pyramid nurbs curve control"""
-    def _create_shapes(self):
+    @classmethod
+    def _create_shapes(cls):
         pyramid = cmds.curve(degree=1, point=[
             [1, 0, 1], [1, 0, -1], [0, 1.4, 0], [1, 0, 1],
             [-1, 0, 1], [0, 1.4, 0], [-1, 0, -1], [-1, 0, 1], 
@@ -119,8 +159,9 @@ class Pyramid4(base_component.Control):
         return [pyramid]
 class Sphere(base_component.Control):
     """A sphere nurbs surface control"""
-    def _create_shapes(self):
-        sphere = cmds.sphere(axis=self.axis_vec)[0]
+    @classmethod
+    def _create_shapes(cls):
+        sphere = cmds.sphere(axis=[0, 1, 0])[0]
         return [sphere]
 class Locator(base_component.Control):
     """A locator control"""
@@ -136,9 +177,10 @@ class Locator(base_component.Control):
         super()._override_build(**kwargs)
 
         loc_shape = self.transform_node.get_shapes()[0]
-        self.input_node["locScale"] >> loc_shape["localScaleX"]
-        self.input_node["locScale"] >> loc_shape["localScaleY"]
-        self.input_node["locScale"] >> loc_shape["localScaleZ"]
+        loc_shape["localScaleX"] << self.input_node["locScale"]
+        loc_shape["localScaleY"] << self.input_node["locScale"]
+        loc_shape["localScaleZ"] << self.input_node["locScale"]
 
-    def _create_shapes(self):
+    @classmethod
+    def _create_shapes(cls):
         return [cmds.spaceLocator()[0]]

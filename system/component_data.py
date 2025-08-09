@@ -205,7 +205,6 @@ class HierData:
         """
 
     HIERARCHY = "hierarchy"
-    HIER_NAME = "hierName"
     HIER_PARENT_MATRIX = "hierParentMatrix"
     HIER_PARENT_INIT_MATRIX = "hierParentInitMatrix"
 
@@ -224,7 +223,6 @@ class HierData:
     OUTPUT_LOC_MATRIX = "outputLocMatrix"
 
     HIER_DATA_NAMES = [
-        HIER_NAME,
         HIER_PARENT_MATRIX,
         HIER_PARENT_INIT_MATRIX
     ]
@@ -325,7 +323,7 @@ class HierData:
         Returns:
             NodeData:
         """
-        return cls.__gen_hier_nodeData(cls.HIERARCHY, cls.HIER_DATA_NAMES)
+        return cls.__gen_hier_nodeData(cls.HIERARCHY, cls.HIER_DATA_NAMES, multi=False)
 
     @classmethod
     def get_input_xform_data(cls):

@@ -5,12 +5,12 @@ import component.control as control
 import utils.utils as utils
 import utils.node_wrapper as nw
 import component.enum_manager as enum_manager
-import maya.cmds as cmds
 
 class Setup(base_component.Hierarchy):
-    """A Base class for setup autorigging components. Derived from Hier"""
+    """A Base class for setup autorigging components. Derived from Hierarchy"""
     root_transform_name = "setup"
     component_type = component_enum_data.ComponentType.setup
+    class_namespace = "setup_"
 
     def _get_input_node_build_attr_data(self):
         node_data = super()._get_input_node_build_attr_data()
@@ -35,7 +35,8 @@ class Setup(base_component.Hierarchy):
         kwargs["num_xforms"] = num_xforms
         kwargs["primary_axis"] = primary_axis
         kwargs["secondary_axis"] = secondary_axis
-        return super().create(instance_name, parent, **kwargs)
+        component_inst = super().create(instance_name, parent, **kwargs)
+        return component_inst
     
     def _override_build(self, **kwargs):
         num_xforms = kwargs["num_xforms"]
@@ -52,7 +53,7 @@ class Setup(base_component.Hierarchy):
             # creating control
             control_inst = control.Locator.create(instance_name=input_xform_attrs[self.HIER_DATA.INPUT_XFORM_NAME], parent=self)
             control_container = control_inst.container_node
-            self.input_node["locScale"] >> control_container["locScale"]
+            control_container["locScale"] << self.input_node["locScale"]
             control_container["offsetMatrix"] = utils.translate_to_matrix([0, index*1.5, 0])
 
             # connecting to output
@@ -62,7 +63,8 @@ class Setup(base_component.Hierarchy):
                 output_world_matrix=control_container["worldMatrix"],
             )
 
-class SetupSimpleLimb(Setup):
+class SimpleLimb(Setup):
+    """3 xform that aim and align to each other. middle xform stays inbetween and orients correctly to whatever the angle the other 2 xform make"""
 
     @classmethod
     def create(cls, instance_name=None, parent=None, **kwargs):
@@ -75,18 +77,18 @@ class SetupSimpleLimb(Setup):
         # creating controls
         control_inst0 = control.Locator.create(instance_name=self.input_node[self.HIER_DATA.INPUT_XFORM][0][self.HIER_DATA.INPUT_XFORM_NAME], parent=self)
         control_inst0.transform_node["ty"] = 8
-        self.container_node["locScale"] >> control_inst0.container_node["locScale"]
+        control_inst0.container_node["locScale"] << self.container_node["locScale"]
         for attr in ["rz","sx","sy","sz"]:
             control_inst0.transform_node[attr].set_locked(True)
             control_inst0.transform_node[attr].set_keyable(False)
         control_inst1 = control.Locator.create(instance_name=self.input_node[self.HIER_DATA.INPUT_XFORM][1][self.HIER_DATA.INPUT_XFORM_NAME], parent=self)
         control_inst1.transform_node["tz"] = -1
-        self.container_node["locScale"] >> control_inst1.container_node["locScale"] 
+        control_inst1.container_node["locScale"] << self.container_node["locScale"]
         for attr in ["ty","rx","ry","rz","sx","sy","sz"]:
             control_inst1.transform_node[attr].set_locked(True)
             control_inst1.transform_node[attr].set_keyable(False)
         control_inst2 = control.Locator.create(instance_name=self.input_node[self.HIER_DATA.INPUT_XFORM][2][self.HIER_DATA.INPUT_XFORM_NAME], parent=self)
-        self.container_node["locScale"] >> control_inst2.container_node["locScale"]
+        control_inst2.container_node["locScale"] << self.container_node["locScale"]
         for attr in ["rx","ry","rz","sx","sy","sz"]:
             control_inst2.transform_node[attr].set_locked(True)
             control_inst2.transform_node[attr].set_keyable(False)
@@ -95,15 +97,15 @@ class SetupSimpleLimb(Setup):
         primary_vec = enum_manager.axis_vec_choice_node(choice_node_name="primary_vec", enum_attr=self.input_node["primaryAxis"])
         secondary_vec = enum_manager.axis_vec_choice_node(choice_node_name="secondary_vec", enum_attr=self.input_node["secondaryAxis"])
         tertiary_vec = nw.create_node("crossProduct", "tertiary_vec")
-        primary_vec["output"] >> tertiary_vec["input1"]
-        secondary_vec["output"] >> tertiary_vec["input2"]
-        self.container_node.add_nodes(primary_vec, secondary_vec, primary_vec)
+        tertiary_vec["input1"] << primary_vec["output"]
+        tertiary_vec["input2"] << secondary_vec["output"]
+        self.container_node.add_nodes(primary_vec, secondary_vec, tertiary_vec)
 
         # mid interp matrix
         mid_interp_matrix, xform2_translate = self.__create_mid_interp_matrix(
             control_inst0.container_node["worldMatrix"], 
             control_inst2.container_node["worldMatrix"])
-        mid_interp_matrix >> control_inst1.container_node["offsetMatrix"]
+        control_inst1.container_node["offsetMatrix"] << mid_interp_matrix
 
         # xform0
         xform0_ws_mat_attr, xform0_inv_attr = self.__create_xform0(
@@ -137,9 +139,9 @@ class SetupSimpleLimb(Setup):
         """
         # aim from source to target
         aim_matrix = nw.create_node("aimMatrix", "mid_mat_aim_ws")
-        source_matrix >> aim_matrix["inputMatrix"] 
-        target_matrix >> aim_matrix["primaryTargetMatrix"]
-        source_matrix >> aim_matrix["secondaryTargetMatrix"]
+        aim_matrix["inputMatrix"]  << source_matrix
+        aim_matrix["primaryTargetMatrix"] << target_matrix
+        aim_matrix["secondaryTargetMatrix"] << source_matrix
         aim_matrix["secondaryMode"] = 2
         aim_matrix["secondaryInputAxis"] = [0, 0, 1]
         aim_matrix["secondaryTargetVector"] = [0, 0, 1]
@@ -150,7 +152,7 @@ class SetupSimpleLimb(Setup):
                                nw.create_node("rowFromMatrix", "xform2_ws_translate")]
 
         for source_matrix, node in zip(input_matricies, transform_mat_nodes):
-            source_matrix >> node["matrix"]
+            node["matrix"] << source_matrix
             node["input"]= 3
 
         # create 4x4 node
@@ -164,7 +166,7 @@ class SetupSimpleLimb(Setup):
                 break
             average_node = nw.create_node("average", f"mid_mat_t{axis.lower()}")
             average_nodes.append(average_node)
-            average_node["output"] >> mid_matrix_inbetween_4x4[f"in3{axis_index}"] 
+            average_node["output"] >> mid_matrix_inbetween_4x4[f"in3{axis_index}"]
             for t_index, node in enumerate(transform_mat_nodes):
                 node[f"output{axis}"] >> average_node["input"][t_index]
 
@@ -175,15 +177,15 @@ class SetupSimpleLimb(Setup):
         for row in range(3):
             row_matrix_node = nw.create_node("rowFromMatrix", f"mid_mat_aim_row{row}")
             aim_matrix_row_nodes.append(row_matrix_node)
-            aim_matrix["outputMatrix"] >> row_matrix_node["matrix"]
+            row_matrix_node["matrix"] << aim_matrix["outputMatrix"]
             row_matrix_node["input"] = row
             for axis_index, axis in axis_enumerated:
                 row_matrix_node[f"output{axis}"] >> mid_matrix_inbetween_4x4[f"in{row}{axis_index}"]
 
         # scale compensate
         scale_comp = nw.create_node("multMatrix", "mid_mat_scale_compensate_ws")
-        mid_matrix_inbetween_4x4["output"] >> scale_comp["matrixIn"][0]
-        self.transform_node["worldInverseMatrix"][0] >> scale_comp["matrixIn"][1]
+        scale_comp["matrixIn"][0] << mid_matrix_inbetween_4x4["output"]
+        scale_comp["matrixIn"][1] << self.transform_node["worldInverseMatrix"][0]
 
         # adding nodes to container
         self.container_node.add_nodes(aim_matrix, *transform_mat_nodes, mid_matrix_inbetween_4x4, *average_nodes, *aim_matrix_row_nodes, scale_comp)
@@ -204,23 +206,23 @@ class SetupSimpleLimb(Setup):
         aim_node = nw.create_node("aimMatrix", "out_xform0_aim_ws_mat")
 
         # aim matrix ws
-        guide_transform0_ws_mat >> aim_node["inputMatrix"]
-        guide_transform1_ws_mat >> aim_node["primaryTargetMatrix"]
-        primary_vec >> aim_node["primaryInputAxis"]
-        guide_transform0_ws_mat >> aim_node["secondaryTargetMatrix"]
-        secondary_vec >> aim_node["secondaryInputAxis"]
+        aim_node["inputMatrix"] << guide_transform0_ws_mat
+        aim_node["primaryTargetMatrix"] << guide_transform1_ws_mat
+        aim_node["primaryInputAxis"] << primary_vec
+        aim_node["secondaryTargetMatrix"] << guide_transform0_ws_mat
+        aim_node["secondaryInputAxis"] << secondary_vec
         aim_node["secondaryTargetVector"] = [0, 0, 1]
         aim_node["secondaryMode"] = 2
 
         # pick out scale matrix
         pick_mat = nw.create_node("pickMatrix", "xform0_pick_mat")
-        aim_node["outputMatrix"] >> pick_mat["inputMatrix"]
+        pick_mat["inputMatrix"] << aim_node["outputMatrix"]
         pick_mat["useScale"] = False
         pick_mat["useShear"] = False
 
         # xform0 inverse
         mat_inv = nw.create_node("inverseMatrix", "xform0_inv_mat")
-        pick_mat["outputMatrix"] >> mat_inv["inputMatrix"]
+        mat_inv["inputMatrix"] << pick_mat["outputMatrix"]
 
         # connect to output xform
         self._set_output_xform_attrs(
@@ -252,28 +254,28 @@ class SetupSimpleLimb(Setup):
         aim_node = nw.create_node("aimMatrix", "out_xform1_aim_ws_mat")
 
         # aim matrix ws
-        guide_transform1_ws_mat >> aim_node["inputMatrix"]
-        guide_transform2_ws_mat >> aim_node["primaryTargetMatrix"]
-        primary_vec >> aim_node["primaryInputAxis"]
-        xform0_ws_mat >> aim_node["secondaryTargetMatrix"]
-        tertiary_vec >> aim_node["secondaryInputAxis"]
-        tertiary_vec >> aim_node["secondaryTargetVector"]
+        aim_node["inputMatrix"] << guide_transform1_ws_mat
+        aim_node["primaryTargetMatrix"] << guide_transform2_ws_mat
+        aim_node["primaryInputAxis"] << primary_vec
+        aim_node["secondaryTargetMatrix"] << xform0_ws_mat
+        aim_node["secondaryInputAxis"] << tertiary_vec
+        aim_node["secondaryTargetVector"] << tertiary_vec
         aim_node["secondaryMode"] = 2
 
         # pick out scale matrix
         pick_mat = nw.create_node("pickMatrix", "xform1_pick_mat")
-        aim_node["outputMatrix"] >> pick_mat["inputMatrix"]
+        pick_mat["inputMatrix"] << aim_node["outputMatrix"]
         pick_mat["useScale"] = False
         pick_mat["useShear"] = False
 
         # xform1 inverse
         mat_inv = nw.create_node("inverseMatrix", "xform1_inv_mat")
-        pick_mat["outputMatrix"] >> mat_inv["inputMatrix"]
+        mat_inv["inputMatrix"] << pick_mat["outputMatrix"]
 
         # xform1 loc
         mat_loc = nw.create_node("multMatrix", "xform1_loc_mat")
-        pick_mat["outputMatrix"] >> mat_loc["matrixIn"][0]
-        xform0_inv_mat >> mat_loc["matrixIn"][1]
+        mat_loc["matrixIn"][0] << pick_mat["outputMatrix"]
+        mat_loc["matrixIn"][1] << xform0_inv_mat
 
         # connect to output xform
         self._set_output_xform_attrs(
@@ -285,7 +287,7 @@ class SetupSimpleLimb(Setup):
             output_loc_matrix=mat_loc["matrixSum"]
         )
 
-        self.container_node.add_nodes(aim_node, mat_inv, mat_loc)
+        self.container_node.add_nodes(aim_node, mat_inv, pick_mat, mat_loc)
         return pick_mat["outputMatrix"], mat_inv["outputMatrix"]
     def __create_xform2(self, xform1_ws_mat:nw.Attr, xform2_translate:nw.Node, xform1_inv_mat:nw.Attr):
         """Creates all xform2 nodes
@@ -299,7 +301,7 @@ class SetupSimpleLimb(Setup):
         for row in range(3):
             xform_mat = nw.create_node("rowFromMatrix", f"xform2_row{row}_mat")
             rows_vecs.append(xform_mat)
-            xform1_ws_mat >> xform_mat["matrix"]
+            xform_mat["matrix"] << xform1_ws_mat
             xform_mat["input"] = row
         xform_matrix2_ws = nw.create_node("fourByFourMatrix", "xform2_ws_mat_4x4")
 
@@ -309,12 +311,12 @@ class SetupSimpleLimb(Setup):
 
         # xform2 inverse
         xform_matrix2_inv = nw.create_node("inverseMatrix", "xform2_inv_mat")
-        xform_matrix2_ws["output"] >> xform_matrix2_inv["inputMatrix"]
+        xform_matrix2_inv["inputMatrix"] << xform_matrix2_ws["output"]
 
         # xform2 loc
         xform_matrix2_loc = nw.create_node("multMatrix", "xform2_loc_mat")
-        xform_matrix2_ws["output"] >> xform_matrix2_loc["matrixIn"][0]
-        xform1_inv_mat >> xform_matrix2_loc["matrixIn"][1]
+        xform_matrix2_loc["matrixIn"][0] << xform_matrix2_ws["output"]
+        xform_matrix2_loc["matrixIn"][1] << xform1_inv_mat
 
         # xform2 connect to output xform
         self._set_output_xform_attrs(

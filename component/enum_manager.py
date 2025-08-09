@@ -24,7 +24,7 @@ def axis_vec_choice_node(choice_node_name, enum_attr:nw.Attr=None):
         
         axis_vec_container["axis"][item.name] >> choice_node["input"][index]
     if enum_attr is not None:
-        enum_attr >> choice_node["selector"]
+        enum_attr  >> choice_node["selector"]
 
     return choice_node
 
@@ -119,10 +119,9 @@ class Color(base_component.SingletonComponent):
         shader["color"] = index_color
 
         shader_sg = nw.wrap_node(cmds.sets(name=f"{color.name}LambSG", renderable=True, noSurfaceShader=True, empty=True))
-        shader["outColor"] >> shader_sg["surfaceShader"]
+        shader_sg["surfaceShader"] << shader["outColor"]
 
-        shader["color"] >> color_manager_inst.output_node["color"][color.name]
-
+        color_manager_inst.output_node["color"][color.name] << shader["color"]
         color_manager_inst.container_node.add_nodes(shader, shader_sg)
         color_manager_inst.rename_nodes()
         
@@ -167,7 +166,7 @@ class Color(base_component.SingletonComponent):
                 shape["overrideEnabled"] = True
                 shape["overrideRGBColors"] = 1
                 if connect:
-                    cls.get_shader(color)["color"] >> shape["overrideColorRGB"]
+                    shape["overrideColorRGB"] << cls.get_shader(color)["color"]
                 else:
                     shape["overrideColorRGB"] = cls.get_shader(color)["color"]
         

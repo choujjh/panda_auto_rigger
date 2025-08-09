@@ -53,7 +53,6 @@ class Component():
         """
         self.__node_data_cache = {}
         self.__namespace_cache = {"full_namespace":"", "short_namespace":"", "instance_namespace":"", "hier_side":"", "instance_name":""}
-        self.class_name = utils.class_type_to_str(type(self))
         if container_node is not None:
             self.__node_data_cache["container_node"] = container_node
     def _get_node_data_from_cache(self, key:str) -> nw.Node:
@@ -121,6 +120,9 @@ class Component():
             _type_: _description_
         """
         return self.container_node["built"].value
+    @classmethod
+    def get_class_name(cls)->str:
+        return utils.class_type_to_str(cls)
 
     #namespace functions
     @property
@@ -231,7 +233,7 @@ class Component():
         node_data =  component_data.NodeData(
             component_data.AttrData(name="input", type_="compound", publish=True),
             component_data.AttrData(name="buildData", type_="compound", publish=True),
-            component_data.AttrData(name="componentClass", type_="string", value=self.class_name, locked=True, parent="buildData"),
+            component_data.AttrData(name="componentClass", type_="string", value=type(self).get_class_name(), locked=True, parent="buildData"),
             component_data.AttrData(name="componentType", type_=type(self).component_type, locked=True, parent="buildData"),
             component_data.AttrData(name="instanceName", type_="string", parent="buildData"),
         )
@@ -506,7 +508,7 @@ class Hierarchy(Component):
         # if connected to transform
         if (output_init_src.attr_name == "worldMatrix[0]" and 
             output_init_src.node.has_attr("worldInverseMatrix[0]")):
-            output_init_src.node["worldInverseMatrix[0]"] >> output_init_inv_matrix
+            output_init_src.node["worldInverseMatrix"][0] >> output_init_inv_matrix
 
         # if output init connected to input init
         elif output_init_src == input_init_matrix:
@@ -515,7 +517,7 @@ class Hierarchy(Component):
         # if output init is connected to
         elif output_init_src is not None:
             inverse_matrix_node = nw.create_node("inverseMatrix", f"xform{index}_inverse_mat")
-            output_init_src >> inverse_matrix_node["inputMatrix"]
+            inverse_matrix_node["inputMatrix"] << output_init_src
             inverse_matrix_node["outputMatrix"] >> output_init_inv_matrix
             return [inverse_matrix_node]
         
@@ -536,7 +538,7 @@ class Hierarchy(Component):
         output_world_matrix_src = output_xform_attrs[self.HIER_DATA.OUTPUT_WORLD_MATRIX].get_src_connection()
 
         # if loc matrix already has connection
-        if output_loc_matrix.has_src_connection:
+        if output_loc_matrix.has_src_connection():
             return []
         added_nodes = []
         # if world matrix isn't connected return
@@ -561,15 +563,15 @@ class Hierarchy(Component):
             # if inverse node needed
             if inverse_attr is None:
                 inverse_matrix_node = nw.create_node("inverseMatrix", f"xform{index-1}_out_world_inverse_mat")
-                prev_world_matrix_src >> inverse_matrix_node["inputMatrix"]
+                inverse_matrix_node["inputMatrix"] << prev_world_matrix_src
                 inverse_attr = inverse_matrix_node["outputMatrix"]
 
                 added_nodes = [inverse_attr]
 
             # adding matrix mult
             mat_mult = nw.create_node("multMatrix", f"xform{index}_loc_output_mat_mult")
-            output_world_matrix_src >> mat_mult["matrixIn"][0]
-            inverse_attr >> mat_mult["matrixIn"][1]
+            mat_mult["matrixIn"][0] << output_world_matrix_src
+            mat_mult["matrixIn"][1] << inverse_attr
             mat_mult["matrixSum"] >> output_loc_matrix
 
             added_nodes.append(mat_mult)
@@ -666,6 +668,23 @@ class Hierarchy(Component):
                 input_xform_matricies[input_attr].set(source_attr)
             elif source_attr is not None:
                 source_attr >> input_xform_matricies[input_attr]
+    def _connect_source_hier_component(self, source_component):
+        if issubclass(type(source_component), Hierarchy):
+            HIER_DATA = self.HIER_DATA
+
+            self_container = self.container_node
+            source_container = source_component.container_node
+            for hier_attr_name in HIER_DATA.HIER_DATA_NAMES:
+                source_container[hier_attr_name] >> self_container[hier_attr_name]
+
+            for index, src_output_xform in enumerate(source_container[HIER_DATA.OUTPUT_XFORM]):
+                input_xform = self._get_input_xform_attrs(index)
+
+                # connecting src output to component input
+                for output_name, input_name in zip(HIER_DATA.OUTPUT_DATA_NAMES, HIER_DATA.INPUT_DATA_NAMES):
+                    src_output_xform[output_name] >> input_xform[input_name]
+        else:
+            cmds.warning(f"{source_component} is not of type Hierarchy")
 
 class Control(Component):
     """A Base class for all control autorigging components. Derived from Component
@@ -711,7 +730,7 @@ class Control(Component):
         self.transform_node["visibility"].set_keyable(False)
 
         # add shapes
-        self._apply_shape_to_cntrl()
+        self._apply_shape_to_cntrl(self.transform_node, self.container_node)
 
         # add build transforms
         self.transform_node["translate"] = kwargs["build_t"]
@@ -719,7 +738,8 @@ class Control(Component):
         self.transform_node["scale"] = kwargs["build_s"]
         self.transform_node.freeze_transforms()
 
-    def _create_shapes(self) -> list:
+    @classmethod
+    def _create_shapes(cls) -> list:
         """Creates shapes and returns a list of the shapes transforms. these 
         shapes will be parented to the transform node later
 
@@ -727,12 +747,18 @@ class Control(Component):
             list(nw.Node):
         """
         raise NotImplementedError
-        
-    def _apply_shape_to_cntrl(self):
-        """Takes create shape function and adds all shapes to transform node"""
+    
+    @classmethod
+    def _apply_shape_to_cntrl(cls, cntrl_transform:nw.Transform, component_container:nw.Container=None):
+        """Takes create shape function and adds all shapes to transform node
+
+        Args:
+            cntrl_transform (nw.Transform):
+            component_container (nw.Container):
+        """
 
         # parenting to transform
-        shape_transforms = self._create_shapes()
+        shape_transforms = cls._create_shapes()
         for transform in shape_transforms:
             if not isinstance(transform, nw.Node):
                 transform = nw.wrap_node(transform)
@@ -745,21 +771,22 @@ class Control(Component):
 
             # apply to transform
             for x in cmds.listRelatives(str(transform), shapes=True):
-                cmds.parent(x, str(self.transform_node), relative=True, shape=True)
+                cmds.parent(x, str(cntrl_transform), relative=True, shape=True)
         
         # deleting transforms
         if shape_transforms != []:
             cmds.delete(shape_transforms)
 
-        shapes_list = self.transform_node.get_shapes()
+        shapes_list = cntrl_transform.get_shapes()
     
         # rename shapes
-        transform_stripped_name = utils.Namespace.strip_namespace(str(self.transform_node))
+        transform_stripped_name = utils.Namespace.strip_namespace(str(cntrl_transform))
         for index, shape in enumerate(shapes_list):
             shape.rename(f"{transform_stripped_name}Shape{index+1}")
 
         # add shapes to container
-        self.container_node.add_nodes(*shapes_list)
+        if component_container is not None:
+            component_container.add_nodes(*shapes_list)
 
     def promote_attr_to_keyable(self, attr:nw.Attr, name=None, **kwargs):
         """Turns attribute given into a controllable attribute by the control
