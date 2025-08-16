@@ -459,7 +459,6 @@ class Hierarchy(Component):
 
         # add nodes to container
         self.container_node.add_nodes(*added_nodes)
-
     def __populate_name(self, index:int):
         """Given the index tries to connect or set the output name
 
@@ -489,8 +488,8 @@ class Hierarchy(Component):
         Args:
             index (int): xform index
         """
-        input_xform_dict = self._get_input_xform_attrs(index)
-        output_xform_dict = self._get_output_xform_attrs(index)
+        input_xform_dict = self._get_input_xform_index_attrs(index)
+        output_xform_dict = self._get_output_xform_index_attrs(index)
 
         # storing matrix attributes
         input_init_matrix = input_xform_dict[self.HIER_DATA.INPUT_INIT_MATRIX]
@@ -504,9 +503,14 @@ class Hierarchy(Component):
         # if output init inverse matrix is connected then return
         if output_init_inv_matrix.get_src_connection() is not None:
             return []
+        
+        # if lengths match
+        elif len(input_init_matrix.parent) == len(output_init_matrix.parent):
+            input_init_matrix >> output_init_matrix
+            input_init_inv_matrix >> output_init_inv_matrix
 
         # if connected to transform
-        if (output_init_src.attr_name == "worldMatrix[0]" and 
+        elif (output_init_src.attr_name == "worldMatrix[0]" and 
             output_init_src.node.has_attr("worldInverseMatrix[0]")):
             output_init_src.node["worldInverseMatrix"][0] >> output_init_inv_matrix
 
@@ -521,11 +525,6 @@ class Hierarchy(Component):
             inverse_matrix_node["outputMatrix"] >> output_init_inv_matrix
             return [inverse_matrix_node]
         
-        # if lengths match
-        elif len(input_init_matrix.parent) == len(output_init_matrix.parent):
-            input_init_matrix >> output_init_matrix
-            input_init_inv_matrix >> output_init_inv_matrix
-
         return []
     def __populate_loc_matrix(self, index:int):
         """Given the index tries to connect or set the output local matrix
@@ -533,7 +532,7 @@ class Hierarchy(Component):
         Args:
             index (int): xform index
         """
-        output_xform_attrs = self._get_output_xform_attrs(index)
+        output_xform_attrs = self._get_output_xform_index_attrs(index)
         output_loc_matrix = output_xform_attrs[self.HIER_DATA.OUTPUT_LOC_MATRIX]
         output_world_matrix_src = output_xform_attrs[self.HIER_DATA.OUTPUT_WORLD_MATRIX].get_src_connection()
 
@@ -596,7 +595,7 @@ class Hierarchy(Component):
                         cmds.warning(f"{attr[sub_attr]} not set")
                 elif not attr[sub_attr].has_src_connection():
                     cmds.warning(f"{attr[sub_attr]} does not have connection")
-    def _get_input_xform_attrs(self, index:int):
+    def _get_input_xform_index_attrs(self, index:int):
         """Gets the input attributes of an index
 
         Args:
@@ -606,7 +605,7 @@ class Hierarchy(Component):
             dict: dict of input attributes
         """
         return {key: self.input_node[self.HIER_DATA.INPUT_XFORM][index][key] for key in self.HIER_DATA.INPUT_DATA_NAMES}
-    def _get_output_xform_attrs(self, index:int):
+    def _get_output_xform_index_attrs(self, index:int):
         """Gets the output attributes of an index
 
         Args:
@@ -616,7 +615,23 @@ class Hierarchy(Component):
             dict: dict of output attributes
         """
         return {key: self.output_node[self.HIER_DATA.OUTPUT_XFORM][index][key] for key in self.HIER_DATA.OUTPUT_DATA_NAMES}
-    def _set_output_xform_attrs(
+    def _get_input_xform_attrs(self):
+        """Gets a list of all input xforms
+
+        Returns:
+            list: 
+        """
+        input_len = len(self.input_node[self.HIER_DATA.INPUT_XFORM])
+        return [self._get_input_xform_index_attrs(index) for index in range(input_len)]
+    def _get_output_xform_attrs(self):
+        """Gets a list of all output xforms
+
+        Returns:
+            list:
+        """
+        output_len = len(self.output_node[self.HIER_DATA.OUTPUT_XFORM])
+        return [self._get_output_xform_index_attrs(index) for index in range(output_len)]
+    def _set_output_xform_index_attrs(
             self, 
             index:int, 
             output_xform_name:Union[nw.Attr, str]=None, 
@@ -635,14 +650,14 @@ class Hierarchy(Component):
             output_world_matrix (nw.Attr, optional): Defaults to None.
             output_loc_matrix (nw.Attr, optional): Defaults to None.
         """
-        output_xform_matricies = self._get_output_xform_attrs(index)
+        output_xform_matricies = self._get_output_xform_index_attrs(index)
         source_attr_list = [output_xform_name, output_init_matrix, output_init_inv_matrix, output_world_matrix, output_loc_matrix]
         for source_attr, output_attr in zip(source_attr_list, self.HIER_DATA.OUTPUT_DATA_NAMES):
             if isinstance(source_attr, str):
                 output_xform_matricies[output_attr].set(source_attr)
             elif source_attr is not None:
                 source_attr >> output_xform_matricies[output_attr]
-    def _set_input_xform_attrs(
+    def _set_input_xform_index_attrs(
             self, 
             index:int, 
             input_xform_name:Union[nw.Attr, str]=None, 
@@ -661,7 +676,7 @@ class Hierarchy(Component):
             input_world_matrix (nw.Attr, optional): Defaults to None.
             input_loc_matrix (nw.Attr, optional): Defaults to None.
         """
-        input_xform_matricies = self._get_input_xform_attrs(index)
+        input_xform_matricies = self._get_input_xform_index_attrs(index)
         source_attr_list = [input_xform_name, input_init_matrix, input_init_inv_matrix, input_world_matrix, input_loc_matrix]
         for source_attr, input_attr in zip(source_attr_list, self.HIER_DATA.INPUT_DATA_NAMES):
             if isinstance(source_attr, str):
@@ -678,7 +693,7 @@ class Hierarchy(Component):
                 source_container[hier_attr_name] >> self_container[hier_attr_name]
 
             for index, src_output_xform in enumerate(source_container[HIER_DATA.OUTPUT_XFORM]):
-                input_xform = self._get_input_xform_attrs(index)
+                input_xform = self._get_input_xform_index_attrs(index)
 
                 # connecting src output to component input
                 for output_name, input_name in zip(HIER_DATA.OUTPUT_DATA_NAMES, HIER_DATA.INPUT_DATA_NAMES):
@@ -686,6 +701,39 @@ class Hierarchy(Component):
         else:
             cmds.warning(f"{source_component} is not of type Hierarchy")
 
+    def _create_orient_translate_blend(self,name:str, matrix_attr:nw.Attr, tx_attr:nw.Attr, ty_attr:nw.Attr, tz_attr:nw.Attr, tw_attr:nw.Attr=None):
+        """Creates a blended matrix where the translate values are overriden
+
+        Args:
+            name (str): 
+            matrix_attr (nw.Attr): matrix to blend from
+            tx_attr (nw.Attr): translate X attr
+            ty_attr (nw.Attr): translate Y attr
+            tz_attr (nw.Attr): translate Z attr
+            tw_attr (nw.Attr, optional): translate W attr. Defaults to None.
+        """
+        row_nodes = []
+        matrix_4x4 = nw.create_node("fourByFourMatrix", f"{name}_4x4_mat")
+        matrix_4x4["in30"] << tx_attr
+        matrix_4x4["in31"] << ty_attr
+        matrix_4x4["in32"] << tz_attr
+        if tw_attr is not None:
+            matrix_4x4["in33"] << tw_attr
+        for row_index in range(3):
+            row_node = nw.create_node("rowFromMatrix", f"{name}_row{row_index}")
+            row_node["input"] = row_index
+            row_node["matrix"] << matrix_attr
+
+            for col_index, axis in enumerate(["X", "Y", "Z", "W"]):
+                matrix_4x4[f"in{row_index}{col_index}"] << row_node[f"output{axis}"]
+            row_nodes.append(row_node)
+        
+
+        self.container_node.add_nodes(matrix_4x4, *row_nodes)
+        return matrix_4x4
+        
+    def _create_start_aim_matrix(self):
+        pass
 class Control(Component):
     """A Base class for all control autorigging components. Derived from Component
 
@@ -698,7 +746,7 @@ class Control(Component):
     can_set_color = True
 
     @classmethod
-    def create(cls, instance_name = None, parent=None, axis_vec:component_enum_data.AxisEnum=component_enum_data.AxisEnum.y, 
+    def create(cls, instance_name = None, parent=None, axis_vec=None, 
                build_tx=0.0, build_ty=0.0, build_tz=0.0,
                build_rx=0.0, build_ry=0.0, build_rz=0.0,
                build_sx=1.0, build_sy=1.0, build_sz=1.0, **kwargs):
@@ -725,12 +773,12 @@ class Control(Component):
         return node_data
 
     def _override_build(self, **kwargs):
-        self.axis_vec = kwargs["axis_vec"].value
+        axis_vec = kwargs["axis_vec"]
         # set visibility to hidden in channel box
         self.transform_node["visibility"].set_keyable(False)
 
         # add shapes
-        self._apply_shape_to_cntrl(self.transform_node, self.container_node)
+        type(self)._apply_shape_to_cntrl(self.transform_node, self.container_node, axis_vec)
 
         # add build transforms
         self.transform_node["translate"] = kwargs["build_t"]
@@ -739,9 +787,12 @@ class Control(Component):
         self.transform_node.freeze_transforms()
 
     @classmethod
-    def _create_shapes(cls) -> list:
+    def _create_shapes(cls, axis_vec) -> list:
         """Creates shapes and returns a list of the shapes transforms. these 
         shapes will be parented to the transform node later
+
+        Args:
+            axis_vec(vector, component_enum_data.AxisEnum):
 
         Returns:
             list(nw.Node):
@@ -749,16 +800,22 @@ class Control(Component):
         raise NotImplementedError
     
     @classmethod
-    def _apply_shape_to_cntrl(cls, cntrl_transform:nw.Transform, component_container:nw.Container=None):
+    def _apply_shape_to_cntrl(cls, cntrl_transform:nw.Transform, component_container:nw.Container=None, axis_vec=None):
         """Takes create shape function and adds all shapes to transform node
 
         Args:
             cntrl_transform (nw.Transform):
             component_container (nw.Container):
+            axis_vec (vector, component_enum_data.AxisEnum, None): 
         """
+        # axis vec
+        if axis_vec is None:
+            axis_vec = component_enum_data.AxisEnum.y.value
+        elif component_enum_data.get_enum_item_class(axis_vec) == component_enum_data.AxisEnum:
+            axis_vec = axis_vec.value
 
         # parenting to transform
-        shape_transforms = cls._create_shapes()
+        shape_transforms = cls._create_shapes(axis_vec=axis_vec)
         for transform in shape_transforms:
             if not isinstance(transform, nw.Node):
                 transform = nw.wrap_node(transform)

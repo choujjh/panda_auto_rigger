@@ -3,7 +3,6 @@ import component.control as control
 import utils.node_wrapper as nw
 import maya.cmds as cmds
 
-
 class VisualizeHier(base_component.Hierarchy):
     """Helps visualize and debug hierarchies by creating chains for world space and local visualization"""
     root_transform_name = "vis_grp"
@@ -26,7 +25,7 @@ class VisualizeHier(base_component.Hierarchy):
         self._connect_source_hier_component(source_component=source_component)
 
         for index in range(len(source_component.container_node[HIER_DATA.OUTPUT_XFORM])):
-            input_xform = self._get_input_xform_attrs(index)
+            input_xform = self._get_input_xform_index_attrs(index)
             
             # making controls
             control_ws_inst = control.Axis.create(instance_name=f"{input_xform[HIER_DATA.INPUT_XFORM_NAME].value}_ws", parent=self)
@@ -48,7 +47,7 @@ class VisualizeHier(base_component.Hierarchy):
             prev_loc_transform = control_loc_inst.transform_node
 
             # connecting to component output
-            output_xform = self._get_output_xform_attrs(index)
+            output_xform = self._get_output_xform_index_attrs(index)
             for input_name, output_name in zip(HIER_DATA.INPUT_DATA_NAMES, HIER_DATA.OUTPUT_DATA_NAMES):
                 input_xform[input_name] >> output_xform[output_name]
 

@@ -364,3 +364,14 @@ class SelectorWeightType(MayaEnumAttr):
     """Enum for different interpolations"""
     wave = 0
     zipper = 1 
+class SoftIKBlendTypes(MayaEnumAttr):
+    """Enum for Blend types"""
+    smoothStep = 0
+    cubic = 1
+
+class SoftIKBlendCurve(MayaEnumAttr):
+    """Enum for which type of curve to blend to"""
+    linear = 0
+    quadratic = 1
+    cubic = 2
+

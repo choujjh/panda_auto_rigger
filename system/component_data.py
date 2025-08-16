@@ -206,7 +206,7 @@ class HierData:
 
     HIERARCHY = "hierarchy"
     HIER_PARENT_MATRIX = "hierParentMatrix"
-    HIER_PARENT_INIT_MATRIX = "hierParentInitMatrix"
+    HIER_PARENT_INIT_INV_MATRIX = "hierParentInitInvMatrix"
 
     INPUT_XFORM = "inputXform"
     INPUT_XFORM_NAME = "inputXformName" 
@@ -224,7 +224,7 @@ class HierData:
 
     HIER_DATA_NAMES = [
         HIER_PARENT_MATRIX,
-        HIER_PARENT_INIT_MATRIX
+        HIER_PARENT_INIT_INV_MATRIX
     ]
     INPUT_DATA_NAMES = [
         INPUT_XFORM_NAME,
