@@ -292,6 +292,8 @@ class Node():
                 attr_name = attr.attr_name
                 self.__attr_cache[attr_name] = attr
 
+        self.__full_attr_list = [attr for attr in self.__full_attr_list if attr.parent is None]
+
         return self.__full_attr_list
     
     def get_dep_node(self):
@@ -1072,23 +1074,29 @@ class Attr():
 
         Returns:
         """
-        
-        if plug.isArray:
-            plug_list = [plug.elementByLogicalIndex(i) for i in range(plug.numElements())]
-            plug_list = [self._get_value(x) for x in plug_list]
-            return plug_list
-        elif plug.isCompound:
-            plug_list = [plug.child(i) for i in range(plug.numChildren())]
-            plug_list = [self._get_value(x) for x in plug_list]
-            return tuple(plug_list)
-        elif self._plug_attr_type(plug) in self.__attr_data_map__.keys():
-            return self.__attr_data_map__[self._plug_attr_type(plug)]["get"](plug)
-        # else:
-            # attr_type = cmds.getAttr(str(self), type=True)
-        return_value = cmds.getAttr(str(self))
-            # if attr_type == "matrix":
-            #     return_value = [return_value[i:i+4] for i in range(0, len(return_value), 4)]
-        return return_value
+        try:
+            if plug.isArray:
+                plug_list = [plug.elementByLogicalIndex(i) for i in range(plug.numElements())]
+                plug_list = [self._get_value(x) for x in plug_list]
+                return plug_list
+            elif plug.isCompound:
+                plug_list = [plug.child(i) for i in range(plug.numChildren())]
+                plug_list = [self._get_value(x) for x in plug_list]
+                return tuple(plug_list)
+            elif self._plug_attr_type(plug) in self.__attr_data_map__.keys():
+                return self.__attr_data_map__[self._plug_attr_type(plug)]["get"](plug)
+            # else:
+                # attr_type = cmds.getAttr(str(self), type=True)
+            return_value = cmds.getAttr(str(self))
+                # if attr_type == "matrix":
+                #     return_value = [return_value[i:i+4] for i in range(0, len(return_value), 4)]
+            return return_value
+        except RuntimeError as e:
+            print(f"ERROR {self} | {e}")
+            return None
+        except ValueError as e:
+            print(f"ERROR {self} | {e}")
+            return None
     def __eq__(self, other):
         """Returns True if the other object is of type Attr and the 
         other's plug matches self's plug
