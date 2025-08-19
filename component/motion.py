@@ -81,6 +81,7 @@ class SimpleIK(base_component.Hierarchy):
             component_data.AttrData("IKSide", type_="double", parent="IK"),
             component_data.AttrData("IKStretch", type_="bool", parent="IK", value=True),
             component_data.AttrData("softIKBlendStart", type_="double", parent="IK", value=0.9, min=0, max=1),
+            component_data.AttrData("softIKEnabled", type_="bool", parent="IK"),
             component_data.AttrData("blendType", type_=component_enum_data.SoftIKBlendTypes.smoothStep, parent="IK"),
             component_data.AttrData("blendCurve", type_=component_enum_data.SoftIKBlendCurve.quadratic, parent="IK"),
         )
@@ -184,8 +185,13 @@ class SimpleIK(base_component.Hierarchy):
                 f"float $len2 = {len2_attr};",
                 f"float $lenRatio = $len2 / $len1;\n",
 
-                f"float $len1Scalar = sqrt({cos0_squared_attr}+pow({solved_height_attr}, 2));",
-                f"float $len2Scalar = sqrt(1 - ($lenRatio * pow({init_height_attr}, 2)) + ($lenRatio * pow({solved_height_attr}, 2)));\n",
+                f"float $len1Scalar = 1.0;",
+                f"float $len2Scalar = 1.0;\n",
+
+                f"if ({self.container_node['softIKEnabled']}) {{",
+                f"\t$len1Scalar = sqrt({cos0_squared_attr}+pow({solved_height_attr}, 2));",
+                f"\t$len2Scalar = sqrt(1 - ($lenRatio * pow({init_height_attr}, 2)) + ($lenRatio * pow({solved_height_attr}, 2)));\n",
+                "}",
 
                 f"{soft_ik_output_data_node['len1']} = $len1 * $len1Scalar;",
                 f"{soft_ik_output_data_node['len2']} = $len2 * $len2Scalar;",

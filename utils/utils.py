@@ -234,6 +234,34 @@ def make_valid_maya_name(name:str):
     """
     return name.replace("[", "_").replace("]", "").replace(" ", "_")
 
+def is_iterable(obj):
+    """Returns if something is iterable 
+
+    Args:
+        obj (Any): object to check
+
+    Returns:
+        bool:
+    """
+    try:
+        iter(obj)
+        return True
+    except:
+        return False
+def make_iterable(obj):
+    """returns the obj in a list if object is not iterable
+
+    Args:
+        obj (Any):
+
+    Returns:
+        Iterable:
+    """
+    if is_iterable(obj):
+        return obj
+    else:
+        return [obj]
+
 class Namespace:
     """Class of static functions to handle namespaces"""
     @classmethod

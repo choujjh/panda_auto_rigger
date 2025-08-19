@@ -41,9 +41,6 @@ def swap_control(to_replace: Union[nw.Container, nw.Transform, base_component.Co
 class Circle(base_component.Control):
     """A circle nurbs curve control"""
     @classmethod
-    def create(cls, instance_name=None, parent=None, axis_vec=None, build_tx=0, build_ty=0, build_tz=0, build_rx=0, build_ry=0, build_rz=0, build_sx=1, build_sy=1, build_sz=1, **kwargs):
-        return super().create(instance_name, parent, axis_vec, build_tx, build_ty, build_tz, build_rx, build_ry, build_rz, build_sx, build_sy, build_sz, **kwargs)
-    @classmethod
     def _create_shapes(cls, axis_vec):
         return [cmds.circle(normal=axis_vec)[0]]
 class Axis(base_component.Control):

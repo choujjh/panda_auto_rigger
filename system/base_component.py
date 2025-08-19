@@ -35,7 +35,6 @@ class Component():
         output_node (nw.Node): Node that all outgoing connections go through this node
         transform_node (nw.Node): Transform node (also input node). if no transform node 
         is created returns None
-        is_built (bool): True if the component is already built
         full_namespace (str): namespace with all parent namespaces included
         short_namespace (str): components full namespace (without parent namespaces)
         instance_namespace (str): instance name + side
@@ -112,14 +111,6 @@ class Component():
         """
         if type(self).root_transform_name is not None:
             return self.input_node
-    @property
-    def is_built(self):
-        """True if the component is already built
-
-        Returns:
-            _type_: _description_
-        """
-        return self.container_node["built"].value
     @classmethod
     def get_class_name(cls)->str:
         return utils.class_type_to_str(cls)
@@ -257,7 +248,6 @@ class Component():
             comp_data.NodeData:
         """
         return component_data.NodeData(
-            component_data.AttrData(name="built", type_="bool", locked=True),
             component_data.AttrData(name="controlSetups", type_="message"),
             component_data.AttrData(name="parentComponent", type_="message"),
             component_data.AttrData(name="childComponents", type_="message", multi=True),
@@ -328,7 +318,6 @@ class Component():
     def _post_build(self):
         """Build cleanup. sets build to true and renames nodes
         """
-        self.container_node["built"] = True
         self.rename_nodes()
 
     def __create_base_nodes(self, parent_container:nw.Container=None):
@@ -701,24 +690,25 @@ class Hierarchy(Component):
         else:
             cmds.warning(f"{source_component} is not of type Hierarchy")
 
-    def _create_orient_translate_blend(self,name:str, matrix_attr:nw.Attr, tx_attr:nw.Attr, ty_attr:nw.Attr, tz_attr:nw.Attr, tw_attr:nw.Attr=None):
+    def _create_orient_translate_blend(self,name:str, matrix_attr:nw.Attr, tx_attr:nw.Attr=None, ty_attr:nw.Attr=None, tz_attr:nw.Attr=None, tw_attr:nw.Attr=None):
         """Creates a blended matrix where the translate values are overriden
 
         Args:
             name (str): 
             matrix_attr (nw.Attr): matrix to blend from
-            tx_attr (nw.Attr): translate X attr
-            ty_attr (nw.Attr): translate Y attr
-            tz_attr (nw.Attr): translate Z attr
+            tx_attr (nw.Attr): translate X attr. Defaults to None.
+            ty_attr (nw.Attr): translate Y attr. Defaults to None.
+            tz_attr (nw.Attr): translate Z attr. Defaults to None.
             tw_attr (nw.Attr, optional): translate W attr. Defaults to None.
         """
         row_nodes = []
         matrix_4x4 = nw.create_node("fourByFourMatrix", f"{name}_4x4_mat")
-        matrix_4x4["in30"] << tx_attr
-        matrix_4x4["in31"] << ty_attr
-        matrix_4x4["in32"] << tz_attr
-        if tw_attr is not None:
-            matrix_4x4["in33"] << tw_attr
+        # translate matrix
+        for index, t_attr in enumerate([tx_attr, ty_attr, tz_attr, tw_attr]):
+            if t_attr is not None:
+                matrix_4x4[f"in3{index}"] << t_attr
+
+        # orient part of the matrix
         for row_index in range(3):
             row_node = nw.create_node("rowFromMatrix", f"{name}_row{row_index}")
             row_node["input"] = row_index
@@ -728,7 +718,6 @@ class Hierarchy(Component):
                 matrix_4x4[f"in{row_index}{col_index}"] << row_node[f"output{axis}"]
             row_nodes.append(row_node)
         
-
         self.container_node.add_nodes(matrix_4x4, *row_nodes)
         return matrix_4x4
         
@@ -747,13 +736,13 @@ class Control(Component):
 
     @classmethod
     def create(cls, instance_name = None, parent=None, axis_vec=None, 
-               build_tx=0.0, build_ty=0.0, build_tz=0.0,
-               build_rx=0.0, build_ry=0.0, build_rz=0.0,
-               build_sx=1.0, build_sy=1.0, build_sz=1.0, **kwargs):
+               build_t=[0.0, 0.0, 0.0],
+               build_r=[0.0, 0.0, 0.0],
+               build_s=[1.0, 1.0, 1.0], **kwargs):
         kwargs["axis_vec"] = axis_vec
-        kwargs["build_t"] = [build_tx, build_ty, build_tz]
-        kwargs["build_r"] = [build_rx, build_ry, build_rz]
-        kwargs["build_s"] = [build_sx, build_sy, build_sz]
+        kwargs["build_t"] = build_t[:3] if utils.is_iterable(build_t) else [build_t, build_t, build_t]
+        kwargs["build_r"] = build_r[:3] if utils.is_iterable(build_r) else [build_r, build_r, build_r]
+        kwargs["build_s"] = build_s[:3] if utils.is_iterable(build_s) else [build_s, build_s, build_s]
 
         return super().create(instance_name, parent, **kwargs)
 

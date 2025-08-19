@@ -108,11 +108,15 @@ class SimpleLimb(Setup):
         for attr in ["ty","rx","ry","rz","sx","sy","sz"]:
             control_inst1.transform_node[attr].set_locked(True)
             control_inst1.transform_node[attr].set_keyable(False)
-        control_inst2 = control.Locator.create(instance_name=self.input_node[self.HIER_DATA.INPUT_XFORM][2][self.HIER_DATA.INPUT_XFORM_NAME], parent=self)
-        control_inst2.container_node["locScale"] << self.container_node["locScale"]
+        control_inst2_translate = control.Sphere.create(instance_name=self.input_node[self.HIER_DATA.INPUT_XFORM][2][self.HIER_DATA.INPUT_XFORM_NAME], parent=self, build_s=0.4)
         for attr in ["rx","ry","rz","sx","sy","sz"]:
-            control_inst2.transform_node[attr].set_locked(True)
-            control_inst2.transform_node[attr].set_keyable(False)
+            control_inst2_translate.transform_node[attr].set_locked(True)
+            control_inst2_translate.transform_node[attr].set_keyable(False)
+        control_inst2_orient = control.Locator.create(instance_name="xform2Orient", parent=self)
+        for attr in ["tx","ty","tz","sx","sy","sz"]:
+            control_inst2_orient.transform_node[attr].set_locked(True)
+            control_inst2_orient.transform_node[attr].set_keyable(False)
+        control_inst2_orient.container_node["locScale"] << self.container_node["locScale"]
 
         # axis vectors
         primary_vec = enum_manager.axis_vec_choice_node(choice_node_name="primary_vec", enum_attr=self.input_node["primaryAxis"])
@@ -128,7 +132,7 @@ class SimpleLimb(Setup):
         # mid interp matrix
         mid_interp_matrix, xform2_translate = self.__create_mid_interp_matrix(
             control_inst0.container_node["worldMatrix"], 
-            control_inst2.container_node["worldMatrix"])
+            control_inst2_translate.container_node["worldMatrix"])
         control_inst1.container_node["offsetMatrix"] << mid_interp_matrix
         control_inst1.transform_node["tz"] >> self.container_node["IKSide"]
 
@@ -141,7 +145,7 @@ class SimpleLimb(Setup):
 
         xform1_ws_mat_attr, xform1_inv_attr = self.__create_xform1(
             guide_transform1_ws_mat=control_inst1.container_node["worldMatrix"], 
-            guide_transform2_ws_mat=control_inst2.container_node["worldMatrix"],
+            guide_transform2_ws_mat=control_inst2_translate.container_node["worldMatrix"],
             xform0_ws_mat=xform0_ws_mat_attr,
             xform0_inv_mat=xform0_inv_attr,
             primary_vec=primary_vec["output"],
@@ -150,6 +154,7 @@ class SimpleLimb(Setup):
         self.__create_xform2(
             xform1_ws_mat=xform1_ws_mat_attr, 
             xform2_translate=xform2_translate, 
+            xform2_orient=control_inst2_orient.transform_node,
             xform1_inv_mat=xform1_inv_attr)
 
     def __create_mid_interp_matrix(self, source_matrix:nw.Attr, target_matrix:nw.Attr):
@@ -301,12 +306,13 @@ class SimpleLimb(Setup):
 
         self.container_node.add_nodes(aim_node, mat_inv, pick_mat, mat_loc)
         return pick_mat["outputMatrix"], mat_inv["outputMatrix"]
-    def __create_xform2(self, xform1_ws_mat:nw.Attr, xform2_translate:nw.Node, xform1_inv_mat:nw.Attr):
+    def __create_xform2(self, xform1_ws_mat:nw.Attr, xform2_translate:nw.Node, xform2_orient:nw.Node, xform1_inv_mat:nw.Attr):
         """Creates all xform2 nodes
 
         Args:
             xform1_ws_mat (nw.Attr): xform1 world space matrix
             xform2_translate (nw.Node): node for xform2 translate
+            xform2_orient (nw.Node): node for xform2 orient
             xform1_inv_mat (nw.Attr): xform1 world space inverse matrix
         """
         xform_matrix2_ws = self._create_orient_translate_blend(
@@ -317,23 +323,20 @@ class SimpleLimb(Setup):
             tz_attr=xform2_translate["outputZ"], 
             tw_attr=xform2_translate["outputW"], 
         )
-
-        # xform2 inverse
-        xform_matrix2_inv = nw.create_node("inverseMatrix", "xform2_inv_mat")
-        xform_matrix2_inv["inputMatrix"] << xform_matrix2_ws["output"]
+        xform_matrix2_ws["output"] >> xform2_orient["offsetParentMatrix"]
 
         # xform2 loc
         xform_matrix2_loc = nw.create_node("multMatrix", "xform2_loc_mat")
-        xform_matrix2_loc["matrixIn"][0] << xform_matrix2_ws["output"]
+        xform_matrix2_loc["matrixIn"][0] << xform2_orient["worldMatrix"][0]
         xform_matrix2_loc["matrixIn"][1] << xform1_inv_mat
 
         # xform2 connect to output xform
         self._set_output_xform_index_attrs(
             index = 2,
-            output_init_matrix=xform_matrix2_ws["output"],
-            output_init_inv_matrix=xform_matrix2_inv["outputMatrix"],
-            output_world_matrix=xform_matrix2_ws["output"],
+            output_init_matrix=xform2_orient["worldMatrix"][0],
+            output_init_inv_matrix=xform2_orient["worldInverseMatrix"][0],
+            output_world_matrix=xform2_orient["worldMatrix"][0],
             output_loc_matrix=xform_matrix2_loc["matrixSum"]
         )
-        self.container_node.add_nodes(xform_matrix2_ws, xform_matrix2_inv, xform_matrix2_loc)
+        self.container_node.add_nodes(xform_matrix2_ws, xform_matrix2_loc)
         
