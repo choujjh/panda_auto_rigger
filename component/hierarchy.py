@@ -24,9 +24,8 @@ class VisualizeHier(base_component.Hierarchy):
 
         self._connect_source_hier_component(source_component=source_component)
 
-        for index in range(len(source_component.container_node[HIER_DATA.OUTPUT_XFORM])):
-            input_xform = self._get_input_xform_index_attrs(index)
-            
+        input_xforms = self._get_input_xform_attrs()
+        for index, input_xform in input_xforms.items():            
             # making controls
             control_ws_inst = control.Axis.create(instance_name=f"{input_xform[HIER_DATA.INPUT_XFORM_NAME].value}_ws", parent=self)
             control_loc_inst = control.Axis.create(instance_name=f"{input_xform[HIER_DATA.INPUT_XFORM_NAME].value}_loc", parent=self)
@@ -47,7 +46,7 @@ class VisualizeHier(base_component.Hierarchy):
             prev_loc_transform = control_loc_inst.transform_node
 
             # connecting to component output
-            output_xform = self._get_output_xform_index_attrs(index)
+            output_xform = self._get_output_xform_attrs(index=index)[index]
             for input_name, output_name in zip(HIER_DATA.INPUT_DATA_NAMES, HIER_DATA.OUTPUT_DATA_NAMES):
                 input_xform[input_name] >> output_xform[output_name]
 

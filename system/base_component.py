@@ -381,7 +381,7 @@ class Component():
                 parent_namespace = utils.Namespace.get_namespace(full_namespace)
                 child_namespaces = [utils.Namespace.strip_namespace(x) for x in utils.Namespace.child_namespaces(parent_namespace)]
                 # add something to instance namespace if it's none
-                if self.input_node["instanceName"].value == "" or self.input_node["instanceName"].value is None:
+                if (self.input_node["instanceName"].value == "" or self.input_node["instanceName"].value is None):
                     self.input_node["instanceName"] = "temp"
                 # getting just the instance_namespace portion of children namespaces
                 child_namespaces = [x.split("__", 1)[0] for x in child_namespaces if x.startswith(utils.strip_trailing_numbers(self.instance_namespace))]
@@ -404,10 +404,6 @@ class Component():
         # check if nothing else in namespace delete
         if utils.Namespace.empty(prev_namespace):
             utils.Namespace.delete(prev_namespace)
-
-        # TODO
-        # connect it up
-        # re publish if needs be
 
 class Hierarchy(Component):
     """A Class meant to be inherited for all hierarchy classes. hierarchy in this
@@ -440,11 +436,21 @@ class Hierarchy(Component):
     def __populate_output_xforms(self):
         """Goes through the output xform attributes and tries to connect name, local matrix, and init matricies"""
         added_nodes = []
-        for index in range(len(self.output_node[self.HIER_DATA.OUTPUT_XFORM])):
+        HIER_DATA = self.HIER_DATA
+        output_xforms = self._get_output_xform_attrs()
+        for index, output_xform in output_xforms.items():
             # init inverse matrix
             self.__populate_name(index)
-            added_nodes.extend(self.__populate_init_matrix(index))
-            added_nodes.extend(self.__populate_loc_matrix(index))
+            added_nodes.extend(self.__populate_world_matrix(
+                index=index,
+                world_matrix_attr=output_xform[HIER_DATA.OUTPUT_INIT_MATRIX],
+                world_matrix_inv_attr=output_xform[HIER_DATA.OUTPUT_INIT_INV_MATRIX],
+                is_init_matrix=True))
+            added_nodes.extend(self.__populate_world_matrix(
+                index=index,
+                world_matrix_attr=output_xform[HIER_DATA.OUTPUT_WORLD_MATRIX],
+                world_matrix_inv_attr=output_xform[HIER_DATA.OUTPUT_WORLD_INV_MATRIX]))
+            added_nodes.extend(self.__populate_loc_matrix(index=index))
 
         # add nodes to container
         self.container_node.add_nodes(*added_nodes)
@@ -471,95 +477,79 @@ class Hierarchy(Component):
         elif output_ws_src is not None:
             if output_ws_src.node.has_attr("instanceName"):
                 output_ws_src.node["instanceName"] >> output_name
-    def __populate_init_matrix(self, index:int):
+    def __populate_world_matrix(self, index:int, world_matrix_attr:nw.Attr, world_matrix_inv_attr:nw.Attr, is_init_matrix:bool=False):
         """Given the index tries to connect or set the output init matrix and output inverse init matrix
 
         Args:
             index (int): xform index
         """
-        input_xform_dict = self._get_input_xform_index_attrs(index)
-        output_xform_dict = self._get_output_xform_index_attrs(index)
+        matrix_src = world_matrix_attr.get_src_connection()
+        inv_matrix_src = world_matrix_inv_attr.get_src_connection()
 
-        # storing matrix attributes
-        input_init_matrix = input_xform_dict[self.HIER_DATA.INPUT_INIT_MATRIX]
-        input_init_inv_matrix = input_xform_dict[self.HIER_DATA.INPUT_INIT_INV_MATRIX]
-        output_init_matrix = output_xform_dict[self.HIER_DATA.OUTPUT_INIT_MATRIX]
-        output_init_inv_matrix = output_xform_dict[self.HIER_DATA.OUTPUT_INIT_INV_MATRIX]
+        inverse_name = f"xform{index}_inverse"
+        if is_init_matrix:
+            inverse_name = f"xform{index}_init_inverse"
 
-        # output src  connection
-        output_init_src = output_init_matrix.get_src_connection()
+        input_xform = self._get_input_xform_attrs(index=index)[index]
+        output_xform = self._get_output_xform_attrs(index=index)[index]
 
-        # if output init inverse matrix is connected then return
-        if output_init_inv_matrix.get_src_connection() is not None:
-            return []
-        
-        # if lengths match
-        elif len(input_init_matrix.parent) == len(output_init_matrix.parent):
-            input_init_matrix >> output_init_matrix
-            input_init_inv_matrix >> output_init_inv_matrix
+        added_nodes = []
+        # pre check to see if it needs to return anything
+        if inv_matrix_src is None and matrix_src is not None:
+            if isinstance(matrix_src.node, nw.Transform):
+                matrix_src.node["worldInverseMatrix"][0] >> world_matrix_inv_attr
+            else:
+                matrix_src_connections = [attr.node for attr in matrix_src.get_dest_connections() if attr.node.type_ == "inverseMatrix"]
+                if matrix_src_connections == []:
+                    inverse_node = nw.create_node("inverseMatrix", name=inverse_name)
+                    inverse_node["inputMatrix"] << matrix_src
+                    inverse_node["outputMatrix"] >> world_matrix_inv_attr
+                    added_nodes.append(inverse_node)
+                else:
+                    matrix_src_connections[0]["outputMatrix"] >> world_matrix_inv_attr
+        elif matrix_src is None and inv_matrix_src is not None:
+            if isinstance(inv_matrix_src.node, nw.Transform):
+                inv_matrix_src.node["worldMatrix"][0] >> world_matrix_attr
+            elif inv_matrix_src.node.type_ == "inverseMatrix":
+                new_matrix_src = inv_matrix_src.node["inputMatrix"].get_src_connection()
+                if new_matrix_src is not None:
+                    new_matrix_src >> world_matrix_attr
 
-        # if connected to transform
-        elif (output_init_src.attr_name == "worldMatrix[0]" and 
-            output_init_src.node.has_attr("worldInverseMatrix[0]")):
-            output_init_src.node["worldInverseMatrix"][0] >> output_init_inv_matrix
-
-        # if output init connected to input init
-        elif output_init_src == input_init_matrix:
-            input_init_inv_matrix >> output_init_inv_matrix
-
-        # if output init is connected to
-        elif output_init_src is not None:
-            inverse_matrix_node = nw.create_node("inverseMatrix", f"xform{index}_inverse_mat")
-            inverse_matrix_node["inputMatrix"] << output_init_src
-            inverse_matrix_node["outputMatrix"] >> output_init_inv_matrix
-            return [inverse_matrix_node]
-        
-        return []
+        elif is_init_matrix and len(input_xform.keys()) == len(output_xform.keys()):
+            if matrix_src is None:
+                input_xform[self.HIER_DATA.INPUT_INIT_MATRIX] >> world_matrix_attr
+            if inv_matrix_src is None:
+                input_xform[self.HIER_DATA.INPUT_INIT_INV_MATRIX] >> world_matrix_inv_attr
+        return added_nodes
     def __populate_loc_matrix(self, index:int):
         """Given the index tries to connect or set the output local matrix
 
         Args:
             index (int): xform index
         """
-        output_xform_attrs = self._get_output_xform_index_attrs(index)
+        output_xform_attrs = self._get_output_xform_attrs(index)[index]
         output_loc_matrix = output_xform_attrs[self.HIER_DATA.OUTPUT_LOC_MATRIX]
         output_world_matrix_src = output_xform_attrs[self.HIER_DATA.OUTPUT_WORLD_MATRIX].get_src_connection()
+        added_nodes = []
 
-        # if loc matrix already has connection
         if output_loc_matrix.has_src_connection():
             return []
-        added_nodes = []
-        # if world matrix isn't connected return
-        if output_world_matrix_src is None:
+        elif output_world_matrix_src is None:
             return []
-        # has no parent
         elif index <= 0:
             output_world_matrix_src >> output_loc_matrix
         
         # connect to parent
         else:
-            prev_world_matrix_src = self.output_node[self.HIER_DATA.OUTPUT_XFORM][index-1][self.HIER_DATA.OUTPUT_WORLD_MATRIX]
-            prev_world_matrix_src = prev_world_matrix_src.get_src_connection()
-            if prev_world_matrix_src is None:
+            prev_world_inv_matrix_src = self.output_node[self.HIER_DATA.OUTPUT_XFORM][index-1][self.HIER_DATA.OUTPUT_WORLD_INV_MATRIX]
+            prev_world_inv_matrix_src = prev_world_inv_matrix_src.get_src_connection()
+            if prev_world_inv_matrix_src is None:
                 return []
-            inverse_attr = None
-            # of connected ws are translates
-            if (prev_world_matrix_src.node.has_attr("worldInverseMatrix[0]") and 
-                  output_world_matrix_src.attr_name == "worldMatrix[0]"
-                  ):
-                inverse_attr = prev_world_matrix_src.node["worldInverseMatrix"][0]
-            # if inverse node needed
-            if inverse_attr is None:
-                inverse_matrix_node = nw.create_node("inverseMatrix", f"xform{index-1}_out_world_inverse_mat")
-                inverse_matrix_node["inputMatrix"] << prev_world_matrix_src
-                inverse_attr = inverse_matrix_node["outputMatrix"]
-
-                added_nodes = [inverse_attr]
 
             # adding matrix mult
             mat_mult = nw.create_node("multMatrix", f"xform{index}_loc_output_mat_mult")
             mat_mult["matrixIn"][0] << output_world_matrix_src
-            mat_mult["matrixIn"][1] << inverse_attr
+            mat_mult["matrixIn"][1] << prev_world_inv_matrix_src
             mat_mult["matrixSum"] >> output_loc_matrix
 
             added_nodes.append(mat_mult)
@@ -577,82 +567,44 @@ class Hierarchy(Component):
         if input_xform_len > output_xform_len:
             cmds.warning(f"input xform (len {input_xform_len}) longer than output xform (len {output_xform_len})")
         
-        for attr in self.output_node[self.HIER_DATA.OUTPUT_XFORM]:
-            for sub_attr in self.HIER_DATA.OUTPUT_DATA_NAMES:
-                if attr[sub_attr].type_ == "string":
-                    if attr[sub_attr].value == None or attr[sub_attr].value == "":
-                        cmds.warning(f"{attr[sub_attr]} not set")
-                elif not attr[sub_attr].has_src_connection():
-                    cmds.warning(f"{attr[sub_attr]} does not have connection")
-    def _get_input_xform_index_attrs(self, index:int):
-        """Gets the input attributes of an index
-
-        Args:
-            index (int):
+        for xform_attr in self.output_node[self.HIER_DATA.OUTPUT_XFORM]:
+            for xform_sub_attr in xform_attr:
+                if xform_sub_attr.type_ == "string":
+                    if xform_sub_attr.value == None or xform_sub_attr.value == "":
+                        cmds.warning(f"{xform_sub_attr} not set")
+                elif not xform_sub_attr.has_src_connection():
+                    cmds.warning(f"{xform_sub_attr} does not have connection")
+    def _get_input_xform_attrs(self, index:Union[int, list]=None):
+        """Gets a dict of input xforms given indicies. returns all if index is None
 
         Returns:
-            dict: dict of input attributes
+            dict: 
         """
-        return {key: self.input_node[self.HIER_DATA.INPUT_XFORM][index][key] for key in self.HIER_DATA.INPUT_DATA_NAMES}
-    def _get_output_xform_index_attrs(self, index:int):
-        """Gets the output attributes of an index
-
-        Args:
-            index (int):
-
-        Returns:
-            dict: dict of output attributes
-        """
-        return {key: self.output_node[self.HIER_DATA.OUTPUT_XFORM][index][key] for key in self.HIER_DATA.OUTPUT_DATA_NAMES}
-    def _get_input_xform_attrs(self):
-        """Gets a list of all input xforms
-
-        Returns:
-            list: 
-        """
-        input_len = len(self.input_node[self.HIER_DATA.INPUT_XFORM])
-        return [self._get_input_xform_index_attrs(index) for index in range(input_len)]
-    def _get_output_xform_attrs(self):
-        """Gets a list of all output xforms
+        
+        if index is None:
+            indicies = range(len(self.input_node[self.HIER_DATA.INPUT_XFORM]))
+        else:
+            indicies = utils.make_iterable(index)
+        return {index:{key: self.input_node[self.HIER_DATA.INPUT_XFORM][index][key] for key in self.HIER_DATA.INPUT_DATA_NAMES} for index in indicies}
+    def _get_output_xform_attrs(self, index:Union[int, list]=None):
+        """Gets a dict of output xforms given indicies. returns all if index is None
 
         Returns:
             list:
         """
-        output_len = len(self.output_node[self.HIER_DATA.OUTPUT_XFORM])
-        return [self._get_output_xform_index_attrs(index) for index in range(output_len)]
-    def _set_output_xform_index_attrs(
-            self, 
-            index:int, 
-            output_xform_name:Union[nw.Attr, str]=None, 
-            output_init_matrix:nw.Attr=None, 
-            output_init_inv_matrix:nw.Attr=None, 
-            output_world_matrix:nw.Attr=None, 
-            output_loc_matrix:nw.Attr=None
-        ):
-        """Connects up attributes to output xform
-
-        Args:
-            index (int):
-            output_name (Union[nw.Attr, str], optional): Defaults to None.
-            output_init_matrix (nw.Attr, optional): Defaults to None.
-            output_init_inv_matrix (nw.Attr, optional): Defaults to None.
-            output_world_matrix (nw.Attr, optional): Defaults to None.
-            output_loc_matrix (nw.Attr, optional): Defaults to None.
-        """
-        output_xform_matricies = self._get_output_xform_index_attrs(index)
-        source_attr_list = [output_xform_name, output_init_matrix, output_init_inv_matrix, output_world_matrix, output_loc_matrix]
-        for source_attr, output_attr in zip(source_attr_list, self.HIER_DATA.OUTPUT_DATA_NAMES):
-            if isinstance(source_attr, str):
-                output_xform_matricies[output_attr].set(source_attr)
-            elif source_attr is not None:
-                source_attr >> output_xform_matricies[output_attr]
-    def _set_input_xform_index_attrs(
+        if index is None:
+            indicies = range(len(self.output_node[self.HIER_DATA.OUTPUT_XFORM]))
+        else:
+            indicies = utils.make_iterable(index)
+        return {index:{key: self.output_node[self.HIER_DATA.OUTPUT_XFORM][index][key] for key in self.HIER_DATA.OUTPUT_DATA_NAMES} for index in indicies}
+    def _set_input_xform_attrs(
             self, 
             index:int, 
             input_xform_name:Union[nw.Attr, str]=None, 
             input_init_matrix:nw.Attr=None, 
             input_init_inv_matrix:nw.Attr=None, 
-            input_world_matrix:nw.Attr=None, 
+            input_world_matrix:nw.Attr=None,
+            input_world_inv_matrix:nw.Attr=None,
             input_loc_matrix:nw.Attr=None
         ):
         """Connects up attributes to output xform
@@ -663,16 +615,55 @@ class Hierarchy(Component):
             input_init_matrix (nw.Attr, optional): Defaults to None.
             input_init_inv_matrix (nw.Attr, optional): Defaults to None.
             input_world_matrix (nw.Attr, optional): Defaults to None.
+            input_world_inv_matrix (nw.Attr, optional): Defaults to None.
             input_loc_matrix (nw.Attr, optional): Defaults to None.
         """
-        input_xform_matricies = self._get_input_xform_index_attrs(index)
-        source_attr_list = [input_xform_name, input_init_matrix, input_init_inv_matrix, input_world_matrix, input_loc_matrix]
+        input_xform_matricies = self._get_input_xform_attrs(index=index)[index]
+        source_attr_list = [input_xform_name, input_init_matrix, input_init_inv_matrix, input_world_matrix, input_world_inv_matrix, input_loc_matrix]
+        if len(source_attr_list) != len(self.HIER_DATA.INPUT_DATA_NAMES):
+            raise RuntimeError("source_attr_list and OUPUT_DATA_NAMES mismatched lengths")
         for source_attr, input_attr in zip(source_attr_list, self.HIER_DATA.INPUT_DATA_NAMES):
             if isinstance(source_attr, str):
                 input_xform_matricies[input_attr].set(source_attr)
             elif source_attr is not None:
                 source_attr >> input_xform_matricies[input_attr]
+    def _set_output_xform_attrs(
+        self, 
+        index:int, 
+        output_xform_name:Union[nw.Attr, str]=None, 
+        output_init_matrix:nw.Attr=None, 
+        output_init_inv_matrix:nw.Attr=None, 
+        output_world_matrix:nw.Attr=None, 
+        output_world_inv_matrix:nw.Attr=None,
+        output_loc_matrix:nw.Attr=None
+    ):
+        """Connects up attributes to output xform
+
+        Args:
+            index (int):
+            output_name (Union[nw.Attr, str], optional): Defaults to None.
+            output_init_matrix (nw.Attr, optional): Defaults to None.
+            output_init_inv_matrix (nw.Attr, optional): Defaults to None.
+            output_world_matrix (nw.Attr, optional): Defaults to None.
+            output_world_inv_matrix (nw.Attr, optional): Defaults to None.
+            output_loc_matrix (nw.Attr, optional): Defaults to None.
+        """
+        output_xform = self._get_output_xform_attrs(index)[index]
+        source_attr_list = [output_xform_name, output_init_matrix, output_init_inv_matrix, output_world_matrix, output_world_inv_matrix, output_loc_matrix]
+        if len(source_attr_list) != len(self.HIER_DATA.OUTPUT_DATA_NAMES):
+            raise RuntimeError("source_attr_list and OUPUT_DATA_NAMES mismatched lengths")
+        for source_attr, output_attr in zip(source_attr_list, self.HIER_DATA.OUTPUT_DATA_NAMES):
+            if isinstance(source_attr, str):
+                output_xform[output_attr].set(source_attr)
+            elif source_attr is not None:
+                source_attr >> output_xform[output_attr]
+    
     def _connect_source_hier_component(self, source_component):
+        """Given a source Hier component connects it's hier output to this component's hier input
+
+        Args:
+            source_component (Hierarchy):
+        """
         if issubclass(type(source_component), Hierarchy):
             HIER_DATA = self.HIER_DATA
 
@@ -681,16 +672,22 @@ class Hierarchy(Component):
             for hier_attr_name in HIER_DATA.HIER_DATA_NAMES:
                 source_container[hier_attr_name] >> self_container[hier_attr_name]
 
-            for index, src_output_xform in enumerate(source_container[HIER_DATA.OUTPUT_XFORM]):
-                input_xform = self._get_input_xform_index_attrs(index)
+            src_xforms = source_component._get_output_xform_attrs()
+            src_names = HIER_DATA.OUTPUT_DATA_NAMES
+            if source_component.container_node == self.container_node.get_container_node():
+                src_xforms = source_component._get_input_xform_attrs()
+                src_names = HIER_DATA.INPUT_DATA_NAMES
+            input_xforms = self._get_input_xform_attrs(utils.length_index_list(len(src_xforms.keys())))
+            for index, src_xform in src_xforms.items():
+                
+                input_xform = input_xforms[index]
 
                 # connecting src output to component input
-                for output_name, input_name in zip(HIER_DATA.OUTPUT_DATA_NAMES, HIER_DATA.INPUT_DATA_NAMES):
-                    src_output_xform[output_name] >> input_xform[input_name]
+                for src_name, input_name in zip(src_names, HIER_DATA.INPUT_DATA_NAMES):
+                    src_xform[src_name] >> input_xform[input_name]
         else:
-            cmds.warning(f"{source_component} is not of type Hierarchy")
-
-    def _create_orient_translate_blend(self,name:str, matrix_attr:nw.Attr, tx_attr:nw.Attr=None, ty_attr:nw.Attr=None, tz_attr:nw.Attr=None, tw_attr:nw.Attr=None):
+            raise RuntimeError(f"{source_component} is not of type Hierarchy")
+    def _create_orient_translate_blend(self, name:str, matrix_attr:nw.Attr, tx_attr:nw.Attr=None, ty_attr:nw.Attr=None, tz_attr:nw.Attr=None, tw_attr:nw.Attr=None):
         """Creates a blended matrix where the translate values are overriden
 
         Args:
@@ -720,9 +717,7 @@ class Hierarchy(Component):
         
         self.container_node.add_nodes(matrix_4x4, *row_nodes)
         return matrix_4x4
-        
-    def _create_start_aim_matrix(self):
-        pass
+       
 class Control(Component):
     """A Base class for all control autorigging components. Derived from Component
 

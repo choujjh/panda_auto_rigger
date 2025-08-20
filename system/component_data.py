@@ -192,16 +192,18 @@ class HierData:
         INPUT_INIT_MATRIX (str):
         INPUT_INIT_INV_MATRIX (str):
         INPUT_WORLD_MATRIX (str):
+        INPUT_WORLD_INV_MATRIX (str)
         INPUT_LOC_MATRIX (str):
         OUTPUT_XFORM (str):
         OUTPUT_XFORM_NAME (str):
         OUTPUT_INIT_MATRIX (str):
         OUTPUT_INIT_INV_MATRIX (str):
         OUTPUT_WORLD_MATRIX (str):
+        OUTPUT_WORLD_INV_MATRIX (str):
         OUTPUT_LOC_MATRIX (str):
         __HIER_DATA_NAMES (list(str)):
-        __INPUT_DATA_NAMES (list(str))
-        __OUTPUT_DATA_NAMES (list(str))
+        __INPUT_DATA_NAMES (list(str)):
+        __OUTPUT_DATA_NAMES (list(str)):
         """
 
     HIERARCHY = "hierarchy"
@@ -213,6 +215,7 @@ class HierData:
     INPUT_INIT_MATRIX = "inputInitMatrix"
     INPUT_INIT_INV_MATRIX = "inputInitInvMatrix"
     INPUT_WORLD_MATRIX = "inputWorldMatrix"
+    INPUT_WORLD_INV_MATRIX = "inputWorldInvMatrix"
     INPUT_LOC_MATRIX = "inputLocMatrix"
 
     OUTPUT_XFORM = "outputXform"
@@ -220,6 +223,7 @@ class HierData:
     OUTPUT_INIT_MATRIX = "outputInitMatrix"
     OUTPUT_INIT_INV_MATRIX = "outputInitInvMatrix"
     OUTPUT_WORLD_MATRIX = "outputWorldMatrix"
+    OUTPUT_WORLD_INV_MATRIX = "outputWorldInvMatrix"
     OUTPUT_LOC_MATRIX = "outputLocMatrix"
 
     HIER_DATA_NAMES = [
@@ -231,6 +235,7 @@ class HierData:
         INPUT_INIT_MATRIX,
         INPUT_INIT_INV_MATRIX,
         INPUT_WORLD_MATRIX,
+        INPUT_WORLD_INV_MATRIX,
         INPUT_LOC_MATRIX
     ]
     OUTPUT_DATA_NAMES = [
@@ -238,6 +243,7 @@ class HierData:
         OUTPUT_INIT_MATRIX,
         OUTPUT_INIT_INV_MATRIX,
         OUTPUT_WORLD_MATRIX,
+        OUTPUT_WORLD_INV_MATRIX,
         OUTPUT_LOC_MATRIX
     ]
 
@@ -293,7 +299,6 @@ class HierData:
                 return False
 
         return True
-    
     @classmethod
     def __gen_hier_nodeData(cls, parent_name:str, attr_names, multi=True):
         """Given a parent name and attribute names generates the Node Data to build
@@ -315,7 +320,6 @@ class HierData:
             attr_data.append(AttrData(attr_name, type_=attr_type, parent=parent_name))
 
         return NodeData(*attr_data)
-    
     @classmethod
     def get_hier_data(cls):
         """Returns NodeData for hier
@@ -324,7 +328,6 @@ class HierData:
             NodeData:
         """
         return cls.__gen_hier_nodeData(cls.HIERARCHY, cls.HIER_DATA_NAMES, multi=False)
-
     @classmethod
     def get_input_xform_data(cls):
         """Returns NodeData for an input xform
@@ -333,7 +336,6 @@ class HierData:
             NodeData:
         """
         return cls.__gen_hier_nodeData(cls.INPUT_XFORM, cls.INPUT_DATA_NAMES, multi=True)
-    
     @classmethod
     def get_output_xform_data(cls):
         """Returns NodeData for an output xform

@@ -261,7 +261,16 @@ def make_iterable(obj):
         return obj
     else:
         return [obj]
+def length_index_list(length:int):
+    """returns list of indicies of length length
 
+    Args:
+        length (int): 
+
+    Returns:
+        list: 
+    """
+    return [index for index in range(length)]
 class Namespace:
     """Class of static functions to handle namespaces"""
     @classmethod

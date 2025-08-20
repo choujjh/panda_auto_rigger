@@ -44,20 +44,20 @@ class Setup(base_component.Hierarchy):
         self.container_node["primaryAxis"] = component_enum_data.get_index_of_item(kwargs["primary_axis"])
         self.container_node["secondaryAxis"] = component_enum_data.get_index_of_item(kwargs["secondary_axis"])
 
-        for index in range(num_xforms):
-            input_xform_attrs = self._get_input_xform_index_attrs(index)
+        input_xforms = self._get_input_xform_attrs(utils.length_index_list(num_xforms))
+        for index, input_xform in input_xforms.items():
 
             # setting name
-            input_xform_attrs[self.HIER_DATA.INPUT_XFORM_NAME].set(f"xform{index}")
+            input_xform[self.HIER_DATA.INPUT_XFORM_NAME].set(f"xform{index}")
 
             # creating control
-            control_inst = control.Locator.create(instance_name=input_xform_attrs[self.HIER_DATA.INPUT_XFORM_NAME], parent=self)
+            control_inst = control.Locator.create(instance_name=input_xform[self.HIER_DATA.INPUT_XFORM_NAME], parent=self)
             control_container = control_inst.container_node
             control_container["locScale"] << self.input_node["locScale"]
             control_container["offsetMatrix"] = utils.translate_to_matrix([0, index*1.5, 0])
 
             # connecting to output
-            self._set_output_xform_index_attrs(
+            self._set_output_xform_attrs(
                 index,
                 output_init_matrix=control_container["worldMatrix"],
                 output_world_matrix=control_container["worldMatrix"],
@@ -84,16 +84,16 @@ class SimpleLimb(Setup):
             component_data.AttrData("IKSide", type_="double", parent="IK"),
         )
 
-
         return node_data
 
     @classmethod
     def create(cls, instance_name=None, parent=None, **kwargs):
         return super().create(instance_name, parent, **kwargs)
     def _override_build(self, **kwargs):
-        for index in range(3):
-            input_xform_attrs = self._get_input_xform_index_attrs(index)
-            input_xform_attrs[self.HIER_DATA.INPUT_XFORM_NAME].set(f"xform{index}")
+
+        input_xforms = self._get_input_xform_attrs(utils.length_index_list(3))
+        for index, input_xform in input_xforms.items():
+            input_xform[self.HIER_DATA.INPUT_XFORM_NAME].set(f"xform{index}")
 
         # creating controls
         control_inst0 = control.Locator.create(instance_name=self.input_node[self.HIER_DATA.INPUT_XFORM][0][self.HIER_DATA.INPUT_XFORM_NAME], parent=self)
@@ -244,7 +244,7 @@ class SimpleLimb(Setup):
         mat_inv["inputMatrix"] << pick_mat["outputMatrix"]
 
         # connect to output xform
-        self._set_output_xform_index_attrs(
+        self._set_output_xform_attrs(
             index = 0,
             output_init_matrix=pick_mat["outputMatrix"],
             output_init_inv_matrix=mat_inv["outputMatrix"],
@@ -296,7 +296,7 @@ class SimpleLimb(Setup):
         mat_loc["matrixIn"][1] << xform0_inv_mat
 
         # connect to output xform
-        self._set_output_xform_index_attrs(
+        self._set_output_xform_attrs(
             index = 1,
             output_init_matrix=pick_mat["outputMatrix"],
             output_init_inv_matrix=mat_inv["outputMatrix"],
@@ -331,7 +331,7 @@ class SimpleLimb(Setup):
         xform_matrix2_loc["matrixIn"][1] << xform1_inv_mat
 
         # xform2 connect to output xform
-        self._set_output_xform_index_attrs(
+        self._set_output_xform_attrs(
             index = 2,
             output_init_matrix=xform2_orient["worldMatrix"][0],
             output_init_inv_matrix=xform2_orient["worldInverseMatrix"][0],
