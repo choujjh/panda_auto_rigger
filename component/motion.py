@@ -6,36 +6,12 @@ import system.component_data as component_data
 import system.component_enum_data as component_enum_data
 import maya.cmds as cmds
 
-class FK(base_component.Hierarchy):
+class FK(base_component.Motion):
     """Given a hierarchy creates an FK chain to accompany it"""
 
     class_namespace = "FK"
     root_transform_name = "fk_grp"
-
-    def _get_input_node_build_attr_data(self):
-        node_data = super()._get_input_node_build_attr_data()
-        node_data.extend_attr_data(
-            component_data.AttrData("primaryVec", type_="double3", parent="input"),
-            component_data.AttrData("primaryVecX", type_="double", parent="primaryVec"),
-            component_data.AttrData("primaryVecY", type_="double", parent="primaryVec"),
-            component_data.AttrData("primaryVecZ", type_="double", parent="primaryVec"),
-            component_data.AttrData("secondaryVec", type_="double3", parent="input"),
-            component_data.AttrData("secondaryVecX", type_="double", parent="secondaryVec"),
-            component_data.AttrData("secondaryVecY", type_="double", parent="secondaryVec"),
-            component_data.AttrData("secondaryVecZ", type_="double", parent="secondaryVec"),
-            component_data.AttrData("tertiaryVec", type_="double3", parent="input"),
-            component_data.AttrData("tertiaryVecX", type_="double", parent="tertiaryVec"),
-            component_data.AttrData("tertiaryVecY", type_="double", parent="tertiaryVec"),
-            component_data.AttrData("tertiaryVecZ", type_="double", parent="tertiaryVec"),
-            component_data.AttrData("IKSide", type_="double", parent="input"),
-        )
-        return node_data
     
-    def _connect_source_hier_component(self, source_component):        
-        super()._connect_source_hier_component(source_component)
-        for attr_name in ["primaryVec", "secondaryVec", "tertiaryVec", "IKSide"]:
-            source_component.container_node[attr_name] >> self.container_node[attr_name]
-
     @classmethod
     def create(cls, source_component:base_component.Hierarchy, instance_name=None, parent=None, **kwargs):
         kwargs["source_component"] = source_component
@@ -77,7 +53,7 @@ class FK(base_component.Hierarchy):
 
         self.container_node.add_nodes(*added_nodes)
 
-class SimpleIK(base_component.Hierarchy):
+class SimpleIK(base_component.Motion):
     """Given the SimpleLimb creates a 2 chain IK chain"""
 
     class_namespace = "simple_IK"
@@ -86,22 +62,9 @@ class SimpleIK(base_component.Hierarchy):
     def _get_input_node_build_attr_data(self):
         node_data = super()._get_input_node_build_attr_data()
         node_data.extend_attr_data(
-            component_data.AttrData("primaryVec", type_="double3", parent="input"),
-            component_data.AttrData("primaryVecX", type_="double", parent="primaryVec"),
-            component_data.AttrData("primaryVecY", type_="double", parent="primaryVec"),
-            component_data.AttrData("primaryVecZ", type_="double", parent="primaryVec"),
-            component_data.AttrData("secondaryVec", type_="double3", parent="input"),
-            component_data.AttrData("secondaryVecX", type_="double", parent="secondaryVec"),
-            component_data.AttrData("secondaryVecY", type_="double", parent="secondaryVec"),
-            component_data.AttrData("secondaryVecZ", type_="double", parent="secondaryVec"),
-            component_data.AttrData("tertiaryVec", type_="double3", parent="input"),
-            component_data.AttrData("tertiaryVecX", type_="double", parent="tertiaryVec"),
-            component_data.AttrData("tertiaryVecY", type_="double", parent="tertiaryVec"),
-            component_data.AttrData("tertiaryVecZ", type_="double", parent="tertiaryVec"),
             component_data.AttrData("IK", type_="compound", parent="input"),
             component_data.AttrData("IKEndMatrix", type_="matrix", parent="IK"),
             component_data.AttrData("IKEndInitInvMatrix", type_="matrix", parent="IK"),
-            component_data.AttrData("IKSide", type_="double", parent="IK"),
             component_data.AttrData("IKStretch", type_="bool", parent="IK", value=True),
             component_data.AttrData("softIKBlendStart", type_="double", parent="IK", value=0.9, min=0, max=1),
             component_data.AttrData("softIKEnabled", type_="bool", parent="IK"),
@@ -114,11 +77,7 @@ class SimpleIK(base_component.Hierarchy):
     def create(cls, source_component:base_component.Hierarchy, instance_name = None, parent=None, **kwargs):
         kwargs["source_component"] = source_component
         return super().create(instance_name, parent, **kwargs)
-    
-    def _connect_source_hier_component(self, source_component):        
-        super()._connect_source_hier_component(source_component)
-        for attr_name in ["primaryVec", "secondaryVec", "tertiaryVec", "IKSide"]:
-            source_component.container_node[attr_name] >> self.container_node[attr_name]
+
     def __setup_ik_control(self, name:str, input_xform_index:int, parent_init_inv_matrix:nw.Attr, parent_world_matrix:nw.Attr):
         """Creates the IK control
 
@@ -300,7 +259,7 @@ class SimpleIK(base_component.Hierarchy):
         Returns:
             nw.Node: the node holding all trig values
         """
-        def __ik_build_data_expression_str(len1_attr:nw.Attr, len2_attr:nw.Attr, curr_len_attr:nw.Attr, ik_build_data_node:nw.Node):
+        def __ik_build_data_expression_str(len1_attr:nw.Attr, len2_attr:nw.Attr, curr_len_attr:nw.Attr, loc_xform1_row:nw.Node, ik_build_data_node:nw.Node):
             """Expression str to get all trig values. stores in trig_hold_value_node
 
             Args:
@@ -327,23 +286,52 @@ class SimpleIK(base_component.Hierarchy):
                 "float $currLenSquared = $currLen * $currLen;\n",
 
                 "float $cos0 = 1;",
-                "float $sin0 = 0;",
+                "float $topRSin0 = 0;",
+                "float $botLSin0 = 0;",
                 "float $cos1 = 1;",
-                "float $sin1 = 0;\n",
+                "float $topRSin1 = 0;",
+                "float $botLSin1 = 0;\n",
+
+                "float $topRSin = 1;",
+
+                f"if ({self.container_node['tertiaryVecX']} != 0.0) {{",
+                f"\t{loc_xform1_row['input']} = 1;",
+                f"\t\tif ({loc_xform1_row['outputZ']} != 0) {{",
+                f"\t\t\t$topRSin = {loc_xform1_row['outputZ']};",
+                "\t}",
+                "}",
+                f"else if ({self.container_node['tertiaryVecY']} != 0.0) {{",
+                f"\t{loc_xform1_row['input']} = 0;",
+                f"\t\t\tif ({loc_xform1_row['outputZ']} != 0) {{",
+                f"\t\t$topRSin = {loc_xform1_row['outputZ']};",
+                "\t}",
+                "}",
+                f"else if ({self.container_node['tertiaryVecZ']} != 0.0) {{",
+                f"\t{loc_xform1_row['input']} = 0;",
+                f"\t\t\tif ({loc_xform1_row['outputY']} != 0) {{",
+                f"\t\t$topRSin = {loc_xform1_row['outputY']};",
+                "\t}",
+                "}",
+                "if ($topRSin >= 0.0) {",
+                "\t$topRSin = 1;",
+                "}",
+                "else {",
+                "\t$topRSin = -1;",
+                "}",
 
                 "if ($currLen < $totalLen) {",
                 "\t$poleVecLen = ($currLen/$totalLen) * $len1;",
                 "\t$cos0 = ($len1Squared + $currLenSquared - $len2Squared) / (2 * $len1 * $currLen);",
-                "\t$cos1 = -1 * ($len1Squared + $len2Squared - $currLenSquared) / (2 * $len1 * $len2);",
-                f"\tif ({self.container_node['IKSide']} < 0) {{",
-                "\t\t$sin0 = sqrt(abs(1 - ($cos0 * $cos0)));",
-                "\t\t$sin1 = -1 * sqrt(abs(1 - ($cos1 * $cos1)));\n",
-                "\t}",
-                "\telse {",
-                "\t\t$sin0 = -1 * sqrt(abs(1 - ($cos0 * $cos0)));",
-                "\t\t$sin1 = sqrt(abs(1 - ($cos1 * $cos1)));\n",
-                "\t}",
+                "\t$cos1 = -1 * ($len1Squared + $len2Squared - $currLenSquared) / (2 * $len1 * $len2);\n",
+
+                "\tfloat $sin0Val = sqrt(abs(1 - ($cos0 * $cos0)));",
+                "\tfloat $sin1Val = sqrt(abs(1 - ($cos1 * $cos1)));",
+                "\t$topRSin0 = -1 * $topRSin * $sin0Val;",
+                "\t$botLSin0 = $topRSin * $sin0Val;",
+                "\t$topRSin1 = $topRSin * $sin1Val;",
+                "\t$botLSin1 = -1 * $topRSin * $sin1Val;",
                 "}",
+
 
                 f"else if ({self.container_node['IKStretch']} && $currLen > $totalLen) {{",
                 "\t$scalar = $currLen/$totalLen;",
@@ -352,19 +340,14 @@ class SimpleIK(base_component.Hierarchy):
                 "\t$poleVecLen = $len1;",
                 "}",
 
-                f"if ({self.container_node['tertiaryVecX']} < 0.0 || {self.container_node['tertiaryVecY']} < 0.0 || {self.container_node['tertiaryVecZ']} < 0.0) {{",
-                "\t$sin0 = -1 * $sin0;",
-                "\t$sin1 = -1 * $sin1;",
-                "}",
-
                 f"{ik_build_data_node['cos0']} = $cos0;",
-                f"{ik_build_data_node['sin0']} = $sin0;",
-                f"{ik_build_data_node['negSin0']} = -1 * $sin0;",
+                f"{ik_build_data_node['topRSin0']} = $topRSin0;",
+                f"{ik_build_data_node['botLSin0']} = $botLSin0;\n",
 
                 f"{ik_build_data_node['cos1']} = $cos1;",
-                f"{ik_build_data_node['sin1']} = $sin1;",
-                f"{ik_build_data_node['negSin1']} = -1 * $sin1;",
-                f"{ik_build_data_node['length1']} = $len1;",
+                f"{ik_build_data_node['topRSin1']} = $topRSin1;",
+                f"{ik_build_data_node['botLSin1']} = $botLSin1;",
+                f"{ik_build_data_node['length1']} = $len1;\n",
 
                 f"{ik_build_data_node['length2']} = $len2;",
                 f"{ik_build_data_node['poleVecLen']} = $poleVecLen;"
@@ -376,13 +359,13 @@ class SimpleIK(base_component.Hierarchy):
         ik_build_data_attrData = component_data.NodeData(
             component_data.AttrData("xform0Data", type_="compound"),
             component_data.AttrData("cos0", type_="double", parent="xform0Data"),
-            component_data.AttrData("sin0", type_="double", parent="xform0Data"),
-            component_data.AttrData("negSin0", type_="double", parent="xform0Data"),
+            component_data.AttrData("topRSin0", type_="double", parent="xform0Data"),
+            component_data.AttrData("botLSin0", type_="double", parent="xform0Data"),
 
             component_data.AttrData("xform1Data", type_="compound"),
             component_data.AttrData("cos1", type_="double", parent="xform1Data"),
-            component_data.AttrData("sin1", type_="double", parent="xform1Data"),
-            component_data.AttrData("negSin1", type_="double", parent="xform1Data"),
+            component_data.AttrData("topRSin1", type_="double", parent="xform1Data"),
+            component_data.AttrData("botLSin1", type_="double", parent="xform1Data"),
             component_data.AttrData("length1", type_="double", parent="xform1Data"),
 
             component_data.AttrData("xform2Data", type_="compound"),
@@ -391,18 +374,23 @@ class SimpleIK(base_component.Hierarchy):
         )
         ik_build_data_attrData.add_attrs_to_node(ik_build_data_node)
 
+        xform1_loc_matrix_row = nw.create_node("rowFromMatrix", name="xform1_loc_matrix_row")
+        xform1_loc_matrix_row["matrix"] << self.container_node[self.HIER_DATA.INPUT_XFORM][1][self.HIER_DATA.INPUT_LOC_MATRIX]
+
         ik_trig_expression_str = __ik_build_data_expression_str(
             len1_attr=len1_attr,
             len2_attr=len2_attr,
             curr_len_attr=curr_len_attr,
+            loc_xform1_row=xform1_loc_matrix_row,
             ik_build_data_node=ik_build_data_node)
 
         ik_trig_expression = nw.wrap_node(cmds.expression(
             string=ik_trig_expression_str, 
             name="ik_build_data_expression"))
         
+        
 
-        self.container_node.add_nodes(ik_build_data_node, ik_trig_expression)
+        self.container_node.add_nodes(ik_build_data_node, ik_trig_expression, xform1_loc_matrix_row)
         return ik_build_data_node
     def __create_local_matrix_nodes(self, ik_build_data_node:nw.Node):
         """Creates local matrix for IK using expressions
@@ -430,27 +418,27 @@ class SimpleIK(base_component.Hierarchy):
                 # no rotation on last matrix
                 if index != 2:                  
                     cos = ik_build_data_node[f"cos{index}"]
-                    sin = ik_build_data_node[f"sin{index}"]
-                    neg_sin = ik_build_data_node[f"negSin{index}"]
+                    topRSin = ik_build_data_node[f"topRSin{index}"]
+                    botLSin = ik_build_data_node[f"botLSin{index}"]
                     expression_str.extend([                       
                         f"matrix $rot_matrix{index}[3][3] = <<1.0, 0.0, 0.0; 0.0, 1.0, 0.0; 0.0, 0.0, 1.0>>;\n",
 
                         f"if({self.container_node['tertiaryVecX']} != 0.0) {{",
                         f"\t$rot_matrix{index}[1][1] = {cos};",
-                        f"\t$rot_matrix{index}[1][2] = {sin};",
-                        f"\t$rot_matrix{index}[2][1] = {neg_sin};",
+                        f"\t$rot_matrix{index}[1][2] = {topRSin};",
+                        f"\t$rot_matrix{index}[2][1] = {botLSin};",
                         f"\t$rot_matrix{index}[2][2] = {cos};",
                         "}",
                         f"else if({self.container_node['tertiaryVecY']} != 0.0) {{",
                         f"\t$rot_matrix{index}[0][0] = {cos};",
-                        f"\t$rot_matrix{index}[0][2] = {neg_sin};",
-                        f"\t$rot_matrix{index}[2][0] = {sin};",
+                        f"\t$rot_matrix{index}[0][2] = {topRSin};",
+                        f"\t$rot_matrix{index}[2][0] = {botLSin};",
                         f"\t$rot_matrix{index}[2][2] = {cos};",
                         "}",
                         f"else if({self.container_node['tertiaryVecZ']} != 0.0) {{",
                         f"\t$rot_matrix{index}[0][0] = {cos};",
-                        f"\t$rot_matrix{index}[0][1] = {neg_sin};",
-                        f"\t$rot_matrix{index}[1][0] = {sin};",
+                        f"\t$rot_matrix{index}[0][1] = {topRSin};",
+                        f"\t$rot_matrix{index}[1][0] = {botLSin};",
                         f"\t$rot_matrix{index}[1][1] = {cos};",
                         "}\n",
 
@@ -657,8 +645,6 @@ class SimpleIK(base_component.Hierarchy):
 
         
         self.container_node.add_nodes(ik_base_mat_aim, *xform_output_nodes)
-
-        #TODO fix multiple inverses
 
         
 

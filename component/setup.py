@@ -18,9 +18,27 @@ class Setup(base_component.Hierarchy):
             component_data.AttrData("primaryAxis", type_=component_enum_data.AxisEnum.x, publish=True),
             component_data.AttrData("secondaryAxis", type_=component_enum_data.AxisEnum.y, publish=True),
             component_data.AttrData("locScale", type_="integer", publish=True, value=1, min=0.1),
-            component_data.AttrData("cntrlColor", type_="double3")
+            # component_data.AttrData("cntrlColor", type_="double3")
         )
         return node_data
+    def _get_output_node_build_attr_data(self):
+        node_data = super()._get_output_node_build_attr_data()
+        node_data.extend_attr_data(
+            component_data.AttrData("primaryVec", type_="double3", parent="output"),
+            component_data.AttrData("primaryVecX", type_="double", parent="primaryVec"),
+            component_data.AttrData("primaryVecY", type_="double", parent="primaryVec"),
+            component_data.AttrData("primaryVecZ", type_="double", parent="primaryVec"),
+            component_data.AttrData("secondaryVec", type_="double3", parent="output"),
+            component_data.AttrData("secondaryVecX", type_="double", parent="secondaryVec"),
+            component_data.AttrData("secondaryVecY", type_="double", parent="secondaryVec"),
+            component_data.AttrData("secondaryVecZ", type_="double", parent="secondaryVec"),
+            component_data.AttrData("tertiaryVec", type_="double3", parent="output"),
+            component_data.AttrData("tertiaryVecX", type_="double", parent="tertiaryVec"),
+            component_data.AttrData("tertiaryVecY", type_="double", parent="tertiaryVec"),
+            component_data.AttrData("tertiaryVecZ", type_="double", parent="tertiaryVec"),
+        )
+        return node_data
+
 
     @classmethod
     def create(
@@ -62,29 +80,8 @@ class Setup(base_component.Hierarchy):
                 output_init_matrix=control_container["worldMatrix"],
                 output_world_matrix=control_container["worldMatrix"],
             )
-
 class SimpleLimb(Setup):
     """3 xform that aim and align to each other. middle xform stays inbetween and orients correctly to whatever the angle the other 2 xform make"""    
-    def _get_output_node_build_attr_data(self):
-        node_data =  super()._get_output_node_build_attr_data()
-        node_data.extend_attr_data(
-            component_data.AttrData("primaryVec", type_="double3", parent="output"),
-            component_data.AttrData("primaryVecX", type_="double", parent="primaryVec"),
-            component_data.AttrData("primaryVecY", type_="double", parent="primaryVec"),
-            component_data.AttrData("primaryVecZ", type_="double", parent="primaryVec"),
-            component_data.AttrData("secondaryVec", type_="double3", parent="output"),
-            component_data.AttrData("secondaryVecX", type_="double", parent="secondaryVec"),
-            component_data.AttrData("secondaryVecY", type_="double", parent="secondaryVec"),
-            component_data.AttrData("secondaryVecZ", type_="double", parent="secondaryVec"),
-            component_data.AttrData("tertiaryVec", type_="double3", parent="output"),
-            component_data.AttrData("tertiaryVecX", type_="double", parent="tertiaryVec"),
-            component_data.AttrData("tertiaryVecY", type_="double", parent="tertiaryVec"),
-            component_data.AttrData("tertiaryVecZ", type_="double", parent="tertiaryVec"),
-            component_data.AttrData("IK", type_="compound", parent="output"),
-            component_data.AttrData("IKSide", type_="double", parent="IK"),
-        )
-
-        return node_data
 
     @classmethod
     def create(cls, instance_name=None, parent=None, **kwargs):
@@ -134,7 +131,6 @@ class SimpleLimb(Setup):
             control_inst0.container_node["worldMatrix"], 
             control_inst2_translate.container_node["worldMatrix"])
         control_inst1.container_node["offsetMatrix"] << mid_interp_matrix
-        control_inst1.transform_node["tz"] >> self.container_node["IKSide"]
 
         # xform0
         xform0_ws_mat_attr, xform0_inv_attr = self.__create_xform0(

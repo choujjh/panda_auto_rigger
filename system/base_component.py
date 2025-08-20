@@ -685,6 +685,12 @@ class Hierarchy(Component):
                 # connecting src output to component input
                 for src_name, input_name in zip(src_names, HIER_DATA.INPUT_DATA_NAMES):
                     src_xform[src_name] >> input_xform[input_name]
+
+            # connecting axis vectors
+            for attr in ["primaryVec", "secondaryVec", "tertiaryVec"]:
+                if source_container.has_attr(attr) and self_container.has_attr(attr):
+                    source_container[attr] >> self_container[attr]
+
         else:
             raise RuntimeError(f"{source_component} is not of type Hierarchy")
     def _create_orient_translate_blend(self, name:str, matrix_attr:nw.Attr, tx_attr:nw.Attr=None, ty_attr:nw.Attr=None, tz_attr:nw.Attr=None, tw_attr:nw.Attr=None):
@@ -717,7 +723,29 @@ class Hierarchy(Component):
         
         self.container_node.add_nodes(matrix_4x4, *row_nodes)
         return matrix_4x4
-       
+class Motion(Hierarchy):
+    """Base class for motion autorigging components. Derived from Hierarchy"""
+    component_type = component_enum_data.ComponentType.motion
+    root_transform_name = "motion_grp"
+    class_namespace = "motion"
+    def _get_input_node_build_attr_data(self):
+        node_data = super()._get_input_node_build_attr_data()
+        node_data.extend_attr_data(
+            component_data.AttrData("primaryVec", type_="double3", parent="input"),
+            component_data.AttrData("primaryVecX", type_="double", parent="primaryVec"),
+            component_data.AttrData("primaryVecY", type_="double", parent="primaryVec"),
+            component_data.AttrData("primaryVecZ", type_="double", parent="primaryVec"),
+            component_data.AttrData("secondaryVec", type_="double3", parent="input"),
+            component_data.AttrData("secondaryVecX", type_="double", parent="secondaryVec"),
+            component_data.AttrData("secondaryVecY", type_="double", parent="secondaryVec"),
+            component_data.AttrData("secondaryVecZ", type_="double", parent="secondaryVec"),
+            component_data.AttrData("tertiaryVec", type_="double3", parent="input"),
+            component_data.AttrData("tertiaryVecX", type_="double", parent="tertiaryVec"),
+            component_data.AttrData("tertiaryVecY", type_="double", parent="tertiaryVec"),
+            component_data.AttrData("tertiaryVecZ", type_="double", parent="tertiaryVec"),
+        )
+        return node_data
+
 class Control(Component):
     """A Base class for all control autorigging components. Derived from Component
 
