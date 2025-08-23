@@ -620,7 +620,7 @@ class SimpleIK(base_component.Motion):
             mult_matrix["matrixIn"][1] << prev_world_matrix
             prev_world_matrix = mult_matrix["matrixSum"]
             if index == 0:
-                local_mat_attr = mult_matrix["matrixSum"]
+                local_mat_attr = None
             else:
                 local_mat_attr = loc_matrix["output"]
 

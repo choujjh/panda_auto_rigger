@@ -19,8 +19,12 @@ class VisualizeHier(base_component.Hierarchy):
 
         ws_grp = nw.create_node("transform", "worldSpace_grp")
         cmds.parent(str(ws_grp), str(self.transform_node))
+        ws_grp["offsetParentMatrix"] << self.transform_node["worldInverseMatrix"][0]
+        loc_grp = nw.create_node("transform", "localSpace_grp")
+        cmds.parent(str(loc_grp), str(self.transform_node))
+        loc_grp["offsetParentMatrix"] << self.transform_node["worldInverseMatrix"][0]
 
-        prev_loc_transform = None
+        prev_loc_transform = loc_grp
 
         self._connect_source_hier_component(source_component=source_component)
 
@@ -40,9 +44,11 @@ class VisualizeHier(base_component.Hierarchy):
             input_xform[HIER_DATA.INPUT_WORLD_MATRIX] >> control_ws_inst.container_node["offsetMatrix"]
 
             # setting up the rest of local matrix
-            if prev_loc_transform is not None:
-                cmds.parent(str(control_loc_inst.transform_node), str(prev_loc_transform))
-            input_xform[HIER_DATA.INPUT_LOC_MATRIX] >> control_loc_inst.container_node["offsetMatrix"]
+            cmds.parent(str(control_loc_inst.transform_node), str(prev_loc_transform))
+            if index != 0:
+                input_xform[HIER_DATA.INPUT_LOC_MATRIX] >> control_loc_inst.container_node["offsetMatrix"]
+            else:
+                input_xform[HIER_DATA.INPUT_WORLD_MATRIX] >> control_loc_inst.container_node["offsetMatrix"]
             prev_loc_transform = control_loc_inst.transform_node
 
             # connecting to component output
@@ -51,5 +57,8 @@ class VisualizeHier(base_component.Hierarchy):
                 input_xform[input_name] >> output_xform[output_name]
 
         self.container_node.add_nodes(ws_grp)
+
+
+        #TODO scaling issue when transform is scaled
 
         

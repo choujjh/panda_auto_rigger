@@ -536,13 +536,15 @@ class Hierarchy(Component):
             return []
         elif output_world_matrix_src is None:
             return []
-        elif index <= 0:
-            output_world_matrix_src >> output_loc_matrix
+        
         
         # connect to parent
         else:
-            prev_world_inv_matrix_src = self.output_node[self.HIER_DATA.OUTPUT_XFORM][index-1][self.HIER_DATA.OUTPUT_WORLD_INV_MATRIX]
-            prev_world_inv_matrix_src = prev_world_inv_matrix_src.get_src_connection()
+            if index == 0:
+                prev_world_inv_matrix_src = self.container_node[self.HIER_DATA.HIER_PARENT_INV_MATRIX]
+            else:
+                prev_world_inv_matrix_src = self.container_node[self.HIER_DATA.OUTPUT_XFORM][index-1][self.HIER_DATA.OUTPUT_WORLD_INV_MATRIX]
+                prev_world_inv_matrix_src = prev_world_inv_matrix_src.get_src_connection()
             if prev_world_inv_matrix_src is None:
                 return []
 
@@ -723,6 +725,7 @@ class Hierarchy(Component):
         
         self.container_node.add_nodes(matrix_4x4, *row_nodes)
         return matrix_4x4
+
 class Motion(Hierarchy):
     """Base class for motion autorigging components. Derived from Hierarchy"""
     component_type = component_enum_data.ComponentType.motion
