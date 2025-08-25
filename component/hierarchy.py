@@ -53,12 +53,24 @@ class VisualizeHier(base_component.Hierarchy):
 
             # connecting to component output
             output_xform = self._get_output_xform_attrs(index=index)[index]
-            for input_name, output_name in zip(HIER_DATA.INPUT_DATA_NAMES, HIER_DATA.OUTPUT_DATA_NAMES):
+            for input_name, output_name in HIER_DATA.get_paired_names(self.IO_ENUM.input, self.IO_ENUM.output):
                 input_xform[input_name] >> output_xform[output_name]
 
         self.container_node.add_nodes(ws_grp)
 
+class MergeHier(base_component.Component):
+    def _get_input_node_build_attr_data(self):
+        node_data = super()._get_input_node_build_attr_data()
 
-        #TODO scaling issue when transform is scaled
+        return node_data
+    
+    def _get_output_node_build_attr_data(self):
+        node_data = super()._get_output_node_build_attr_data()
+
+
+
+        return node_data
+
+
 
         

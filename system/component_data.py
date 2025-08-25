@@ -227,12 +227,12 @@ class HierData:
     OUTPUT_WORLD_INV_MATRIX = "outputWorldInvMatrix"
     OUTPUT_LOC_MATRIX = "outputLocMatrix"
 
-    HIER_DATA_NAMES = [
+    __HIER_DATA_NAMES = [
         HIER_PARENT_MATRIX,
         HIER_PARENT_INV_MATRIX,
         HIER_PARENT_INIT_INV_MATRIX
     ]
-    INPUT_DATA_NAMES = [
+    __INPUT_DATA_NAMES = [
         INPUT_XFORM_NAME,
         INPUT_INIT_MATRIX,
         INPUT_INIT_INV_MATRIX,
@@ -240,7 +240,7 @@ class HierData:
         INPUT_WORLD_INV_MATRIX,
         INPUT_LOC_MATRIX
     ]
-    OUTPUT_DATA_NAMES = [
+    __OUTPUT_DATA_NAMES = [
         OUTPUT_XFORM_NAME,
         OUTPUT_INIT_MATRIX,
         OUTPUT_INIT_INV_MATRIX,
@@ -248,6 +248,61 @@ class HierData:
         OUTPUT_WORLD_INV_MATRIX,
         OUTPUT_LOC_MATRIX
     ]
+
+    @classmethod
+    def get_hier_data_names(cls):
+        """returns hier data names
+
+        Returns:
+            list(str): 
+        """
+        return cls.__HIER_DATA_NAMES
+    @classmethod
+    def get_input_data_names(cls, init_matricies:bool=False):
+        """gets input data names. removes init matricies if init_matricies is False
+
+        Args:
+            init_matricies (bool, optional): Defaults to False.
+
+        Returns:
+            list(str):
+        """
+        input_data_names = cls.__INPUT_DATA_NAMES
+        if not init_matricies:
+            input_data_names = [input_name for input_name in input_data_names if input_name.find("Init") < 0]
+        return input_data_names
+    @classmethod
+    def get_output_data_names(cls, init_matricies:bool=True):
+        """gets output data names. removes init matricies if init_matricies is False
+
+        Args:
+            init_matricies (bool, optional): Defaults to False.
+
+        Returns:
+            list(str):
+        """
+        output_data_names = cls.__OUTPUT_DATA_NAMES
+        if not init_matricies:
+            output_data_names = [output_name for output_name in output_data_names if output_name.find("Init") < 0]
+        return output_data_names
+    @classmethod
+    def get_paired_names(cls, src:component_enum_data.IO, dest:component_enum_data.IO, has_input_init_matricies=False):
+        """gives name pairs for hier names. src and dest are either input or output. has input init matricies removes Init matricies
+        names
+
+        Args:
+            src (component_enum_data.IO): 
+            dest (component_enum_data.IO): 
+            has_input_init_matricies (bool, optional): Defaults to False.
+
+        Returns:
+            list(tuples(str)): 
+        """
+        input_names = cls.get_input_data_names(has_input_init_matricies)
+        output_names = cls.get_output_data_names(has_input_init_matricies)
+        src_names = input_names if src == component_enum_data.IO.input else output_names
+        dest_names = input_names if dest == component_enum_data.IO.input else output_names
+        return [(src_name, dest_name) for src_name, dest_name in zip(src_names, dest_names)]
 
     @classmethod
     def is_hier_attr(cls, attr:nw.Attr):
@@ -259,7 +314,7 @@ class HierData:
         Returns:
             bool:
         """
-        hier_names = cls.HIER_DATA_NAMES()
+        hier_names = cls.__HIER_DATA_NAMES()
         for attr_name in hier_names:
             if not attr.has_attr(attr_name):
                 return False
@@ -279,7 +334,7 @@ class HierData:
         Returns:
             bool:
         """
-        xform_names = cls.INPUT_DATA_NAMES()
+        xform_names = cls.get_input_data_names(init_matricies=False)
         for attr_name in xform_names:
             if not attr.has_attr(attr_name):
                 return False
@@ -295,7 +350,7 @@ class HierData:
         Returns:
             bool:
         """
-        xform_names = cls.OUTPUT_DATA_NAMES()
+        xform_names = cls.get_output_data_names(init_matricies=True)
         for attr_name in xform_names:
             if not attr.has_attr(attr_name):
                 return False
@@ -329,15 +384,19 @@ class HierData:
         Returns:
             NodeData:
         """
-        return cls.__gen_hier_nodeData(cls.HIERARCHY, cls.HIER_DATA_NAMES, multi=False)
+        return cls.__gen_hier_nodeData(cls.HIERARCHY, cls.__HIER_DATA_NAMES, multi=False)
     @classmethod
-    def get_input_xform_data(cls):
+    def get_input_xform_data(cls, init_matricies=False):
         """Returns NodeData for an input xform
+
+        Args:
+            input_matricies: has input matricies
 
         Returns:
             NodeData:
         """
-        return cls.__gen_hier_nodeData(cls.INPUT_XFORM, cls.INPUT_DATA_NAMES, multi=True)
+        input_data_names = cls.get_input_data_names(init_matricies)
+        return cls.__gen_hier_nodeData(cls.INPUT_XFORM, input_data_names, multi=True)
     @classmethod
     def get_output_xform_data(cls):
         """Returns NodeData for an output xform
@@ -345,7 +404,7 @@ class HierData:
         Returns:
             NodeData:
         """
-        return cls.__gen_hier_nodeData(cls.OUTPUT_XFORM, cls.OUTPUT_DATA_NAMES, multi=True)
+        return cls.__gen_hier_nodeData(cls.OUTPUT_XFORM, cls.get_output_data_names(), multi=True)
         
 class ControlSetupData():
     """A class that takes Control data and saves it to be inputed into a control

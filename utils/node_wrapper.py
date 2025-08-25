@@ -511,16 +511,20 @@ class Container(Node):
             return Container(containers[0])
         return containers
 
-    def remove_nodes(self, *args):
-        """Removes specified nodes from container
+    def remove_nodes(self, *args, all_descendents=False):
+        """Removes specified nodes from container. removes all nodes if no args
+        are given
 
         Args:
             args (list): nodes to be removed from container
         """
+        if len(args) == 0:
+            args = self.get_nodes()
         args = [str(x) for x in args]
+
         remove_list = args.copy()
         for node in args:
-            curr_remove_nodes = cmds.listRelatives(node, allDescendents=True)
+            curr_remove_nodes = cmds.listRelatives(node, allDescendents=all_descendents)
             if curr_remove_nodes is not None:
                 remove_list.extend(curr_remove_nodes)
         cmds.container(str(self), edit=True, removeNode=remove_list, force=True)

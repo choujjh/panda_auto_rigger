@@ -374,4 +374,7 @@ class SoftIKBlendCurve(MayaEnumAttr):
     linear = 0
     quadratic = 1
     cubic = 2
-
+class IO(Enum):
+    """Enum for Input and Output"""
+    input = 0
+    output = 1

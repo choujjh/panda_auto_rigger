@@ -4,7 +4,6 @@ import system.component_enum_data as component_enum_data
 from typing import Union
 
 import utils.utils as utils
-
 import maya.cmds as cmds
 
 def get_component(container_node:nw.Container):
@@ -183,7 +182,6 @@ class Component():
             self.__namespace_cache["short_namespace"] = short_namespace
         if type(self).class_namespace == None or type(self).class_namespace == "":
             self.__namespace_cache["short_namespace"] = short_namespace.replace("__", "")
-
     def __update_instance_namespace(self):
         """Update instance namespace"""
 
@@ -414,13 +412,19 @@ class Hierarchy(Component):
         functions
     """
     HIER_DATA = component_data.HierData
+    IO_ENUM = component_enum_data.IO
     class_namespace = "hier"
     component_type = component_enum_data.ComponentType.hier
+    _has_input_init_matricies = False
+
+    @property
+    def has_input_init_matricies(self):
+        return type(self)._has_input_init_matricies
 
     def _get_input_node_build_attr_data(self):
         node_data = super()._get_input_node_build_attr_data()
         node_data.extend_attr_data(self.HIER_DATA.get_hier_data())
-        node_data.extend_attr_data(self.HIER_DATA.get_input_xform_data())
+        node_data.extend_attr_data(self.HIER_DATA.get_input_xform_data(self.has_input_init_matricies))
         return node_data
     def _get_output_node_build_attr_data(self):
         node_data = super()._get_output_node_build_attr_data()
@@ -516,9 +520,9 @@ class Hierarchy(Component):
                     new_matrix_src >> world_matrix_attr
 
         elif is_init_matrix and len(input_xform.keys()) == len(output_xform.keys()):
-            if matrix_src is None:
+            if matrix_src is None and self.has_input_init_matricies:
                 input_xform[self.HIER_DATA.INPUT_INIT_MATRIX] >> world_matrix_attr
-            if inv_matrix_src is None:
+            if inv_matrix_src is None and self.has_input_init_matricies:
                 input_xform[self.HIER_DATA.INPUT_INIT_INV_MATRIX] >> world_matrix_inv_attr
         return added_nodes
     def __populate_loc_matrix(self, index:int):
@@ -587,7 +591,7 @@ class Hierarchy(Component):
             indicies = range(len(self.input_node[self.HIER_DATA.INPUT_XFORM]))
         else:
             indicies = utils.make_iterable(index)
-        return {index:{key: self.input_node[self.HIER_DATA.INPUT_XFORM][index][key] for key in self.HIER_DATA.INPUT_DATA_NAMES} for index in indicies}
+        return {index:{key: self.input_node[self.HIER_DATA.INPUT_XFORM][index][key] for key in self.HIER_DATA.get_input_data_names(self.has_input_init_matricies)} for index in indicies}
     def _get_output_xform_attrs(self, index:Union[int, list]=None):
         """Gets a dict of output xforms given indicies. returns all if index is None
 
@@ -598,7 +602,7 @@ class Hierarchy(Component):
             indicies = range(len(self.output_node[self.HIER_DATA.OUTPUT_XFORM]))
         else:
             indicies = utils.make_iterable(index)
-        return {index:{key: self.output_node[self.HIER_DATA.OUTPUT_XFORM][index][key] for key in self.HIER_DATA.OUTPUT_DATA_NAMES} for index in indicies}
+        return {index:{key: self.output_node[self.HIER_DATA.OUTPUT_XFORM][index][key] for key in self.HIER_DATA.get_output_data_names()} for index in indicies}
     def _set_input_xform_attrs(
             self, 
             index:int, 
@@ -621,10 +625,14 @@ class Hierarchy(Component):
             input_loc_matrix (nw.Attr, optional): Defaults to None.
         """
         input_xform_matricies = self._get_input_xform_attrs(index=index)[index]
-        source_attr_list = [input_xform_name, input_init_matrix, input_init_inv_matrix, input_world_matrix, input_world_inv_matrix, input_loc_matrix]
-        if len(source_attr_list) != len(self.HIER_DATA.INPUT_DATA_NAMES):
+        if self.has_input_init_matricies:
+            source_attr_list = [input_xform_name, input_init_matrix, input_init_inv_matrix, input_world_matrix, input_world_inv_matrix, input_loc_matrix]
+        else:
+            source_attr_list = [input_xform_name, input_world_matrix, input_world_inv_matrix, input_loc_matrix]
+        input_data_names = self.HIER_DATA.get_input_data_names(self.has_input_init_matricies)
+        if len(source_attr_list) != len(input_data_names):
             raise RuntimeError("source_attr_list and OUPUT_DATA_NAMES mismatched lengths")
-        for source_attr, input_attr in zip(source_attr_list, self.HIER_DATA.INPUT_DATA_NAMES):
+        for source_attr, input_attr in zip(source_attr_list, input_data_names):
             if isinstance(source_attr, str):
                 input_xform_matricies[input_attr].set(source_attr)
             elif source_attr is not None:
@@ -652,9 +660,10 @@ class Hierarchy(Component):
         """
         output_xform = self._get_output_xform_attrs(index)[index]
         source_attr_list = [output_xform_name, output_init_matrix, output_init_inv_matrix, output_world_matrix, output_world_inv_matrix, output_loc_matrix]
-        if len(source_attr_list) != len(self.HIER_DATA.OUTPUT_DATA_NAMES):
+        output_data_names = self.HIER_DATA.get_output_data_names()
+        if len(source_attr_list) != len(output_data_names):
             raise RuntimeError("source_attr_list and OUPUT_DATA_NAMES mismatched lengths")
-        for source_attr, output_attr in zip(source_attr_list, self.HIER_DATA.OUTPUT_DATA_NAMES):
+        for source_attr, output_attr in zip(source_attr_list, output_data_names):
             if isinstance(source_attr, str):
                 output_xform[output_attr].set(source_attr)
             elif source_attr is not None:
@@ -669,30 +678,41 @@ class Hierarchy(Component):
         if issubclass(type(source_component), Hierarchy):
             HIER_DATA = self.HIER_DATA
 
+            # getting both containers
             self_container = self.container_node
             source_container = source_component.container_node
-            for hier_attr_name in HIER_DATA.HIER_DATA_NAMES:
+            for hier_attr_name in HIER_DATA.get_hier_data_names():
                 source_container[hier_attr_name] >> self_container[hier_attr_name]
 
-            src_xforms = source_component._get_output_xform_attrs()
-            src_names = HIER_DATA.OUTPUT_DATA_NAMES
-            if source_component.container_node == self.container_node.get_container_node():
-                src_xforms = source_component._get_input_xform_attrs()
-                src_names = HIER_DATA.INPUT_DATA_NAMES
-            input_xforms = self._get_input_xform_attrs(utils.length_index_list(len(src_xforms.keys())))
+            parent_component_source = True if source_container == self_container.get_container_node() else False
+            src_type = self.IO_ENUM.input if parent_component_source else self.IO_ENUM.output
+            src_xforms =  source_component._get_input_xform_attrs() if parent_component_source else source_component._get_output_xform_attrs()
+            self_input_xforms = self._get_input_xform_attrs(utils.length_index_list(len(src_xforms.keys())))
             for index, src_xform in src_xforms.items():
-                
-                input_xform = input_xforms[index]
 
-                # connecting src output to component input
-                for src_name, input_name in zip(src_names, HIER_DATA.INPUT_DATA_NAMES):
-                    src_xform[src_name] >> input_xform[input_name]
+                input_xform = self_input_xforms[index]
+                # for loop through attributes to connect
+                for src_name, self_input_name in HIER_DATA.get_paired_names(src=src_type, dest=self.IO_ENUM.input):
+                    src_xform[src_name] >> input_xform[self_input_name]
 
+                # connecting up the init matricies
+                if self.has_input_init_matricies:
+                    self_xform = self.container_node[HIER_DATA.INPUT_XFORM][index]
+                    self_init_mat = self_xform[HIER_DATA.INPUT_INIT_MATRIX]
+                    self_init_inv_mat = self_xform[HIER_DATA.INPUT_INIT_INV_MATRIX]
+                else:
+                    self_xform = self.container_node[HIER_DATA.OUTPUT_XFORM][index]
+                    self_init_mat = self_xform[HIER_DATA.OUTPUT_INIT_MATRIX]
+                    self_init_inv_mat = self_xform[HIER_DATA.OUTPUT_INIT_INV_MATRIX]
+
+                src_xform[HIER_DATA.OUTPUT_INIT_MATRIX] >> self_init_mat
+                src_xform[HIER_DATA.OUTPUT_INIT_INV_MATRIX] >> self_init_inv_mat
+                    
             # connecting axis vectors
             for attr in ["primaryVec", "secondaryVec", "tertiaryVec"]:
                 if source_container.has_attr(attr) and self_container.has_attr(attr):
                     source_container[attr] >> self_container[attr]
-
+            
         else:
             raise RuntimeError(f"{source_component} is not of type Hierarchy")
     def _create_orient_translate_blend(self, name:str, matrix_attr:nw.Attr, tx_attr:nw.Attr=None, ty_attr:nw.Attr=None, tz_attr:nw.Attr=None, tw_attr:nw.Attr=None):
