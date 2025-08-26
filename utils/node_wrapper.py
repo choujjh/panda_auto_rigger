@@ -1234,7 +1234,11 @@ class Attr():
             int:
         """
         if self.plug.isArray:
-            return self.plug.numElements()
+            curr_len = cmds.getAttr(str(self), multiIndices=True)
+            if curr_len is None:
+                return 0
+            return len(curr_len)
+            # return self.plug.numElements()
         elif self.plug.isCompound:
             return self.plug.numChildren()
     # Iterator overloads
@@ -1345,13 +1349,8 @@ class Attr():
         
             # node functions
         
-            # rewrite iterator (to include parent plugs)
-            # get connections (get if attribute is connected to something)
-        
         # skin cluster
     # TODO
-        # container
-            # get all nodes in container
         # nodes
             # set attr should be easier
             # error check __getItem__

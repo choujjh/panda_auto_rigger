@@ -5,30 +5,31 @@ class NodeData():
     """Class to encapsulate node data to add attributes, publish attributes etc
 
     Attributes:
-        node_attr_list (list): node attribute list
+        node_attr_dict (list): node attribute list
     """
 
     def __init__(self, *args):
         """takes args and add them to node_attr_list
 
         Args:
-            args (): list to add to node_attr_list
+            args (): list to add to node_attr_dict
         """
-        self.node_attr_list = []
+        self.node_attr_dict = {}
 
         self.extend_attr_data(*args)
 
     def extend_attr_data(self, *args):
-        """Takes args and adds them to node_attr_list checking for AttrData
+        """Takes args and adds them to node_attr_dict checking for AttrData
         
         Args:
-            args (): list to add to node_attr_list
+            args (): list to add to node_attr_dict
         """
         if len(args) > 0 and isinstance(args[0], NodeData):
-            args = args[0].node_attr_list
+            args_dict = {key: data for key, data in args[0].node_attr_dict.items()}
         else:
-            args = [data for data in args if isinstance(data, AttrData)]
-        self.node_attr_list.extend(args)
+            
+            args_dict = {data.name:data for data in args if isinstance(data, AttrData)}
+        self.node_attr_dict.update(args_dict)
 
     def add_attrs_to_node(self, node:nw.Node):
         """Takes node_attr_list AttrData and processes data to add, set value, 
@@ -40,7 +41,19 @@ class NodeData():
         # adding attrs
         num_children_dict = self.__get_num_children_dict()
 
-        for data in self.node_attr_list:
+        # reorganizing data #TODO make a better implementation
+        data_list = []
+        for data in self.node_attr_dict.values():
+            data_added = False
+            for index, saved_data in enumerate(data_list):
+                if "parent" in saved_data.add_attr_kwargs.keys() and saved_data.add_attr_kwargs["parent"] == data.name:
+                    data_list.insert(index, data)
+                    data_added = True
+                    break
+            if not data_added:
+                data_list.append(data)
+
+        for data in data_list:
             if data.do_add_attr:
 
                 if data.name in num_children_dict.keys():
@@ -52,7 +65,7 @@ class NodeData():
                 node.add_attr(long_name=data.name, type=data.type_, **data.add_attr_kwargs)
 
         # setting attrs and locking
-        for data in self.node_attr_list:
+        for data in data_list:
             # dealing with attr value
             if data.value is not None:
                 if isinstance(data.value, nw.Attr):
@@ -63,6 +76,34 @@ class NodeData():
             # locking
             if data.locked:
                 node[data.name].set_locked(True)
+
+    def remove(self, *keys:str):
+        """Given keys removes attrData
+
+        Args:
+            keys (list(str)):
+
+        Raises:
+            KeyError: if key not found
+        """
+        for key in keys:
+            if key not in self.node_attr_dict.keys():
+                raise KeyError(f"{key} not in node_attr_dict")
+            self.node_attr_dict.pop(key)
+
+    def modify_add_attr_kwargs(self, key:str, **add_attr_kwargs):
+        """given a key modifies the add_attr_kwargs
+
+        Args:
+            key (str):
+            add_attr_kwargs (dict)
+
+        Raises:
+            KeyError: if key not found
+        """
+        if key not in self.node_attr_dict.keys():
+            raise KeyError(f"{key} not in node_attr_dict")
+        self.node_attr_dict[key].add_attr_kwargs.update(add_attr_kwargs)
 
     def publish_attr_data_attributes(self, node:nw.Node):
         """Takes node_attr_list AttrData and publishes attributes to it's parent
@@ -75,7 +116,7 @@ class NodeData():
 
         if container_node is None:
             return
-        for data in self.node_attr_list:
+        for data in self.node_attr_dict.values():
             if data.publish != False:
                 if node.has_attr(data.name):
                     if isinstance(data.publish, str):
@@ -92,7 +133,7 @@ class NodeData():
             dict:
         """
         num_children_dict = {}
-        for data in self.node_attr_list:
+        for data in self.node_attr_dict.values():
             attr_kwargs = data.add_attr_kwargs
             if "parent" in attr_kwargs.keys():
                 parent_name = attr_kwargs["parent"]
@@ -109,7 +150,7 @@ class NodeData():
         Returns:
             str:
         """
-        return "\n".join([str(x) for x in self.node_attr_list])
+        return "\n".join([str(x) for x in self.node_attr_dict.values()])
     
     def __iter__(self):
         """Iterates through AttrData
@@ -117,7 +158,7 @@ class NodeData():
         Yields:
             AttrData:
         """
-        for x in self.node_attr_list:
+        for x in self.node_attr_dict:
             yield x
 
 class AttrData:
@@ -162,8 +203,6 @@ class AttrData:
             if enum_class is not None:
                 enum_data = self.type_
                 self.type_ = "enum"
-                
-
 
                 self.add_attr_kwargs["enumName"] = enum_class.maya_enum_str()
 

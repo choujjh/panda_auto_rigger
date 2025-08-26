@@ -317,7 +317,7 @@ class Component():
         """Build cleanup. sets build to true and renames nodes
         """
         self.rename_nodes()
-
+        
     def __create_base_nodes(self, parent_container:nw.Container=None):
         """Creates the base node (input, output, container) in the initialization
         phase
@@ -332,7 +332,7 @@ class Component():
 
         # output node
         output_node_attr_data = self._get_output_node_build_attr_data()
-        has_output_node = len(output_node_attr_data.node_attr_list) > 1
+        has_output_node = len(output_node_attr_data.node_attr_dict) > 1
         if has_output_node:
             output_node = nw.create_node("network", "output")
             output_node_attr_data = self._get_output_node_build_attr_data()
@@ -392,13 +392,11 @@ class Component():
                 full_namespace = self.full_namespace
             
             utils.Namespace.add_namespace(full_namespace)
-
         rename_node(self.container_node, full_namespace)
         for node in self.container_node.get_nodes():
             # TODO replace later with if it's a component not just a container
             if node.type_ != "container":
                 rename_node(node, full_namespace)
-
         # check if nothing else in namespace delete
         if utils.Namespace.empty(prev_namespace):
             utils.Namespace.delete(prev_namespace)
@@ -433,11 +431,11 @@ class Hierarchy(Component):
     
     def _post_build(self):
         super()._post_build()
-        self.__populate_output_xforms()
+        self._populate_output_xforms()
         self.rename_nodes()
-        self.__check_xforms()
+        self._check_xforms()
     
-    def __populate_output_xforms(self):
+    def _populate_output_xforms(self):
         """Goes through the output xform attributes and tries to connect name, local matrix, and init matricies"""
         added_nodes = []
         HIER_DATA = self.HIER_DATA
@@ -445,11 +443,12 @@ class Hierarchy(Component):
         for index, output_xform in output_xforms.items():
             # init inverse matrix
             self.__populate_name(index)
-            added_nodes.extend(self.__populate_world_matrix(
-                index=index,
-                world_matrix_attr=output_xform[HIER_DATA.OUTPUT_INIT_MATRIX],
-                world_matrix_inv_attr=output_xform[HIER_DATA.OUTPUT_INIT_INV_MATRIX],
-                is_init_matrix=True))
+            if self.has_input_init_matricies:
+                added_nodes.extend(self.__populate_world_matrix(
+                    index=index,
+                    world_matrix_attr=output_xform[HIER_DATA.OUTPUT_INIT_MATRIX],
+                    world_matrix_inv_attr=output_xform[HIER_DATA.OUTPUT_INIT_INV_MATRIX],
+                    is_init_matrix=True))
             added_nodes.extend(self.__populate_world_matrix(
                 index=index,
                 world_matrix_attr=output_xform[HIER_DATA.OUTPUT_WORLD_MATRIX],
@@ -465,8 +464,10 @@ class Hierarchy(Component):
             index (int): xform index
         """
         # set variables
-        input_name = self.input_node[self.HIER_DATA.INPUT_XFORM][index][self.HIER_DATA.INPUT_XFORM_NAME]
         output_name = self.output_node[self.HIER_DATA.OUTPUT_XFORM][index][self.HIER_DATA.OUTPUT_XFORM_NAME]
+        if output_name.has_src_connection():
+            return
+        input_name = self.input_node[self.HIER_DATA.INPUT_XFORM][index][self.HIER_DATA.INPUT_XFORM_NAME]
         output_ws_src = self.output_node[self.HIER_DATA.OUTPUT_XFORM][index][self.HIER_DATA.OUTPUT_WORLD_MATRIX].get_src_connection()
         
         # check if needs to be set
@@ -499,6 +500,8 @@ class Hierarchy(Component):
 
         added_nodes = []
         # pre check to see if it needs to return anything
+        if inv_matrix_src is not None and matrix_src is not None:
+            return []
         if inv_matrix_src is None and matrix_src is not None:
             if isinstance(matrix_src.node, nw.Transform):
                 matrix_src.node["worldInverseMatrix"][0] >> world_matrix_inv_attr
@@ -563,16 +566,17 @@ class Hierarchy(Component):
             return added_nodes
         return added_nodes
 
-    def __check_xforms(self):
+    def _check_xforms(self, check_len=True):
         """After component is built, checks to see if xforms were properly set"""
-        input_xform_len = len(self.input_node[self.HIER_DATA.INPUT_XFORM])
-        output_xform_len = len(self.output_node[self.HIER_DATA.OUTPUT_XFORM])
-        if output_xform_len == 0:
-            cmds.warning(f"{self.container_node} component has no xform output")
+        if check_len:
+            input_xform_len = len(self.input_node[self.HIER_DATA.INPUT_XFORM])
+            output_xform_len = len(self.output_node[self.HIER_DATA.OUTPUT_XFORM])
+            if output_xform_len == 0:
+                cmds.warning(f"{self.container_node} component has no xform output")
 
-        if input_xform_len > output_xform_len:
-            cmds.warning(f"input xform (len {input_xform_len}) longer than output xform (len {output_xform_len})")
-        
+            if input_xform_len > output_xform_len:
+                cmds.warning(f"input xform (len {input_xform_len}) longer than output xform (len {output_xform_len})")
+
         for xform_attr in self.output_node[self.HIER_DATA.OUTPUT_XFORM]:
             for xform_sub_attr in xform_attr:
                 if xform_sub_attr.type_ == "string":
