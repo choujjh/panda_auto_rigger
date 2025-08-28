@@ -112,63 +112,58 @@ class Color(base_component.SingletonComponent):
         Args:
             color (component_enum_data.Colors):
         """
+        shader = utils.make_lambert_shader(color=color, name=f"{color.name}")
+        shader_sg = utils.get_shader_sg(shader)
         color_manager_inst = cls.instance()
-
-        index_color = utils.get_rgb_from_index(color.value)
-        shader = nw.wrap_node(cmds.shadingNode("lambert", name=f"{color.name}Lamb", asShader=True))
-        shader["color"] = index_color
-
-        shader_sg = nw.wrap_node(cmds.sets(name=f"{color.name}LambSG", renderable=True, noSurfaceShader=True, empty=True))
-        shader_sg["surfaceShader"] << shader["outColor"]
 
         color_manager_inst.output_node["color"][color.name] << shader["color"]
         color_manager_inst.container_node.add_nodes(shader, shader_sg)
         color_manager_inst.rename_nodes()
         
     
-    @classmethod
-    def apply_color(cls, obj:Union[nw.Transform, base_component.Control, nw.Node], color:component_enum_data.Color, connect=True):
-        """Apply color to 
+    # @classmethod
+    # def apply_color(cls, obj:Union[nw.Transform, base_component.Control, nw.Node], color:component_enum_data.Color, connect=True):
+    #     """Apply color to 
 
-        Args:
-            obj (Union[nw.Transform, component.Control, nw.Node]): _description_
-            color (component_enum_data.Colors): _description_
+    #     Args:
+    #         obj (Union[nw.Transform, component.Control, nw.Node]): _description_
+    #         color (component_enum_data.Colors): _description_
 
-        Raises:
-            RuntimeError: _description_
-        """
-        if color == component_enum_data.Color.none:
-            cls.get_shader(color=color)
-            cmds.warning(f"not applying color to {obj} because color is None")
-            return
-        # switch obj from control component to transform node
-        shapes_list = []
-        if issubclass(type(obj), base_component.Control):
-            transform = obj.transform_node
-            if transform is None:
-                cmds.warning(f"transform is None. did not apply color")
-                raise RuntimeError("transform is None. did not apply color")
-            elif not obj.can_set_color:
-                cmds.warning(f"{obj.container_node} component is not able to set color")
-                return
-            obj = transform
-        elif isinstance(obj, nw.Node) and obj.type_ !="transform":
-            if obj.has_attr("overrideEnabled") and obj.has_attr("overrideRGBColors") and obj.has_attr("overrideColorRGB"):
-                shapes_list = [obj]
-        if isinstance(obj, nw.Transform):
-            shapes_list = obj.get_shapes()
+    #     Raises:
+    #         RuntimeError: _description_
+    #     """
+    #     if color == component_enum_data.Color.none:
+    #         cls.get_shader(color=color)
+    #         cmds.warning(f"not applying color to {obj} because color is None")
+    #         return
+    #     # switch obj from control component to transform node
+    #     shapes_list = []
+    #     if issubclass(type(obj), base_component.Control):
+    #         transform = obj.transform_node
+    #         if transform is None:
+    #             cmds.warning(f"transform is None. did not apply color")
+    #             raise RuntimeError("transform is None. did not apply color")
+    #         elif not obj.can_set_color:
+    #             cmds.warning(f"{obj.container_node} component is not able to set color")
+    #             return
+    #         obj = transform
+    #     elif isinstance(obj, nw.Node) and obj.type_ !="transform":
+    #         if obj.has_attr("overrideEnabled") and obj.has_attr("overrideRGBColors") and obj.has_attr("overrideColorRGB"):
+    #             shapes_list = [obj]
+    #     if isinstance(obj, nw.Transform):
+    #         shapes_list = obj.get_shapes()
 
-        # going through shapes list
-        for shape in shapes_list:
-            if shape.type_ == "nurbsSurface":
-                cmds.sets([str(shape)], e=True, forceElement=str(cls.get_shader_sg(color)))
-            else:
-                shape["overrideEnabled"] = True
-                shape["overrideRGBColors"] = 1
-                if connect:
-                    shape["overrideColorRGB"] << cls.get_shader(color)["color"]
-                else:
-                    shape["overrideColorRGB"] = cls.get_shader(color)["color"]
+    #     # going through shapes list
+    #     for shape in shapes_list:
+    #         if shape.type_ == "nurbsSurface":
+    #             cmds.sets([str(shape)], e=True, forceElement=str(cls.get_shader_sg(color)))
+    #         else:
+    #             shape["overrideEnabled"] = True
+    #             shape["overrideRGBColors"] = 1
+    #             if connect:
+    #                 shape["overrideColorRGB"] << cls.get_shader(color)["color"]
+    #             else:
+    #                 shape["overrideColorRGB"] = cls.get_shader(color)["color"]
         
                 
         

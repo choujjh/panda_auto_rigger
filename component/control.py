@@ -36,19 +36,21 @@ def swap_control(to_replace: Union[nw.Container, nw.Transform, base_component.Co
     # delete shapes
     cmds.delete([str(x) for x in to_replace.transform_node.get_shapes()])
 
-    replace_component._apply_shape_to_cntrl(to_replace.transform_node, to_replace.container_node)
+    replace_inst = replace_component()
+    replace_inst._apply_shape_to_cntrl(
+        cntrl_transform=to_replace.transform_node, 
+        component_container=to_replace.container_node)
 
 class Circle(base_component.Control):
     """A circle nurbs curve control"""
-    @classmethod
-    def _create_shapes(cls, axis_vec):
+    
+    def _create_shapes(self, axis_vec):
         return [cmds.circle(normal=axis_vec)[0]]
 class Axis(base_component.Control):
     """A axis nurbs curve control with a red, green, and blue axis pointers"""
     can_set_color = False
     
-    @classmethod
-    def _create_shapes(cls, axis_vec):
+    def _create_shapes(self, axis_vec):
         x_axis = nw.wrap_node(cmds.curve(degree=1, point=[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]))
         y_axis = nw.wrap_node(cmds.curve(degree=1, point=[[0.0, 0.0, 0.0], [0.0, 1.0, 0.0]]))
         z_axis = nw.wrap_node(cmds.curve(degree=1, point=[[0.0, 0.0, 0.0], [0.0, 0.0, 1.0]]))
@@ -61,8 +63,8 @@ class Axis(base_component.Control):
         return [x_axis, y_axis, z_axis]
 class BoxControl(base_component.Control):
     """A box nurbs curve control"""
-    @classmethod
-    def _create_shapes(cls, axis_vec):
+    
+    def _create_shapes(self, axis_vec):
         x = 1.0
         y = 1.0
         z = 1.0
@@ -76,16 +78,16 @@ class BoxControl(base_component.Control):
         ])
         
         return [box]
-class DiamondControl(base_component.Control):
+class Diamond(base_component.Control):
     """A diamond nurbs surface control"""
-    @classmethod
-    def _create_shapes(cls, axis_vec):
+    
+    def _create_shapes(self, axis_vec):
         diamond = cmds.sphere(axis=axis_vec, sections=4, spans=2, degree=1)[0]
         return [diamond]
-class DiamondWireControl(base_component.Control):
+class DiamondWire(base_component.Control):
     """A diamond nurbs curve control"""
-    @classmethod
-    def _create_shapes(cls, axis_vec):
+    
+    def _create_shapes(self, axis_vec):
         diamond = cmds.curve(degree=1, point=[
             [0, 1, 0], [1, 0, 0], [0, -1, 0],
             [0, 0, 1], [0, 1, 0],
@@ -97,8 +99,8 @@ class DiamondWireControl(base_component.Control):
         return [diamond]
 class Gear(base_component.Control):
     """A gear nurbs curve control"""
-    @classmethod
-    def _create_shapes(cls, axis_vec):
+    
+    def _create_shapes(self, axis_vec):
         outer_shape = cmds.curve(degree=3, point=[
             [0.303359, 0, 0.940211], [0.662567, 0, 0.732822], [0.707107, 0, 0.720888], [0.751647, 0, 0.732822],
             [0.925336, 0, 0.833101], [0.973133, 0, 0.839394], [1.011381, 0, 0.810046], [1.20721, 0, 0.470859],
@@ -136,8 +138,8 @@ class Gear(base_component.Control):
         return [inner_shape, outer_shape]
 class Gimbal(base_component.Control):
     can_set_color = False
-    @classmethod
-    def _create_shapes(cls, axis_vec):
+    
+    def _create_shapes(self, axis_vec):
         circle1 = nw.wrap_node(cmds.circle(normal=[1.0, 0.0, 0.0])[0])
         circle2 = nw.wrap_node(cmds.circle(normal=[0.0, 1.0, 0.0])[0])
         circle3 = nw.wrap_node(cmds.circle(normal=[0.0, 0.0, 1.0])[0])
@@ -149,8 +151,8 @@ class Gimbal(base_component.Control):
         return [circle1, circle2, circle3]
 class Pyramid4(base_component.Control):
     """A pyramid nurbs curve control"""
-    @classmethod
-    def _create_shapes(cls, axis_vec):
+    
+    def _create_shapes(self, axis_vec):
         pyramid = cmds.curve(degree=1, point=[
             [1, 0, 1], [1, 0, -1], [0, 1.4, 0], [1, 0, 1],
             [-1, 0, 1], [0, 1.4, 0], [-1, 0, -1], [-1, 0, 1], 
@@ -159,8 +161,8 @@ class Pyramid4(base_component.Control):
         return [pyramid]
 class Sphere(base_component.Control):
     """A sphere nurbs surface control"""
-    @classmethod
-    def _create_shapes(cls, axis_vec):
+    
+    def _create_shapes(self, axis_vec):
         sphere = cmds.sphere(axis=axis_vec)[0]
         return [sphere]
 class Locator(base_component.Control):
@@ -181,6 +183,5 @@ class Locator(base_component.Control):
         loc_shape["localScaleY"] << self.input_node["locScale"]
         loc_shape["localScaleZ"] << self.input_node["locScale"]
 
-    @classmethod
-    def _create_shapes(cls, axis_vec):
+    def _create_shapes(self, axis_vec):
         return [cmds.spaceLocator()[0]]

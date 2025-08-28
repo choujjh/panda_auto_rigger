@@ -4,15 +4,11 @@ import component.control as control
 import utils.node_wrapper as nw
 import utils.utils as utils
 import maya.cmds as cmds
+from typing import Union
 
 class VisualizeHier(base_component.Hierarchy):
     """Helps visualize and debug hierarchies by creating chains for world space and local visualization"""
     root_transform_name = "vis_grp"
-
-    @classmethod
-    def create(cls, source_component:base_component.Hierarchy, instance_name = None, parent=None, **kwargs):
-        kwargs["source_component"] = source_component
-        return super().create(instance_name, parent, **kwargs)
     
     def _override_build(self, **kwargs):
         source_component= kwargs["source_component"]
@@ -28,7 +24,7 @@ class VisualizeHier(base_component.Hierarchy):
 
         prev_loc_transform = loc_grp
 
-        self._connect_source_hier_component(source_component=source_component)
+        self._connect_source_hier_component(source_component=source_component, connect_hierarchy=kwargs["connect_hierarchy"])
 
         input_xforms = self._get_input_xform_attrs()
         for index, input_xform in input_xforms.items():            
@@ -60,13 +56,14 @@ class VisualizeHier(base_component.Hierarchy):
 
         self.container_node.add_nodes(ws_grp)
 
-class MergeHier(base_component.Hierarchy):
+class MergeHier(base_component.Component):
     class_namespace="merge_hier"
+    HIER_DATA = component_data.HierData
+
     def _get_input_node_build_attr_data(self):
         node_data = super()._get_input_node_build_attr_data()
 
-        for input_name in self.HIER_DATA.get_input_data_names():
-            node_data.remove(input_name)
+        node_data.extend_attr_data(self.HIER_DATA.get_hier_data())
 
         node_data.extend_attr_data(
             component_data.AttrData("hierParentMatricies", type_="matrix", multi=True, publish=True),
@@ -76,16 +73,30 @@ class MergeHier(base_component.Hierarchy):
         )
         
         return node_data
+    
+    def _get_output_node_build_attr_data(self):
+        node_data = super()._get_output_node_build_attr_data()
+        node_data.extend_attr_data(self.HIER_DATA.get_output_xform_data())
+
+        return node_data
+
     @classmethod
     def create(cls, source_components=[], instance_name = None, parent=None, **kwargs):
         kwargs["source_components"] = utils.make_iterable(source_components)
                 
         return super().create(instance_name, parent, **kwargs)
-    def _override_build(self, **kwargs):
-        HIER_DATA = self.HIER_DATA
-        source_components = kwargs["source_components"]
-        self._connect_source_hier_component(source_components=source_components)
+    
 
+    def _override_build(self, **kwargs):
+        source_components = kwargs["source_components"]
+
+        self._connect_source_hier_components(source_components=source_components)
+        hier_parent_mat = self.__connect_hier()
+        blend_weight_attrs = self.__blend_weights()
+        self.__blend_matricies(hier_parent_mat=hier_parent_mat, blend_weight_attrs=blend_weight_attrs)
+        
+    def __connect_hier(self):
+        """creates all nodes connected to hier"""
         # connecting hier
         hier_parent_mat = nw.create_node("blendMatrix", "hierParentMatrixBlend")
         for xform_index, hier_attr in enumerate(self.container_node["hierParentMatricies"]):
@@ -95,30 +106,45 @@ class MergeHier(base_component.Hierarchy):
                 hier_parent_mat["target"][xform_index-1]["targetMatrix"] << hier_attr
         hier_parent_inv = nw.create_node("inverseMatrix", "hierParentInvMatrixBlend")
         hier_parent_inv["inputMatrix"] << hier_parent_mat["outputMatrix"]
-        self.container_node[HIER_DATA.HIER_PARENT_MATRIX] << hier_parent_mat["outputMatrix"]
-        self.container_node[HIER_DATA.HIER_PARENT_INV_MATRIX] << hier_parent_inv["outputMatrix"] #TODO erroring out
+        self.container_node[self.HIER_DATA.HIER_PARENT_MATRIX] << hier_parent_mat["outputMatrix"]
+        self.container_node[self.HIER_DATA.HIER_PARENT_INV_MATRIX] << hier_parent_inv["outputMatrix"] #TODO erroring out
 
-        # getting the weights for components
-        added_nodes = [hier_parent_mat, hier_parent_inv]
+        self.container_node.add_nodes(hier_parent_mat, hier_parent_inv)
+        return hier_parent_mat
+    def __blend_weights(self):
+        """creates all nodes for blending
 
+        Returns:
+            list(nw.Attr): list of attribute that has the blended weights for each index
+        """
         blend_weight_attrs = []
-        for component_index in range(len(self.container_node[HIER_DATA.INPUT_XFORM])):
-            if component_index != 0:
-                clamp = nw.create_node("clampRange", f"component{component_index}_clamp")
-                if component_index == 1:
+        added_nodes = []
+        for index in range(len(self.container_node[self.HIER_DATA.INPUT_XFORM])):
+            if index != 0:
+                clamp = nw.create_node("clampRange", f"component{index}_clamp")
+                if index == 1:
                     clamp["input"] << self.container_node["hierBlend"]
                 else:
-                    component_weight = nw.create_node("subtract", name=f"component{xform_index}_envelope")
+                    component_weight = nw.create_node("subtract", name=f"component{index}_envelope")
                     component_weight["input1"] << self.container_node["hierBlend"]
-                    component_weight["input2"].set(xform_index-1)
+                    component_weight["input2"].set(index-1)
                     clamp["input"] << component_weight["output"]
                     added_nodes.append(component_weight)
                 added_nodes.append(clamp)
                 blend_weight_attrs.append(clamp["output"])
+        self.container_node.add_nodes(*added_nodes)
 
-        # creating blends
+        return blend_weight_attrs
+    def __blend_matricies(self, hier_parent_mat:nw.Node, blend_weight_attrs:list):
+        """creates local, world, and inverse matricies
+
+        Args:
+            hier_parent_mat (nw.Node): 
+            blend_weight_attrs (list): 
+        """
+        added_nodes = []
         prev_ws_attr = hier_parent_mat["outputMatrix"]
-        hier_len = len(self.container_node[HIER_DATA.INPUT_XFORM][0][HIER_DATA.INPUT_LOC_MATRIX])
+        hier_len = len(self.container_node[self.HIER_DATA.INPUT_XFORM][0][self.HIER_DATA.INPUT_LOC_MATRIX])
         for xform_index in range(hier_len):
             blend_mat = nw.create_node("blendMatrix", name=f"xform{xform_index}_loc_blend")
 
@@ -126,27 +152,47 @@ class MergeHier(base_component.Hierarchy):
             mult_mat = nw.create_node("multMatrix", name=f"xform{xform_index}_ws_mat")
             mult_mat["matrixIn"][0] << blend_mat["outputMatrix"]
             mult_mat["matrixIn"][1] << prev_ws_attr
-            prev_ws_attr = mult_mat["matrixSum"]
+            inverse_mat = nw.create_node("inverseMatrix", name=f"xform{xform_index}_inv_mat")
+            inverse_mat["inputMatrix"] << mult_mat["matrixSum"]
             
+            prev_ws_attr = mult_mat["matrixSum"]
             #local space blend
-            for component_index, input_xform in enumerate(self.container_node[HIER_DATA.INPUT_XFORM]):
-                loc_mat_attr = input_xform[HIER_DATA.INPUT_LOC_MATRIX][xform_index]
+            for component_index, input_xform in enumerate(self.container_node[self.HIER_DATA.INPUT_XFORM]):
+                loc_mat_attr = input_xform[self.HIER_DATA.INPUT_LOC_MATRIX][xform_index]
                 if component_index == 0:
                     blend_mat["inputMatrix"] << loc_mat_attr
                 else:
                     blend_mat["target"][component_index-1]["targetMatrix"] << loc_mat_attr
                     blend_mat["target"][component_index-1]["weight"] << blend_weight_attrs[component_index-1]
-                added_nodes.extend([blend_mat, mult_mat])
+                added_nodes.extend([blend_mat, mult_mat, inverse_mat])
 
-            self._set_output_xform_attrs(
+
+            self._set_output_xform(
                 index=xform_index,
                 output_world_matrix=mult_mat["matrixSum"],
+                output_inv_matrix=inverse_mat["outputMatrix"],
                 output_loc_matrix=blend_mat["outputMatrix"],
             )
                         
         self.container_node.add_nodes(*added_nodes)
+    def _set_output_xform(self, index:int, output_world_matrix:nw.Attr, output_inv_matrix:nw.Attr, output_loc_matrix:nw.Attr):
+        output_xform_attr = self.container_node[self.HIER_DATA.OUTPUT_XFORM]
 
-    def _connect_source_hier_component(self, source_components):
+        output_xform_attr[index][self.HIER_DATA.OUTPUT_WORLD_MATRIX] << output_world_matrix
+        output_xform_attr[index][self.HIER_DATA.OUTPUT_WORLD_INV_MATRIX] << output_inv_matrix
+        output_xform_attr[index][self.HIER_DATA.OUTPUT_LOC_MATRIX] << output_loc_matrix
+    def _connect_source_hier_components(self, source_components):
+        """given a list of source components, connects them to this component
+
+        Args:
+            source_components (iter):
+
+        Raises:
+            RuntimeError: _description_
+            RuntimeError: _description_
+            RuntimeError: _description_
+            RuntimeError: _description_
+        """
         if utils.is_iterable(source_components) and len(source_components) > 0:
             #connect up local matricies
             HIER_DATA = self.HIER_DATA
@@ -173,28 +219,27 @@ class MergeHier(base_component.Hierarchy):
                 # connect up output name, world matrix and init matricies 
                 curr_src_container = source_components[0].container_node
                 for index, src_out_xform in enumerate(curr_src_container[HIER_DATA.OUTPUT_XFORM]):
-                    self._set_output_xform_attrs(
-                        index=index,
-                        output_xform_name=src_out_xform[HIER_DATA.OUTPUT_XFORM_NAME],
-                        output_init_matrix=src_out_xform[HIER_DATA.OUTPUT_INIT_MATRIX],
-                        output_init_inv_matrix=src_out_xform[HIER_DATA.OUTPUT_INIT_INV_MATRIX]
-                    )
+                    out_xform = self.container_node[HIER_DATA.OUTPUT_XFORM][index]
+
+                    out_xform[HIER_DATA.OUTPUT_XFORM_NAME] << src_out_xform[HIER_DATA.OUTPUT_XFORM_NAME]
+                    out_xform[HIER_DATA.OUTPUT_INIT_MATRIX] << src_out_xform[HIER_DATA.OUTPUT_INIT_MATRIX]
+                    out_xform[HIER_DATA.OUTPUT_INIT_INV_MATRIX] << src_out_xform[HIER_DATA.OUTPUT_INIT_INV_MATRIX]
             
             # setting hiers
             source_container = source_components[0].container_node
-            source_container[HIER_DATA.HIER_PARENT_INV_MATRIX] >> self.container_node[HIER_DATA.HIER_PARENT_INV_MATRIX]
-            
-
+            source_container[HIER_DATA.HIER_PARENT_INIT_INV_MATRIX] >> self.container_node[HIER_DATA.HIER_PARENT_INIT_INV_MATRIX]
 
         else:
             raise RuntimeError("source component needs to be iterable")
-    def _populate_output_xforms(self):
-        pass
+    def _get_output_xform_attrs(self, index:Union[int, list]=None):
+        """Gets a dict of output xforms given indicies. returns all if index is None
 
-    def _check_xforms(self):
-        output_xform_len = len(self.output_node[self.HIER_DATA.OUTPUT_XFORM])
-        if output_xform_len == 0:
-            cmds.warning(f"{self.container_node} component has no xform output")
-        
-        return super()._check_xforms(False)
+        Returns:
+            list:
+        """
+        if index is None:
+            indicies = range(len(self.output_node[self.HIER_DATA.OUTPUT_XFORM]))
+        else:
+            indicies = utils.make_iterable(index)
+        return {index:{key: self.output_node[self.HIER_DATA.OUTPUT_XFORM][index][key] for key in self.HIER_DATA.get_output_data_names()} for index in indicies}
     

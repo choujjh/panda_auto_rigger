@@ -46,6 +46,7 @@ class Setup(base_component.Hierarchy):
         instance_name=None, 
         parent=None, 
         num_xforms=3, 
+        control_color=None,
         primary_axis:component_enum_data.MayaEnumAttr=component_enum_data.AxisEnum.x, 
         secondary_axis:component_enum_data.MayaEnumAttr=component_enum_data.AxisEnum.y, 
         **kwargs):
@@ -53,11 +54,13 @@ class Setup(base_component.Hierarchy):
         kwargs["num_xforms"] = num_xforms
         kwargs["primary_axis"] = primary_axis
         kwargs["secondary_axis"] = secondary_axis
+        kwargs["control_color"] = control_color
         component_inst = super().create(instance_name, parent, **kwargs)
         return component_inst
     
     def _override_build(self, **kwargs):
         num_xforms = kwargs["num_xforms"]
+        control_color = kwargs["control_color"]
 
         self.container_node["primaryAxis"] = component_enum_data.get_index_of_item(kwargs["primary_axis"])
         self.container_node["secondaryAxis"] = component_enum_data.get_index_of_item(kwargs["secondary_axis"])
@@ -69,7 +72,7 @@ class Setup(base_component.Hierarchy):
             input_xform[self.HIER_DATA.INPUT_XFORM_NAME].set(f"xform{index}")
 
             # creating control
-            control_inst = control.Locator.create(instance_name=input_xform[self.HIER_DATA.INPUT_XFORM_NAME], parent=self)
+            control_inst = control.Locator.create(instance_name=input_xform[self.HIER_DATA.INPUT_XFORM_NAME], parent=self, color=control_color)
             control_container = control_inst.container_node
             control_container["locScale"] << self.input_node["locScale"]
             control_container["offsetMatrix"] = utils.translate_to_matrix([0, index*1.5, 0])
@@ -84,32 +87,57 @@ class SimpleLimb(Setup):
     """3 xform that aim and align to each other. middle xform stays inbetween and orients correctly to whatever the angle the other 2 xform make"""    
 
     @classmethod
-    def create(cls, instance_name=None, parent=None, **kwargs):
-        return super().create(instance_name, parent, **kwargs)
+    def create(
+        cls, 
+        instance_name=None, 
+        parent=None, 
+        control_color=None,
+        primary_axis:component_enum_data.MayaEnumAttr=component_enum_data.AxisEnum.x, 
+        secondary_axis:component_enum_data.MayaEnumAttr=component_enum_data.AxisEnum.y, 
+        **kwargs):
+
+        kwargs["primary_axis"] = primary_axis
+        kwargs["secondary_axis"] = secondary_axis
+        kwargs["control_color"] = control_color
+        component_inst = super().create(instance_name, parent, **kwargs)
+        return component_inst
+    
     def _override_build(self, **kwargs):
+        control_color = kwargs["control_color"]
+
+        self.container_node["primaryAxis"] = component_enum_data.get_index_of_item(kwargs["primary_axis"])
+        self.container_node["secondaryAxis"] = component_enum_data.get_index_of_item(kwargs["secondary_axis"])
 
         input_xforms = self._get_input_xform_attrs(utils.length_index_list(3))
         for index, input_xform in input_xforms.items():
             input_xform[self.HIER_DATA.INPUT_XFORM_NAME].set(f"xform{index}")
 
         # creating controls
-        control_inst0 = control.Locator.create(instance_name=self.input_node[self.HIER_DATA.INPUT_XFORM][0][self.HIER_DATA.INPUT_XFORM_NAME], parent=self)
+        control_inst0 = control.Locator.create(
+            instance_name=self.input_node[self.HIER_DATA.INPUT_XFORM][0][self.HIER_DATA.INPUT_XFORM_NAME], 
+            parent=self, color=control_color)
         control_inst0.transform_node["ty"] = 8
         control_inst0.container_node["locScale"] << self.container_node["locScale"]
         for attr in ["rz","sx","sy","sz"]:
             control_inst0.transform_node[attr].set_locked(True)
             control_inst0.transform_node[attr].set_keyable(False)
-        control_inst1 = control.Locator.create(instance_name=self.input_node[self.HIER_DATA.INPUT_XFORM][1][self.HIER_DATA.INPUT_XFORM_NAME], parent=self)
+        control_inst1 = control.Locator.create(
+            instance_name=self.input_node[self.HIER_DATA.INPUT_XFORM][1][self.HIER_DATA.INPUT_XFORM_NAME], 
+            parent=self, color=control_color)
         control_inst1.transform_node["tz"] = 1
         control_inst1.container_node["locScale"] << self.container_node["locScale"]
         for attr in ["ty","rx","ry","rz","sx","sy","sz"]:
             control_inst1.transform_node[attr].set_locked(True)
             control_inst1.transform_node[attr].set_keyable(False)
-        control_inst2_translate = control.Sphere.create(instance_name=self.input_node[self.HIER_DATA.INPUT_XFORM][2][self.HIER_DATA.INPUT_XFORM_NAME], parent=self, build_s=0.4)
+        control_inst2_translate = control.Sphere.create(
+            instance_name=self.input_node[self.HIER_DATA.INPUT_XFORM][2][self.HIER_DATA.INPUT_XFORM_NAME], 
+            parent=self, build_s=0.4, color=control_color)
         for attr in ["rx","ry","rz","sx","sy","sz"]:
             control_inst2_translate.transform_node[attr].set_locked(True)
             control_inst2_translate.transform_node[attr].set_keyable(False)
-        control_inst2_orient = control.Locator.create(instance_name="xform2Orient", parent=self)
+        control_inst2_orient = control.Locator.create(
+            instance_name="xform2Orient", parent=self, 
+            color=control_color)
         for attr in ["tx","ty","tz","sx","sy","sz"]:
             control_inst2_orient.transform_node[attr].set_locked(True)
             control_inst2_orient.transform_node[attr].set_keyable(False)

@@ -419,6 +419,12 @@ class Hierarchy(Component):
     def has_input_init_matricies(self):
         return type(self)._has_input_init_matricies
 
+    @classmethod
+    def create(cls, source_component:Component, connect_hierarchy:bool=True, instance_name = None, parent=None, **kwargs):
+        kwargs["source_component"] = source_component
+        kwargs["connect_hierarchy"] = connect_hierarchy
+        return super().create(instance_name, parent, **kwargs)
+
     def _get_input_node_build_attr_data(self):
         node_data = super()._get_input_node_build_attr_data()
         node_data.extend_attr_data(self.HIER_DATA.get_hier_data())
@@ -428,13 +434,11 @@ class Hierarchy(Component):
         node_data = super()._get_output_node_build_attr_data()
         node_data.extend_attr_data(self.HIER_DATA.get_output_xform_data())
         return node_data
-    
     def _post_build(self):
         super()._post_build()
         self._populate_output_xforms()
         self.rename_nodes()
         self._check_xforms()
-    
     def _populate_output_xforms(self):
         """Goes through the output xform attributes and tries to connect name, local matrix, and init matricies"""
         added_nodes = []
@@ -673,22 +677,42 @@ class Hierarchy(Component):
             elif source_attr is not None:
                 source_attr >> output_xform[output_attr]
     
-    def _connect_source_hier_component(self, source_component):
+    def _has_output_xforms(self, source_component):
+        """checks to see if component has output xforms"""
+        if source_component.container_node.has_attr(self.HIER_DATA.OUTPUT_XFORM):
+            if self.HIER_DATA.is_output_xform_attr(source_component.container_node[self.HIER_DATA.OUTPUT_XFORM][0]):
+                return True
+        return False
+    def _has_input_xforms(self, source_component):
+        """checks to see if component has input xforms"""
+        if source_component.container_node.has_attr(self.HIER_DATA.INPUT_XFORM):
+            if self.HIER_DATA.is_input_xform_attr(source_component.container_node[self.HIER_DATA.INPUT_XFORM][0]):
+                return True
+        return False
+    
+    def _connect_source_hier_component(self, source_component, connect_hierarchy):
         """Given a source Hier component connects it's hier output to this component's hier input
 
         Args:
             source_component (Hierarchy):
         """
-        if issubclass(type(source_component), Hierarchy):
+
+
+        if self._has_output_xforms(source_component=source_component):
             HIER_DATA = self.HIER_DATA
 
             # getting both containers
             self_container = self.container_node
             source_container = source_component.container_node
-            for hier_attr_name in HIER_DATA.get_hier_data_names():
-                source_container[hier_attr_name] >> self_container[hier_attr_name]
-
             parent_component_source = True if source_container == self_container.get_container_node() else False
+            if parent_component_source and self._has_input_xforms(source_component=source_component):
+                raise RuntimeError("source parent component does not have input xforms")
+
+            if connect_hierarchy:
+                for hier_attr_name in HIER_DATA.get_hier_data_names():
+                    if source_container.has_attr(hier_attr_name):
+                        source_container[hier_attr_name] >> self_container[hier_attr_name]
+
             src_type = self.IO_ENUM.input if parent_component_source else self.IO_ENUM.output
             src_xforms =  source_component._get_input_xform_attrs() if parent_component_source else source_component._get_output_xform_attrs()
             self_input_xforms = self._get_input_xform_attrs(utils.length_index_list(len(src_xforms.keys())))
@@ -718,7 +742,7 @@ class Hierarchy(Component):
                     source_container[attr] >> self_container[attr]
             
         else:
-            raise RuntimeError(f"{source_component} is not of type Hierarchy")
+            raise RuntimeError(f"{source_component} does not have output xforms")
     def _create_orient_translate_blend(self, name:str, matrix_attr:nw.Attr, tx_attr:nw.Attr=None, ty_attr:nw.Attr=None, tz_attr:nw.Attr=None, tw_attr:nw.Attr=None):
         """Creates a blended matrix where the translate values are overriden
 
@@ -773,6 +797,11 @@ class Motion(Hierarchy):
         )
         return node_data
 
+    @classmethod
+    def create(cls, source_component, connect_hierarchy=True, control_color=None, instance_name=None, parent=None, **kwargs):
+        kwargs["control_color"]=control_color
+        return super().create(source_component, connect_hierarchy, instance_name, parent, **kwargs)
+
 class Control(Component):
     """A Base class for all control autorigging components. Derived from Component
 
@@ -788,11 +817,13 @@ class Control(Component):
     def create(cls, instance_name = None, parent=None, axis_vec=None, 
                build_t=[0.0, 0.0, 0.0],
                build_r=[0.0, 0.0, 0.0],
-               build_s=[1.0, 1.0, 1.0], **kwargs):
+               build_s=[1.0, 1.0, 1.0], 
+               color=None, **kwargs):
         kwargs["axis_vec"] = axis_vec
-        kwargs["build_t"] = build_t[:3] if utils.is_iterable(build_t) else [build_t, build_t, build_t]
-        kwargs["build_r"] = build_r[:3] if utils.is_iterable(build_r) else [build_r, build_r, build_r]
-        kwargs["build_s"] = build_s[:3] if utils.is_iterable(build_s) else [build_s, build_s, build_s]
+        kwargs["build_t"] = utils.make_len(build_t, len_=3) if utils.is_iterable(build_t) else [build_t, build_t, build_t]
+        kwargs["build_r"] = utils.make_len(build_r, len_=3) if utils.is_iterable(build_r) else [build_r, build_r, build_r]
+        kwargs["build_s"] = utils.make_len(build_s, len_=3, default=1.0) if utils.is_iterable(build_s) else [build_s, build_s, build_s]
+        kwargs["color"] = color
 
         return super().create(instance_name, parent, **kwargs)
 
@@ -813,20 +844,23 @@ class Control(Component):
 
     def _override_build(self, **kwargs):
         axis_vec = kwargs["axis_vec"]
+        color = kwargs["color"]
         # set visibility to hidden in channel box
         self.transform_node["visibility"].set_keyable(False)
 
         # add shapes
-        type(self)._apply_shape_to_cntrl(self.transform_node, self.container_node, axis_vec)
+        self._apply_shape_to_cntrl(axis_vec=axis_vec)
 
         # add build transforms
         self.transform_node["translate"] = kwargs["build_t"]
         self.transform_node["rotate"] = kwargs["build_r"]
         self.transform_node["scale"] = kwargs["build_s"]
         self.transform_node.freeze_transforms()
+        if color is not None:
+            self.apply_color(color)
+        
 
-    @classmethod
-    def _create_shapes(cls, axis_vec) -> list:
+    def _create_shapes(self, axis_vec) -> list:
         """Creates shapes and returns a list of the shapes transforms. these 
         shapes will be parented to the transform node later
 
@@ -838,8 +872,7 @@ class Control(Component):
         """
         raise NotImplementedError
     
-    @classmethod
-    def _apply_shape_to_cntrl(cls, cntrl_transform:nw.Transform, component_container:nw.Container=None, axis_vec=None):
+    def _apply_shape_to_cntrl(self, cntrl_transform:nw.Transform=None, component_container:nw.Container=None, axis_vec=None):
         """Takes create shape function and adds all shapes to transform node
 
         Args:
@@ -847,6 +880,12 @@ class Control(Component):
             component_container (nw.Container):
             axis_vec (vector, component_enum_data.AxisEnum, None): 
         """
+        
+        if cntrl_transform is None:
+            cntrl_transform = self.transform_node
+        if component_container is None:
+            component_container = self.container_node
+
         # axis vec
         if axis_vec is None:
             axis_vec = component_enum_data.AxisEnum.y.value
@@ -854,7 +893,7 @@ class Control(Component):
             axis_vec = axis_vec.value
 
         # parenting to transform
-        shape_transforms = cls._create_shapes(axis_vec=axis_vec)
+        shape_transforms = self._create_shapes(axis_vec=axis_vec)
         for transform in shape_transforms:
             if not isinstance(transform, nw.Node):
                 transform = nw.wrap_node(transform)
@@ -883,6 +922,30 @@ class Control(Component):
         # add shapes to container
         if component_container is not None:
             component_container.add_nodes(*shapes_list)
+
+    def apply_color(self, color: Union[component_enum_data.Color, list, nw.Node]):
+        import component.enum_manager as enum_manager
+        
+        if self.container_node["hasColor"].is_locked():
+            return
+        else:
+            rgb = [1.0, 1.0, 1.0]
+            shader = None
+            surface_shapes = [shape for shape in self.transform_node.get_shapes() if shape.type_ == "mesh" or shape.type_ == "nurbsSurface"]
+            if isinstance(color, nw.Node) and color.type_ == "lambert":
+                shader = color
+            elif isinstance(color, component_enum_data.Color):
+                shader = enum_manager.Color.get_shader(color)
+            if isinstance(color, list):
+                rgb = utils.make_len(color, len_=3, default=1.0)
+
+            self.container_node["hasColor"] = True
+            if shader is not None:
+                if len(surface_shapes) > 0:
+                    utils.apply_shader_group(surface_shapes, shader)
+                self.container_node["color"] << shader["color"]
+            else:
+                self.container_node["color"] = rgb
 
     def promote_attr_to_keyable(self, attr:nw.Attr, name=None, **kwargs):
         """Turns attribute given into a controllable attribute by the control

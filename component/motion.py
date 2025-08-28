@@ -12,24 +12,24 @@ class FK(base_component.Motion):
     class_namespace = "FK"
     root_transform_name = "fk_grp"
     
-    @classmethod
-    def create(cls, source_component:base_component.Hierarchy, instance_name=None, parent=None, **kwargs):
-        kwargs["source_component"] = source_component
-        return super().create(instance_name, parent, **kwargs)
-
     def _override_build(self, **kwargs):
         #qol variables
         added_nodes = []
         HIER_DATA =self.HIER_DATA
+        color = kwargs["control_color"]
 
         # connecting source component
         source_component = kwargs["source_component"]
-        self._connect_source_hier_component(source_component=source_component)
+        self._connect_source_hier_component(source_component=source_component, connect_hierarchy=kwargs["connect_hierarchy"])
 
         prev_ws_attr = self.container_node[HIER_DATA.HIER_PARENT_MATRIX]
         prev_inv_attr = self.container_node[HIER_DATA.HIER_PARENT_INIT_INV_MATRIX]
         for index, input_xform in enumerate(self.input_node[self.HIER_DATA.INPUT_XFORM]):
-            control_inst = control.Circle.create(instance_name=input_xform[HIER_DATA.INPUT_XFORM_NAME], axis_vec=source_component.container_node["primaryVec"].value, parent=self)
+            control_inst = control.Circle.create(
+                instance_name=input_xform[HIER_DATA.INPUT_XFORM_NAME], 
+                axis_vec=source_component.container_node["primaryVec"].value, 
+                parent=self, 
+                color=color)
             for attr in ["sx", "sy", "sz"]:
                 control_inst.transform_node[attr].set_locked(True)
                 control_inst.transform_node[attr].set_keyable(False)
@@ -50,12 +50,10 @@ class FK(base_component.Motion):
                 index=index,
                 output_world_matrix=control_inst.container_node["worldMatrix"]
             )
-
         self.container_node.add_nodes(*added_nodes)
 
 class SimpleIK(base_component.Motion):
     """Given the SimpleLimb creates a 2 chain IK chain"""
-
     class_namespace = "simple_IK"
     root_transform_name = "ik_grp"
 
@@ -73,12 +71,7 @@ class SimpleIK(base_component.Motion):
         )
         return node_data
 
-    @classmethod
-    def create(cls, source_component:base_component.Hierarchy, instance_name = None, parent=None, **kwargs):
-        kwargs["source_component"] = source_component
-        return super().create(instance_name, parent, **kwargs)
-
-    def __setup_ik_control(self, name:str, input_xform_index:int, parent_init_inv_matrix:nw.Attr, parent_world_matrix:nw.Attr):
+    def __setup_ik_control(self, name:str, input_xform_index:int, parent_init_inv_matrix:nw.Attr, parent_world_matrix:nw.Attr, color=None):
         """Creates the IK control
 
         Args:
@@ -86,12 +79,13 @@ class SimpleIK(base_component.Motion):
             input_xform_index (int): input matrix index for it's parent
             parent_init_inv_matrix (nw.Attr):
             parent_world_matrix (nw.Attr):
+            color ():
 
         Returns
             base_component.Control:
         """
         input_xform = self._get_input_xform_attrs(index=input_xform_index)[input_xform_index]
-        control_inst = control.BoxControl.create(instance_name=input_xform[self.HIER_DATA.INPUT_XFORM_NAME], parent=self)
+        control_inst = control.BoxControl.create(instance_name=input_xform[self.HIER_DATA.INPUT_XFORM_NAME], parent=self, color=color)
         for attr_name in ["sx", "sy", "sz"]:
             control_inst.transform_node[attr_name].set_locked(True)
             control_inst.transform_node[attr_name].set_keyable(False)
@@ -485,13 +479,14 @@ class SimpleIK(base_component.Motion):
         
         self.container_node.add_nodes(*loc_rot_matricies, ik_loc_mat_expression, world_rot_point)
         return loc_rot_matricies, world_rot_point
-    def __create_pole_vec_nodes(self, ik_build_data_node:nw.Node, root_cntrl_ws_mat:nw.Attr, end_cntrl_ws_mat:nw.Attr):
+    def __create_pole_vec_nodes(self, ik_build_data_node:nw.Node, root_cntrl_ws_mat:nw.Attr, end_cntrl_ws_mat:nw.Attr, color=None):
         """Creates all pole vector nodes
 
         Args:
             ik_build_data_node (nw.Node): 
             root_cntrl_ws_mat (nw.Attr): 
             end_cntrl_ws_mat (nw.Attr): 
+            color ():
 
         Returns:
             base_component.Control: pole vector control
@@ -522,7 +517,7 @@ class SimpleIK(base_component.Motion):
                 
             return "\n".join(expression_str)
         # control
-        pole_cntrl_inst = control.DiamondWireControl.create(instance_name="poleVec", parent=self, build_s=0.8)
+        pole_cntrl_inst = control.DiamondWire.create(instance_name="poleVec", parent=self, build_s=0.8, color=color)
         for attr_name in ["sx", "sy", "sz"]:
             pole_cntrl_inst.transform_node[attr_name].set_locked(True)
             pole_cntrl_inst.transform_node[attr_name].set_keyable(False)
@@ -576,19 +571,22 @@ class SimpleIK(base_component.Motion):
 
     def _override_build(self, **kwargs):
         source_component = kwargs["source_component"]
-        self._connect_source_hier_component(source_component)
+        control_color = kwargs["control_color"]
+        self._connect_source_hier_component(source_component, connect_hierarchy=kwargs["connect_hierarchy"])
 
         # controls
         root_control = self.__setup_ik_control(
             name="root", 
             input_xform_index=0, 
             parent_init_inv_matrix=self.input_node[self.HIER_DATA.HIER_PARENT_INIT_INV_MATRIX],
-            parent_world_matrix=self.input_node[self.HIER_DATA.HIER_PARENT_MATRIX])
+            parent_world_matrix=self.input_node[self.HIER_DATA.HIER_PARENT_MATRIX], 
+            color=control_color)
         end_control = self.__setup_ik_control(
             name="end",
             input_xform_index=2,
             parent_init_inv_matrix=self.container_node["IKEndInitInvMatrix"],
-            parent_world_matrix=self.container_node["IKEndMatrix"])
+            parent_world_matrix=self.container_node["IKEndMatrix"],
+            color=control_color)
 
         # get all expression calculations
         len1_attr, len2_attr, curr_len_attr = self.__create_dist_nodes(root_control=root_control, end_control=end_control)
@@ -599,7 +597,8 @@ class SimpleIK(base_component.Motion):
         pole_cntrl_inst = self.__create_pole_vec_nodes(
             ik_build_data_node=ik_build_data,
             root_cntrl_ws_mat=root_control.container_node["worldMatrix"],
-            end_cntrl_ws_mat=end_control.container_node["worldMatrix"])
+            end_cntrl_ws_mat=end_control.container_node["worldMatrix"],
+            color=control_color)
         
         # create aim matrix
         ik_base_mat_aim = nw.create_node("aimMatrix", "ik_base_mat")

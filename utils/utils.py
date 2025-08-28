@@ -271,6 +271,89 @@ def length_index_list(length:int):
         list: 
     """
     return [index for index in range(length)]
+def make_len(curr_list:list, len_:int, default=0.0):
+    """Makes a list a certain len
+
+    Args:
+        curr_list (list): 
+        len_ (int): 
+        default (float, optional): . Defaults to 0.0.
+
+    Returns:
+        list:
+    """
+
+    curr_list_len = len(curr_list)
+    if curr_list_len < len_:
+        ending_list = [default for x in range(len_ - curr_list_len)]
+        curr_list.extend(ending_list)
+        return ending_list
+    elif curr_list_len > len_:
+        return curr_list[:len_]
+    return curr_list
+
+import system.component_enum_data as component_enum_data
+from typing import Union
+def make_lambert_shader(color:Union[component_enum_data.Color, list, nw.Attr], name:str=None):
+    """creates a lambert shader
+
+    Args:
+        color (Union[component_enum_data.Color, list, nw.Attr]):
+        name (str, optional): Defaults to None.
+
+    Returns:
+        nw.Node:
+    """
+    if name is None:
+        shader = nw.wrap_node(cmds.shadingNode("lambert", asShader=True))
+    else:
+        shader = nw.wrap_node(cmds.shadingNode("lambert", name=f"{name}Lamb", asShader=True))
+
+    shader_sg = nw.wrap_node(cmds.sets(name=f"{name}LambSG", renderable=True, noSurfaceShader=True, empty=True))
+    shader_sg["surfaceShader"] << shader["outColor"]
+
+    if isinstance(color, component_enum_data.Color):
+        color = get_rgb_from_index(color.value)
+    if isinstance(color, nw.Attr):
+        shader["color"] << color
+    else:
+        shader["color"] = color
+
+    return shader
+def get_shader_sg(shader:nw.Node):
+    """Gets shading group of lambert shader
+
+    Args:
+        shader (nw.Node):
+
+    Raises:
+        RuntimeError: not a lambert node
+        RuntimeError: no shading group found
+
+    Returns:
+        nw.Node:
+    """
+    if shader.type_ != "lambert":
+        raise RuntimeError(f"{shader} is not a lambert node")
+    shader_sg = [x for x in shader["outColor"].get_dest_connections() if x.attr_name=="surfaceShader" and x.node.type_ == "shadingEngine"]
+    if len(shader_sg) != 1:
+        raise RuntimeError("Shading Group not found for {shader}")
+    return shader_sg[0].node
+def apply_shader_group(shapes:list, shader:nw.Node):
+    """sets shapes shading color
+
+    Args:
+        shapes (list(nw.Node)): 
+        shader (nw.Node): 
+    """
+    shapes = [str(x) for x in make_iterable(shapes)]
+    shader_sg = get_shader_sg(shader)
+
+    cmds.sets(shapes, e=True, forceElement=str(shader_sg))
+def apply_display_color(objs:list, color:Union[list, component_enum_data.Color]):
+    pass
+
+
 class Namespace:
     """Class of static functions to handle namespaces"""
     @classmethod
