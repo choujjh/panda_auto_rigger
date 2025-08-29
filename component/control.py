@@ -4,6 +4,7 @@ import maya.cmds as cmds
 import system.base_component as base_component
 import utils.node_wrapper as nw
 import component.enum_manager as enum_manager
+import utils.utils as utils
 from typing import Union
 
 def swap_control(to_replace: Union[nw.Container, nw.Transform, base_component.Control], replace_component:type):
@@ -55,10 +56,15 @@ class Axis(base_component.Control):
         y_axis = nw.wrap_node(cmds.curve(degree=1, point=[[0.0, 0.0, 0.0], [0.0, 1.0, 0.0]]))
         z_axis = nw.wrap_node(cmds.curve(degree=1, point=[[0.0, 0.0, 0.0], [0.0, 0.0, 1.0]]))
 
-        # utils.set_color()
-        enum_manager.Color.apply_color(x_axis.get_shapes()[0], component_enum_data.Color.red, connect=False)
-        enum_manager.Color.apply_color(y_axis.get_shapes()[0], component_enum_data.Color.green, connect=False)
-        enum_manager.Color.apply_color(z_axis.get_shapes()[0], component_enum_data.Color.blue, connect=False)
+        utils.apply_display_color(
+            nodes=x_axis.get_shapes(), 
+            color=utils.get_rgb_from_index(component_enum_data.Color.red))
+        utils.apply_display_color(
+            nodes=y_axis.get_shapes(), 
+            color=utils.get_rgb_from_index(component_enum_data.Color.green))
+        utils.apply_display_color(
+            nodes=z_axis.get_shapes(), 
+            color=utils.get_rgb_from_index(component_enum_data.Color.blue))
         
         return [x_axis, y_axis, z_axis]
 class BoxControl(base_component.Control):
@@ -144,9 +150,15 @@ class Gimbal(base_component.Control):
         circle2 = nw.wrap_node(cmds.circle(normal=[0.0, 1.0, 0.0])[0])
         circle3 = nw.wrap_node(cmds.circle(normal=[0.0, 0.0, 1.0])[0])
 
-        enum_manager.Color.apply_color(circle1.get_shapes()[0], component_enum_data.Color.red)
-        enum_manager.Color.apply_color(circle2.get_shapes()[0], component_enum_data.Color.green)
-        enum_manager.Color.apply_color(circle3.get_shapes()[0], component_enum_data.Color.blue)
+        utils.apply_display_color(
+            nodes=circle1.get_shapes(), 
+            color=utils.get_rgb_from_index(component_enum_data.Color.red))
+        utils.apply_display_color(
+            nodes=circle2.get_shapes(), 
+            color=utils.get_rgb_from_index(component_enum_data.Color.green))
+        utils.apply_display_color(
+            nodes=circle3.get_shapes(), 
+            color=utils.get_rgb_from_index(component_enum_data.Color.blue))
         
         return [circle1, circle2, circle3]
 class Pyramid4(base_component.Control):

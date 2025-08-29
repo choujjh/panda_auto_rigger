@@ -3,6 +3,7 @@ import maya.cmds as cmds
 import re
 import math
 from maya.api import OpenMaya as om2
+from typing import Union
 
 def camel_to_snake(camel_str):
     """Camel case to snake case.
@@ -212,7 +213,8 @@ def unnest_dict(curr_dict:dict):
 
     return return_dict
 
-def get_rgb_from_index(index:int):
+import system.component_enum_data as component_enum_data
+def get_rgb_from_index(index:Union[int, component_enum_data.Color]):
     """Gets rgb from maya's color index
 
     Args:
@@ -221,6 +223,8 @@ def get_rgb_from_index(index:int):
     Returns:
         list(float): 3 values making up the rgb of the color
     """
+    if not isinstance(index, int):
+        index = index.value
     return cmds.colorIndex(index, query=True)
 
 def make_valid_maya_name(name:str):
@@ -292,8 +296,6 @@ def make_len(curr_list:list, len_:int, default=0.0):
         return curr_list[:len_]
     return curr_list
 
-import system.component_enum_data as component_enum_data
-from typing import Union
 def make_lambert_shader(color:Union[component_enum_data.Color, list, nw.Attr], name:str=None):
     """creates a lambert shader
 
@@ -350,9 +352,32 @@ def apply_shader_group(shapes:list, shader:nw.Node):
     shader_sg = get_shader_sg(shader)
 
     cmds.sets(shapes, e=True, forceElement=str(shader_sg))
-def apply_display_color(objs:list, color:Union[list, component_enum_data.Color]):
-    pass
+def apply_display_color(nodes:list, color:Union[list, component_enum_data.Color, nw.Attr]):
+    display_attrs = ["overrideEnabled", "overrideRGBColors", "overrideColorRGB"]
+    for node in nodes:
+        if not issubclass(type(node), nw.Node):
+            raise ValueError(f"{node} should is not of type Node")
+        
+        has_all_attrs = True
+        for attr in display_attrs:
+            if not node.has_attr(attr):
+                cmds.warning(f"{node} has no attribute {attr}")
+                has_all_attrs = False
+        if not has_all_attrs:
+            continue
+        node["overrideEnabled"] = True
+        node["overrideRGBColors"] = 1
+        
+        rgb = None
+        if isinstance(color, list):
+            rgb = make_len(color, len_=3, default=0.5)
+        elif component_enum_data.get_enum_item_class(color) == component_enum_data.Color:
+            rgb = get_rgb_from_index(color.value)
+        elif isinstance(color, nw.Attr):
+            node["overrideColorRGB"] << color
 
+        if rgb is not None:
+            node["overrideColorRGB"] = rgb
 
 class Namespace:
     """Class of static functions to handle namespaces"""

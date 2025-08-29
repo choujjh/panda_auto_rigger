@@ -339,7 +339,7 @@ class Component():
             output_node_attr_data.add_attrs_to_node(output_node)
 
         # container node
-        self.__node_data_cache["container_node"] = nw.create_node("container", "component_container")
+        self.__node_data_cache["container_node"] = nw.create_node("container", "container")
         container_node_attr_data = self._get_container_node_build_attr_data()
         container_node_attr_data.add_attrs_to_node(self.container_node)
         if parent_container is not None:
@@ -704,8 +704,8 @@ class Hierarchy(Component):
             # getting both containers
             self_container = self.container_node
             source_container = source_component.container_node
-            parent_component_source = True if source_container == self_container.get_container_node() else False
-            if parent_component_source and self._has_input_xforms(source_component=source_component):
+            parent_component_as_source = True if source_container == self_container.get_container_node() else False
+            if parent_component_as_source and not self._has_input_xforms(source_component=source_component):
                 raise RuntimeError("source parent component does not have input xforms")
 
             if connect_hierarchy:
@@ -713,8 +713,8 @@ class Hierarchy(Component):
                     if source_container.has_attr(hier_attr_name):
                         source_container[hier_attr_name] >> self_container[hier_attr_name]
 
-            src_type = self.IO_ENUM.input if parent_component_source else self.IO_ENUM.output
-            src_xforms =  source_component._get_input_xform_attrs() if parent_component_source else source_component._get_output_xform_attrs()
+            src_type = self.IO_ENUM.input if parent_component_as_source else self.IO_ENUM.output
+            src_xforms =  source_component._get_input_xform_attrs() if parent_component_as_source else source_component._get_output_xform_attrs()
             self_input_xforms = self._get_input_xform_attrs(utils.length_index_list(len(src_xforms.keys())))
             for index, src_xform in src_xforms.items():
 
@@ -733,8 +733,8 @@ class Hierarchy(Component):
                     self_init_mat = self_xform[HIER_DATA.OUTPUT_INIT_MATRIX]
                     self_init_inv_mat = self_xform[HIER_DATA.OUTPUT_INIT_INV_MATRIX]
 
-                src_xform[HIER_DATA.OUTPUT_INIT_MATRIX] >> self_init_mat
-                src_xform[HIER_DATA.OUTPUT_INIT_INV_MATRIX] >> self_init_inv_mat
+                source_container[HIER_DATA.OUTPUT_XFORM][index][HIER_DATA.OUTPUT_INIT_MATRIX] >> self_init_mat
+                source_container[HIER_DATA.OUTPUT_XFORM][index][HIER_DATA.OUTPUT_INIT_INV_MATRIX] >> self_init_inv_mat
                     
             # connecting axis vectors
             for attr in ["primaryVec", "secondaryVec", "tertiaryVec"]:
@@ -777,7 +777,7 @@ class Hierarchy(Component):
 class Motion(Hierarchy):
     """Base class for motion autorigging components. Derived from Hierarchy"""
     component_type = component_enum_data.ComponentType.motion
-    root_transform_name = "motion_grp"
+    root_transform_name = "grp"
     class_namespace = "motion"
     def _get_input_node_build_attr_data(self):
         node_data = super()._get_input_node_build_attr_data()
@@ -799,6 +799,36 @@ class Motion(Hierarchy):
 
     @classmethod
     def create(cls, source_component, connect_hierarchy=True, control_color=None, instance_name=None, parent=None, **kwargs):
+        kwargs["control_color"]=control_color
+        return super().create(source_component, connect_hierarchy, instance_name, parent, **kwargs)
+
+class Anim(Hierarchy):
+    """Base class for anim autorigging components. Derived from Hierarchy"""
+    component_type = component_enum_data.ComponentType.anim
+    root_transform_name = "grp"
+    class_namespace = "anim"
+
+    def _get_input_node_build_attr_data(self):
+        node_data = super()._get_input_node_build_attr_data()
+        node_data.extend_attr_data(
+            component_data.AttrData("primaryVec", type_="double3", parent="input"),
+            component_data.AttrData("primaryVecX", type_="double", parent="primaryVec"),
+            component_data.AttrData("primaryVecY", type_="double", parent="primaryVec"),
+            component_data.AttrData("primaryVecZ", type_="double", parent="primaryVec"),
+            component_data.AttrData("secondaryVec", type_="double3", parent="input"),
+            component_data.AttrData("secondaryVecX", type_="double", parent="secondaryVec"),
+            component_data.AttrData("secondaryVecY", type_="double", parent="secondaryVec"),
+            component_data.AttrData("secondaryVecZ", type_="double", parent="secondaryVec"),
+            component_data.AttrData("tertiaryVec", type_="double3", parent="input"),
+            component_data.AttrData("tertiaryVecX", type_="double", parent="tertiaryVec"),
+            component_data.AttrData("tertiaryVecY", type_="double", parent="tertiaryVec"),
+            component_data.AttrData("tertiaryVecZ", type_="double", parent="tertiaryVec"),
+        )
+        
+        return node_data
+
+    @classmethod
+    def create(cls, source_component, connect_hierarchy = True, control_color=None, instance_name=None, parent=None, **kwargs):
         kwargs["control_color"]=control_color
         return super().create(source_component, connect_hierarchy, instance_name, parent, **kwargs)
 
@@ -871,7 +901,6 @@ class Control(Component):
             list(nw.Node):
         """
         raise NotImplementedError
-    
     def _apply_shape_to_cntrl(self, cntrl_transform:nw.Transform=None, component_container:nw.Container=None, axis_vec=None):
         """Takes create shape function and adds all shapes to transform node
 
@@ -922,8 +951,12 @@ class Control(Component):
         # add shapes to container
         if component_container is not None:
             component_container.add_nodes(*shapes_list)
-
     def apply_color(self, color: Union[component_enum_data.Color, list, nw.Node]):
+        """Applies color to control
+
+        Args:
+            color (Union[component_enum_data.Color, list, nw.Node]): 
+        """
         import component.enum_manager as enum_manager
         
         if self.container_node["hasColor"].is_locked():
@@ -943,10 +976,9 @@ class Control(Component):
             if shader is not None:
                 if len(surface_shapes) > 0:
                     utils.apply_shader_group(surface_shapes, shader)
-                self.container_node["color"] << shader["color"]
+                utils.apply_display_color(nodes=[self.transform_node], color=shader["color"])
             else:
-                self.container_node["color"] = rgb
-
+                utils.apply_display_color(nodes=[self.transform_node], color=rgb)
     def promote_attr_to_keyable(self, attr:nw.Attr, name=None, **kwargs):
         """Turns attribute given into a controllable attribute by the control
 
@@ -1006,7 +1038,7 @@ class Control(Component):
             else:
                 transform_node.add_attr(name, type=attr_type, **kwargs)
 
-            attr_connection = attr.get_src_connections()
+            attr_connection = attr.get_connections(as_dest=True, as_src=False)
             if attr_connection == [] and attr_type not in ["nurbsCurve", "nurbsSurface","mesh", "message"]:
                 try:
                     transform_node[name] = attr.value

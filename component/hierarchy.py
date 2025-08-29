@@ -8,7 +8,8 @@ from typing import Union
 
 class VisualizeHier(base_component.Hierarchy):
     """Helps visualize and debug hierarchies by creating chains for world space and local visualization"""
-    root_transform_name = "vis_grp"
+    root_transform_name = "v_grp"
+    class_namespace = "hier_vis"
     
     def _override_build(self, **kwargs):
         source_component= kwargs["source_component"]
@@ -81,8 +82,9 @@ class MergeHier(base_component.Component):
         return node_data
 
     @classmethod
-    def create(cls, source_components=[], instance_name = None, parent=None, **kwargs):
+    def create(cls, source_components=[], connect_hierarchy=True, instance_name = None, parent=None, **kwargs):
         kwargs["source_components"] = utils.make_iterable(source_components)
+        kwargs["connect_hierarchy"] = connect_hierarchy
                 
         return super().create(instance_name, parent, **kwargs)
     

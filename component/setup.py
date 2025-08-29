@@ -18,7 +18,6 @@ class Setup(base_component.Hierarchy):
             component_data.AttrData("primaryAxis", type_=component_enum_data.AxisEnum.x, publish=True),
             component_data.AttrData("secondaryAxis", type_=component_enum_data.AxisEnum.y, publish=True),
             component_data.AttrData("locScale", type_="integer", publish=True, value=1, min=0.1),
-            # component_data.AttrData("cntrlColor", type_="double3")
         )
         return node_data
     def _get_output_node_build_attr_data(self):
@@ -83,8 +82,19 @@ class Setup(base_component.Hierarchy):
                 output_init_matrix=control_container["worldMatrix"],
                 output_world_matrix=control_container["worldMatrix"],
             )
+        
 class SimpleLimb(Setup):
-    """3 xform that aim and align to each other. middle xform stays inbetween and orients correctly to whatever the angle the other 2 xform make"""    
+    """3 xform that aim and align to each other. middle xform stays inbetween and orients correctly to whatever the angle the other 2 xform make"""
+
+    def _get_input_node_build_attr_data(self):
+        node_data = super()._get_input_node_build_attr_data()
+
+        node_data.extend_attr_data(
+            component_data.AttrData("settingCntrlXformFollow", type_="long", publish=True, min=0, max=2),
+            component_data.AttrData("settingCntrlInitMatrix", type_="matrix", publish=True)
+        )
+
+        return node_data
 
     @classmethod
     def create(
@@ -167,6 +177,7 @@ class SimpleLimb(Setup):
             primary_vec=primary_vec["output"], 
             secondary_vec=secondary_vec["output"])
 
+        # xform1
         xform1_ws_mat_attr, xform1_inv_attr = self.__create_xform1(
             guide_transform1_ws_mat=control_inst1.container_node["worldMatrix"], 
             guide_transform2_ws_mat=control_inst2_translate.container_node["worldMatrix"],
@@ -175,11 +186,19 @@ class SimpleLimb(Setup):
             primary_vec=primary_vec["output"],
             tertiary_vec=tertiary_vec["output"])
         
+        # xform2
         self.__create_xform2(
             xform1_ws_mat=xform1_ws_mat_attr, 
             xform2_translate=xform2_translate, 
             xform2_orient=control_inst2_orient.transform_node,
             xform1_inv_mat=xform1_inv_attr)
+        
+        #guide xform
+        settings_cntrl_inst = control.Locator.create(instance_name="settingsGuide", parent=self, color=control_color)
+        settings_cntrl_inst.transform_node["tz"] = -2
+        settings_cntrl_inst.transform_node["rz"] = 90
+        settings_cntrl_inst.container_node["worldMatrix"] >> self.container_node["settingCntrlInitMatrix"]
+        self.container_node["settingCntrlXformFollow"] = 2
 
     def __create_mid_interp_matrix(self, source_matrix:nw.Attr, target_matrix:nw.Attr):
         """Creates all nodes to have the middle interp matrix

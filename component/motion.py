@@ -1,7 +1,6 @@
 import system.base_component as base_component
 import component.control as control
 import utils.node_wrapper as nw
-import component.setup as setup
 import system.component_data as component_data
 import system.component_enum_data as component_enum_data
 import maya.cmds as cmds
@@ -63,7 +62,7 @@ class SimpleIK(base_component.Motion):
             component_data.AttrData("IK", type_="compound", parent="input"),
             component_data.AttrData("IKEndMatrix", type_="matrix", parent="IK"),
             component_data.AttrData("IKEndInitInvMatrix", type_="matrix", parent="IK"),
-            component_data.AttrData("IKStretch", type_="bool", parent="IK", value=True),
+            component_data.AttrData("IKStretchEnabled", type_="bool", parent="IK", value=True),
             component_data.AttrData("softIKBlendStart", type_="double", parent="IK", value=0.9, min=0, max=1),
             component_data.AttrData("softIKEnabled", type_="bool", parent="IK"),
             component_data.AttrData("blendType", type_=component_enum_data.SoftIKBlendTypes.smoothStep, parent="IK"),
@@ -327,7 +326,7 @@ class SimpleIK(base_component.Motion):
                 "}",
 
 
-                f"else if ({self.container_node['IKStretch']} && $currLen > $totalLen) {{",
+                f"else if ({self.container_node['IKStretchEnabled']} && $currLen > $totalLen) {{",
                 "\t$scalar = $currLen/$totalLen;",
                 "\t$len1 = $len1 * $scalar;",
                 "\t$len2 = $len2 * $scalar;\n",
