@@ -37,10 +37,28 @@ class Component():
         full_namespace (str): namespace with all parent namespaces included
         short_namespace (str): components full namespace (without parent namespaces)
         instance_namespace (str): instance name + side
+
+        _IN (str): str constant for input
+        _BLD_DATA (str): str constant for buildData
+        _BLD_COMP_CLASS (str): str constant for componentClass
+        _BLD_COMP_TYPE (str): str constant for componentType
+        _BLD_INST_NAME (str): str constant for instanceName
+        _OUT (str): str constant for output
+        _CONTR_PAR_COMP (str): str constant for parentComponent
+        _CONTR_CHLD_COMP (str): str constant for childComponents
     """
     component_type = component_enum_data.ComponentType.component
     root_transform_name = None
     class_namespace = "component"
+
+    _IN = "input"
+    _BLD_DATA = "buildData"
+    _BLD_COMP_CLASS = "componentClass"
+    _BLD_COMP_TYPE = "componentType"
+    _BLD_INST_NAME = "instanceName"
+    _OUT = "output"
+    _CONTR_PAR_COMP = "parentComponent"
+    _CONTR_CHLD_COMP = "childComponents"
 
     def __init__(self, container_node:nw.Node=None):
         """initializes component with container nodes
@@ -200,8 +218,8 @@ class Component():
                     instance_namespace = f"{component_enum_data.CharacterSide.get(side).value}_"
 
         instance_name = None
-        if self.input_node.has_attr("instanceName"):
-            instance_name = self.input_node["instanceName"].value
+        if self.input_node.has_attr(self._BLD_INST_NAME):
+            instance_name = self.input_node[self._BLD_INST_NAME].value
             if instance_name != self.__namespace_cache["instance_name"]:
                 self.__namespace_cache["instance_name"] = instance_name
                 
@@ -220,11 +238,11 @@ class Component():
             comp_data.NodeData:
         """
         node_data =  component_data.NodeData(
-            component_data.AttrData(name="input", type_="compound", publish=True),
-            component_data.AttrData(name="buildData", type_="compound", publish=True),
-            component_data.AttrData(name="componentClass", type_="string", value=type(self).get_class_name(), locked=True, parent="buildData"),
-            component_data.AttrData(name="componentType", type_=type(self).component_type, locked=True, parent="buildData"),
-            component_data.AttrData(name="instanceName", type_="string", parent="buildData"),
+            component_data.AttrData(name=self._IN, type_="compound", publish=True),
+            component_data.AttrData(name=self._BLD_DATA, type_="compound", publish=True),
+            component_data.AttrData(name=self._BLD_COMP_CLASS, type_="string", value=type(self).get_class_name(), locked=True, parent=self._BLD_DATA),
+            component_data.AttrData(name=self._BLD_COMP_TYPE, type_=type(self).component_type, locked=True, parent=self._BLD_DATA),
+            component_data.AttrData(name=self._BLD_INST_NAME, type_="string", parent=self._BLD_DATA),
         )
         return node_data
     def _get_output_node_build_attr_data(self) -> component_data.NodeData:
@@ -235,7 +253,7 @@ class Component():
             comp_data.NodeData:
         """
         node_data = component_data.NodeData(
-            component_data.AttrData(name="output", type_="compound", publish=True),
+            component_data.AttrData(name=self._OUT, type_="compound", publish=True),
         )        
         return node_data
     def _get_container_node_build_attr_data(self) -> component_data.NodeData:
@@ -246,9 +264,8 @@ class Component():
             comp_data.NodeData:
         """
         return component_data.NodeData(
-            component_data.AttrData(name="controlSetups", type_="message"),
-            component_data.AttrData(name="parentComponent", type_="message"),
-            component_data.AttrData(name="childComponents", type_="message", multi=True),
+            component_data.AttrData(name=self._CONTR_PAR_COMP, type_="message"),
+            component_data.AttrData(name=self._CONTR_CHLD_COMP, type_="message", multi=True),
         )
 
     @classmethod
@@ -268,7 +285,6 @@ class Component():
         component_inst._post_build()
 
         return component_inst
-    
     def _pre_build(self, instance_name:Union[str, nw.Attr]=None, parent=None):
         """handles creation and connection of initial nodes and 
 
@@ -284,18 +300,18 @@ class Component():
             if instance_name is not None:
                 if isinstance(instance_name, nw.Attr):
                     if instance_name.type_ != "string":
-                        input_node_name = self.input_node["instanceName"]
+                        input_node_name = self.input_node[self._BLD_INST_NAME]
                         cmds.warning(f"{instance_name} is not a string attribute. Not connectiong to {input_node_name}")
                     else:
-                        instance_name >> self.input_node["instanceName"]
+                        instance_name >> self.input_node[self._BLD_INST_NAME]
                 else:
-                    self.input_node["instanceName"]=instance_name
+                    self.input_node[self._BLD_INST_NAME]=instance_name
             
             # connecting parent and child components
             if parent is not None:
-                if parent.has_attr("childComponents"):
-                    child_component_len = len(parent["childComponents"])
-                    parent["childComponents"][child_component_len] >> self.container_node["parentComponent"]
+                if parent.has_attr(self._CONTR_CHLD_COMP):
+                    child_component_len = len(parent[self._CONTR_CHLD_COMP])
+                    parent[self._CONTR_CHLD_COMP][child_component_len] >> self.container_node[self._CONTR_PAR_COMP]
 
                     # parenting transforms
                     parent_component = get_component(parent)
@@ -304,7 +320,6 @@ class Component():
                         
             # renaming to nodes
             self.rename_nodes()
-
     def _override_build(self, **kwargs):
         """Takes care of derived component creation. must be implemented by child class
 
@@ -312,12 +327,10 @@ class Component():
             NotImplementedError: must be implemented by child classes
         """
         raise NotImplementedError
-
     def _post_build(self):
         """Build cleanup. sets build to true and renames nodes
         """
         self.rename_nodes()
-        
     def __create_base_nodes(self, parent_container:nw.Container=None):
         """Creates the base node (input, output, container) in the initialization
         phase
@@ -379,14 +392,14 @@ class Component():
                 parent_namespace = utils.Namespace.get_namespace(full_namespace)
                 child_namespaces = [utils.Namespace.strip_namespace(x) for x in utils.Namespace.child_namespaces(parent_namespace)]
                 # add something to instance namespace if it's none
-                if (self.input_node["instanceName"].value == "" or self.input_node["instanceName"].value is None):
-                    self.input_node["instanceName"] = "temp"
+                if (self.input_node[self._BLD_INST_NAME].value == "" or self.input_node[self._BLD_INST_NAME].value is None):
+                    self.input_node[self._BLD_INST_NAME] = "temp"
                 # getting just the instance_namespace portion of children namespaces
                 child_namespaces = [x.split("__", 1)[0] for x in child_namespaces if x.startswith(utils.strip_trailing_numbers(self.instance_namespace))]
                 if child_namespaces != []:
                     highest_trailing_number = utils.get_max_trailing_number(child_namespaces)
-                    instance_name = utils.strip_trailing_numbers(self.input_node["instanceName"].value)
-                    self.input_node["instanceName"] = f"{instance_name}{int(highest_trailing_number + 1)}"
+                    instance_name = utils.strip_trailing_numbers(self.input_node[self._BLD_INST_NAME].value)
+                    self.input_node[self._BLD_INST_NAME] = f"{instance_name}{int(highest_trailing_number + 1)}"
 
                 # give it a unique namespace by giving instance_namespace a new value
                 full_namespace = self.full_namespace
@@ -408,12 +421,29 @@ class Hierarchy(Component):
     Attributes:
         HIER_DATA (component_data.HierData): stores all Hier names and hier check
         functions
+        IO_ENUM (component_enum_data.IO): stores input output enum
     """
-    HIER_DATA = component_data.HierData
-    IO_ENUM = component_enum_data.IO
     class_namespace = "hier"
     component_type = component_enum_data.ComponentType.hier
     _has_input_init_matricies = False
+
+    HIER_DATA = component_data.HierData
+    IO_ENUM = component_enum_data.IO
+    _PRM_VEC = "primaryVec"
+    _PRM_VEC_X = "primaryVecX"
+    _PRM_VEC_Y = "primaryVecY"
+    _PRM_VEC_Z = "primaryVecZ"
+    _SEC_VEC = "secondaryVec"
+    _SEC_VEC_X = "secondaryVecX"
+    _SEC_VEC_Y = "secondaryVecY"
+    _SEC_VEC_Z = "secondaryVecZ"
+    _TER_VEC = "tertiaryVec"
+    _TER_VEC_X = "tertiaryVecX"
+    _TER_VEC_Y = "tertiaryVecY"
+    _TER_VEC_Z = "tertiaryVecZ"
+    _KWG_CNTRL_CLR = "control_color"
+    _KWG_SRC_COMP = "source_component"
+    _KWG_CONN_HIER = "connect_hierarchy"
 
     @property
     def has_input_init_matricies(self):
@@ -421,8 +451,8 @@ class Hierarchy(Component):
 
     @classmethod
     def create(cls, source_component:Component, connect_hierarchy:bool=True, instance_name = None, parent=None, **kwargs):
-        kwargs["source_component"] = source_component
-        kwargs["connect_hierarchy"] = connect_hierarchy
+        kwargs[cls._KWG_SRC_COMP] = source_component
+        kwargs[cls._KWG_CONN_HIER] = connect_hierarchy
         return super().create(instance_name, parent, **kwargs)
 
     def _get_input_node_build_attr_data(self):
@@ -484,8 +514,8 @@ class Hierarchy(Component):
             input_name >> output_name
         
         elif output_ws_src is not None:
-            if output_ws_src.node.has_attr("instanceName"):
-                output_ws_src.node["instanceName"] >> output_name
+            if output_ws_src.node.has_attr(self._BLD_INST_NAME):
+                output_ws_src.node[self._BLD_INST_NAME] >> output_name
     def __populate_world_matrix(self, index:int, world_matrix_attr:nw.Attr, world_matrix_inv_attr:nw.Attr, is_init_matrix:bool=False):
         """Given the index tries to connect or set the output init matrix and output inverse init matrix
 
@@ -737,7 +767,7 @@ class Hierarchy(Component):
                 source_container[HIER_DATA.OUTPUT_XFORM][index][HIER_DATA.OUTPUT_INIT_INV_MATRIX] >> self_init_inv_mat
                     
             # connecting axis vectors
-            for attr in ["primaryVec", "secondaryVec", "tertiaryVec"]:
+            for attr in [self._PRM_VEC, self._SEC_VEC, self._TER_VEC]:
                 if source_container.has_attr(attr) and self_container.has_attr(attr):
                     source_container[attr] >> self_container[attr]
             
@@ -779,58 +809,35 @@ class Motion(Hierarchy):
     component_type = component_enum_data.ComponentType.motion
     root_transform_name = "grp"
     class_namespace = "motion"
+
     def _get_input_node_build_attr_data(self):
         node_data = super()._get_input_node_build_attr_data()
         node_data.extend_attr_data(
-            component_data.AttrData("primaryVec", type_="double3", parent="input"),
-            component_data.AttrData("primaryVecX", type_="double", parent="primaryVec"),
-            component_data.AttrData("primaryVecY", type_="double", parent="primaryVec"),
-            component_data.AttrData("primaryVecZ", type_="double", parent="primaryVec"),
-            component_data.AttrData("secondaryVec", type_="double3", parent="input"),
-            component_data.AttrData("secondaryVecX", type_="double", parent="secondaryVec"),
-            component_data.AttrData("secondaryVecY", type_="double", parent="secondaryVec"),
-            component_data.AttrData("secondaryVecZ", type_="double", parent="secondaryVec"),
-            component_data.AttrData("tertiaryVec", type_="double3", parent="input"),
-            component_data.AttrData("tertiaryVecX", type_="double", parent="tertiaryVec"),
-            component_data.AttrData("tertiaryVecY", type_="double", parent="tertiaryVec"),
-            component_data.AttrData("tertiaryVecZ", type_="double", parent="tertiaryVec"),
+            component_data.AttrData(self._PRM_VEC, type_="double3", parent=self._IN),
+            component_data.AttrData(self._PRM_VEC_X, type_="double", parent=self._PRM_VEC),
+            component_data.AttrData(self._PRM_VEC_Y, type_="double", parent=self._PRM_VEC),
+            component_data.AttrData(self._PRM_VEC_Z, type_="double", parent=self._PRM_VEC),
+            component_data.AttrData(self._SEC_VEC, type_="double3", parent=self._IN),
+            component_data.AttrData(self._SEC_VEC_X, type_="double", parent=self._SEC_VEC),
+            component_data.AttrData(self._SEC_VEC_Y, type_="double", parent=self._SEC_VEC),
+            component_data.AttrData(self._SEC_VEC_Z, type_="double", parent=self._SEC_VEC),
+            component_data.AttrData(self._TER_VEC, type_="double3", parent=self._IN),
+            component_data.AttrData(self._TER_VEC_X, type_="double", parent=self._TER_VEC),
+            component_data.AttrData(self._TER_VEC_Y, type_="double", parent=self._TER_VEC),
+            component_data.AttrData(self._TER_VEC_Z, type_="double", parent=self._TER_VEC),
         )
         return node_data
 
     @classmethod
     def create(cls, source_component, connect_hierarchy=True, control_color=None, instance_name=None, parent=None, **kwargs):
-        kwargs["control_color"]=control_color
+        kwargs[cls._KWG_CNTRL_CLR]=control_color
         return super().create(source_component, connect_hierarchy, instance_name, parent, **kwargs)
 
-class Anim(Hierarchy):
+class Anim(Motion):
     """Base class for anim autorigging components. Derived from Hierarchy"""
     component_type = component_enum_data.ComponentType.anim
     root_transform_name = "grp"
     class_namespace = "anim"
-
-    def _get_input_node_build_attr_data(self):
-        node_data = super()._get_input_node_build_attr_data()
-        node_data.extend_attr_data(
-            component_data.AttrData("primaryVec", type_="double3", parent="input"),
-            component_data.AttrData("primaryVecX", type_="double", parent="primaryVec"),
-            component_data.AttrData("primaryVecY", type_="double", parent="primaryVec"),
-            component_data.AttrData("primaryVecZ", type_="double", parent="primaryVec"),
-            component_data.AttrData("secondaryVec", type_="double3", parent="input"),
-            component_data.AttrData("secondaryVecX", type_="double", parent="secondaryVec"),
-            component_data.AttrData("secondaryVecY", type_="double", parent="secondaryVec"),
-            component_data.AttrData("secondaryVecZ", type_="double", parent="secondaryVec"),
-            component_data.AttrData("tertiaryVec", type_="double3", parent="input"),
-            component_data.AttrData("tertiaryVecX", type_="double", parent="tertiaryVec"),
-            component_data.AttrData("tertiaryVecY", type_="double", parent="tertiaryVec"),
-            component_data.AttrData("tertiaryVecZ", type_="double", parent="tertiaryVec"),
-        )
-        
-        return node_data
-
-    @classmethod
-    def create(cls, source_component, connect_hierarchy = True, control_color=None, instance_name=None, parent=None, **kwargs):
-        kwargs["control_color"]=control_color
-        return super().create(source_component, connect_hierarchy, instance_name, parent, **kwargs)
 
 class Control(Component):
     """A Base class for all control autorigging components. Derived from Component
@@ -843,17 +850,29 @@ class Control(Component):
     class_namespace = "cntrl"
     can_set_color = True
 
+    _IN_OFF_MAT = "offsetMatrix"
+    _IN_HAS_CLR = "hasColor"
+    _IN_CLR = "color"
+    _OUT_WS_MAT = "worldMatrix"
+    _OUT_LOC_MAT = "localMatrix"
+    _OUT_WS_INV_MAT = "worldInverseMatrix"
+    _KWG_AXIS_VEC  = "axis_vec"
+    _KWG_BUILD_T = "build_t"
+    _KWG_BUILD_R = "build_r"
+    _KWG_BUILD_S = "build_s"
+    _KWG_CLR = "color"
+
     @classmethod
     def create(cls, instance_name = None, parent=None, axis_vec=None, 
                build_t=[0.0, 0.0, 0.0],
                build_r=[0.0, 0.0, 0.0],
                build_s=[1.0, 1.0, 1.0], 
                color=None, **kwargs):
-        kwargs["axis_vec"] = axis_vec
-        kwargs["build_t"] = utils.make_len(build_t, len_=3) if utils.is_iterable(build_t) else [build_t, build_t, build_t]
-        kwargs["build_r"] = utils.make_len(build_r, len_=3) if utils.is_iterable(build_r) else [build_r, build_r, build_r]
-        kwargs["build_s"] = utils.make_len(build_s, len_=3, default=1.0) if utils.is_iterable(build_s) else [build_s, build_s, build_s]
-        kwargs["color"] = color
+        kwargs[cls._KWG_AXIS_VEC] = axis_vec
+        kwargs[cls._KWG_BUILD_T] = utils.make_len(build_t, len_=3) if utils.is_iterable(build_t) else [build_t, build_t, build_t]
+        kwargs[cls._KWG_BUILD_R] = utils.make_len(build_r, len_=3) if utils.is_iterable(build_r) else [build_r, build_r, build_r]
+        kwargs[cls._KWG_BUILD_S] = utils.make_len(build_s, len_=3, default=1.0) if utils.is_iterable(build_s) else [build_s, build_s, build_s]
+        kwargs[cls._KWG_CLR] = color
 
         return super().create(instance_name, parent, **kwargs)
 
@@ -861,20 +880,20 @@ class Control(Component):
         node_data = super()._get_input_node_build_attr_data()
 
         node_data.extend_attr_data(
-            component_data.AttrData(name="offsetParentMatrix", publish="offsetMatrix"),
-            component_data.AttrData(name="worldMatrix[0]", publish="worldMatrix"),
-            component_data.AttrData(name="matrix", publish="localMatrix"),
-            component_data.AttrData(name="worldInverseMatrix[0]", publish="worldInverseMatrix"),
+            component_data.AttrData(name="offsetParentMatrix", publish=self._IN_OFF_MAT),
+            component_data.AttrData(name="worldMatrix[0]", publish=self._OUT_WS_MAT),
+            component_data.AttrData(name="matrix", publish=self._OUT_LOC_MAT),
+            component_data.AttrData(name="worldInverseMatrix[0]", publish=self._OUT_WS_INV_MAT),
 
-            component_data.AttrData(name="overrideEnabled", publish="hasColor", locked=not type(self).can_set_color),
-            component_data.AttrData(name="overrideColorRGB", publish="color", locked=not type(self).can_set_color),
+            component_data.AttrData(name="overrideEnabled", publish=self._IN_HAS_CLR, locked=not type(self).can_set_color),
+            component_data.AttrData(name="overrideColorRGB", publish=self._IN_HAS_CLR, locked=not type(self).can_set_color),
             component_data.AttrData(name="overrideRGBColors", value=1),
         )
         return node_data
 
     def _override_build(self, **kwargs):
-        axis_vec = kwargs["axis_vec"]
-        color = kwargs["color"]
+        axis_vec = kwargs[self._KWG_AXIS_VEC]
+        color = kwargs[self._KWG_CLR]
         # set visibility to hidden in channel box
         self.transform_node["visibility"].set_keyable(False)
 
@@ -882,9 +901,9 @@ class Control(Component):
         self._apply_shape_to_cntrl(axis_vec=axis_vec)
 
         # add build transforms
-        self.transform_node["translate"] = kwargs["build_t"]
-        self.transform_node["rotate"] = kwargs["build_r"]
-        self.transform_node["scale"] = kwargs["build_s"]
+        self.transform_node["translate"] = kwargs[self._KWG_BUILD_T]
+        self.transform_node["rotate"] = kwargs[self._KWG_BUILD_R]
+        self.transform_node["scale"] = kwargs[self._KWG_BUILD_S]
         self.transform_node.freeze_transforms()
         if color is not None:
             self.apply_color(color)
@@ -959,7 +978,7 @@ class Control(Component):
         """
         import component.enum_manager as enum_manager
         
-        if self.container_node["hasColor"].is_locked():
+        if self.container_node[self._IN_HAS_CLR].is_locked():
             return
         else:
             rgb = [1.0, 1.0, 1.0]
@@ -972,7 +991,7 @@ class Control(Component):
             if isinstance(color, list):
                 rgb = utils.make_len(color, len_=3, default=1.0)
 
-            self.container_node["hasColor"] = True
+            self.container_node[self._IN_HAS_CLR] = True
             if shader is not None:
                 if len(surface_shapes) > 0:
                     utils.apply_shader_group(surface_shapes, shader)

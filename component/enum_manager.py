@@ -1,7 +1,7 @@
 from typing import Union
 
 import system.component_enum_data as component_enum_data
-import system.base_component as base_component
+import system.base_component as b_comp
 import utils.node_wrapper as nw
 import system.component_data as component_data
 import utils.utils as utils
@@ -22,15 +22,17 @@ def axis_vec_choice_node(choice_node_name, enum_attr:nw.Attr=None):
 
     for index, item in enumerate(component_enum_data.AxisEnum):
         
-        axis_vec_container["axis"][item.name] >> choice_node["input"][index]
+        axis_vec_container[AxisVector._OUT_AXIS][item.name] >> choice_node["input"][index]
     if enum_attr is not None:
         enum_attr  >> choice_node["selector"]
 
     return choice_node
 
-class AxisVector(base_component.SingletonComponent):
+class AxisVector(b_comp.SingletonComponent):
     """Component of axis vectors that creates vectors from the enum"""
     class_namespace="axis_vec_manager"
+    _OUT_AXIS = "axis"
+
     def __init__(self, container_node = None):
         super().__init__(container_node)
         self.self_component = None
@@ -38,9 +40,9 @@ class AxisVector(base_component.SingletonComponent):
     def _get_output_node_build_attr_data(self):
         node_data = super()._get_output_node_build_attr_data()
 
-        attr_data = [component_data.AttrData("axis", type_="compound", parent="output")]
+        attr_data = [component_data.AttrData(self._OUT_AXIS, type_="compound", parent=self._OUT)]
         for item in component_enum_data.AxisEnum:
-            attr_data.append(component_data.AttrData(item.name, type_="double3", parent="axis"))
+            attr_data.append(component_data.AttrData(item.name, type_="double3", parent=self._OUT_AXIS))
             attr_data.append(component_data.AttrData(f"{item.name}X", type_="double", parent=item.name))
             attr_data.append(component_data.AttrData(f"{item.name}Y", type_="double", parent=item.name))
             attr_data.append(component_data.AttrData(f"{item.name}Z", type_="double", parent=item.name))
@@ -50,19 +52,21 @@ class AxisVector(base_component.SingletonComponent):
     
     def _override_build(self, **kwargs):
         for item in component_enum_data.AxisEnum:
-            self.output_node["axis"][item.name] = item.value
+            self.output_node[self._OUT_AXIS][item.name] = item.value
 
-        self.output_node["axis"].set_locked(True)
+        self.output_node[self._OUT_AXIS].set_locked(True)
 
-class Color(base_component.SingletonComponent):
+class Color(b_comp.SingletonComponent):
     """Component of colors that creates shaders from color enum"""
     class_namespace="color_manager"
+
+    _OUT_COLOR = "color"
     def _get_output_node_build_attr_data(self):
         node_data = super()._get_output_node_build_attr_data()
 
-        attr_data = [component_data.AttrData("color", type_="compound", parent="output")]
+        attr_data = [component_data.AttrData(self._OUT_COLOR, type_="compound", parent=self._OUT)]
         for item in component_enum_data.Color:
-            attr_data.append(component_data.AttrData(item.name, type_="double3", parent="color"))
+            attr_data.append(component_data.AttrData(item.name, type_="double3", parent=self._OUT_COLOR))
             attr_data.append(component_data.AttrData(f"{item.name}R", type_="double", parent=item.name))
             attr_data.append(component_data.AttrData(f"{item.name}G", type_="double", parent=item.name))
             attr_data.append(component_data.AttrData(f"{item.name}B", type_="double", parent=item.name))
@@ -73,7 +77,7 @@ class Color(base_component.SingletonComponent):
     def _override_build(self, **kwargs):
         for color_enum in component_enum_data.Color:
             index_color = utils.get_rgb_from_index(color_enum.value)
-            self.output_node["color"][color_enum.name] = index_color
+            self.output_node[self._OUT_COLOR][color_enum.name] = index_color
 
     @classmethod
     def get_shader(cls, color:component_enum_data.Color):
@@ -115,7 +119,7 @@ class Color(base_component.SingletonComponent):
         shader_sg = utils.get_shader_sg(shader)
         color_manager_inst = cls.instance()
 
-        color_manager_inst.output_node["color"][color.name] << shader["color"]
+        color_manager_inst.output_node[cls._OUT_COLOR][color.name] << shader["color"]
         color_manager_inst.container_node.add_nodes(shader, shader_sg)
         color_manager_inst.rename_nodes()
     @classmethod

@@ -1,4 +1,4 @@
-import system.base_component as base_component
+import system.base_component as b_comp
 import system.component_data as component_data
 import component.control as control
 import utils.node_wrapper as nw
@@ -6,13 +6,13 @@ import utils.utils as utils
 import maya.cmds as cmds
 from typing import Union
 
-class VisualizeHier(base_component.Hierarchy):
+class VisualizeHier(b_comp.Hierarchy):
     """Helps visualize and debug hierarchies by creating chains for world space and local visualization"""
     root_transform_name = "v_grp"
     class_namespace = "hier_vis"
-    
+
     def _override_build(self, **kwargs):
-        source_component= kwargs["source_component"]
+        source_component= kwargs[self._KWG_SRC_COMP]
 
         HIER_DATA = self.HIER_DATA
 
@@ -25,7 +25,7 @@ class VisualizeHier(base_component.Hierarchy):
 
         prev_loc_transform = loc_grp
 
-        self._connect_source_hier_component(source_component=source_component, connect_hierarchy=kwargs["connect_hierarchy"])
+        self._connect_source_hier_component(source_component=source_component, connect_hierarchy=kwargs[self._KWG_CONN_HIER])
 
         input_xforms = self._get_input_xform_attrs()
         for index, input_xform in input_xforms.items():            
@@ -40,14 +40,14 @@ class VisualizeHier(base_component.Hierarchy):
             
             # setting up the rest of ws matrix
             cmds.parent(str(control_ws_inst.transform_node), str(ws_grp))
-            input_xform[HIER_DATA.INPUT_WORLD_MATRIX] >> control_ws_inst.container_node["offsetMatrix"]
+            input_xform[HIER_DATA.INPUT_WORLD_MATRIX] >> control_ws_inst.container_node[b_comp.Control._IN_OFF_MAT]
 
             # setting up the rest of local matrix
             cmds.parent(str(control_loc_inst.transform_node), str(prev_loc_transform))
             if index != 0:
-                input_xform[HIER_DATA.INPUT_LOC_MATRIX] >> control_loc_inst.container_node["offsetMatrix"]
+                input_xform[HIER_DATA.INPUT_LOC_MATRIX] >> control_loc_inst.container_node[b_comp.Control._IN_OFF_MAT]
             else:
-                input_xform[HIER_DATA.INPUT_WORLD_MATRIX] >> control_loc_inst.container_node["offsetMatrix"]
+                input_xform[HIER_DATA.INPUT_WORLD_MATRIX] >> control_loc_inst.container_node[b_comp.Control._IN_OFF_MAT]
             prev_loc_transform = control_loc_inst.transform_node
 
             # connecting to component output
@@ -57,9 +57,13 @@ class VisualizeHier(base_component.Hierarchy):
 
         self.container_node.add_nodes(ws_grp)
 
-class MergeHier(base_component.Component):
+class MergeHier(b_comp.Component):
     class_namespace="merge_hier"
     HIER_DATA = component_data.HierData
+
+    _IN_HIER_PAR_MAT = "hierParentMatricies"
+    _IN_HIER_BLEND = "hierBlend"
+    _KWG_SRC_COMP = "source_component"
 
     def _get_input_node_build_attr_data(self):
         node_data = super()._get_input_node_build_attr_data()
@@ -67,10 +71,10 @@ class MergeHier(base_component.Component):
         node_data.extend_attr_data(self.HIER_DATA.get_hier_data())
 
         node_data.extend_attr_data(
-            component_data.AttrData("hierParentMatricies", type_="matrix", multi=True, publish=True),
+            component_data.AttrData(self._IN_HIER_PAR_MAT, type_="matrix", multi=True, publish=True),
             component_data.AttrData(self.HIER_DATA.INPUT_XFORM, type_="compound", multi=True, publish=True),
             component_data.AttrData(self.HIER_DATA.INPUT_LOC_MATRIX, type_="matrix", parent=self.HIER_DATA.INPUT_XFORM, multi=True),
-            component_data.AttrData("hierBlend", type_="float", parent="input", min=0),
+            component_data.AttrData(self._IN_HIER_BLEND, type_="double", parent=self._IN, min=0),
         )
         
         return node_data
@@ -82,15 +86,14 @@ class MergeHier(base_component.Component):
         return node_data
 
     @classmethod
-    def create(cls, source_components=[], connect_hierarchy=True, instance_name = None, parent=None, **kwargs):
-        kwargs["source_components"] = utils.make_iterable(source_components)
-        kwargs["connect_hierarchy"] = connect_hierarchy
+    def create(cls, source_components=[], instance_name = None, parent=None, **kwargs):
+        kwargs[cls._KWG_SRC_COMP] = utils.make_iterable(source_components)
                 
         return super().create(instance_name, parent, **kwargs)
     
 
     def _override_build(self, **kwargs):
-        source_components = kwargs["source_components"]
+        source_components = kwargs[self._KWG_SRC_COMP]
 
         self._connect_source_hier_components(source_components=source_components)
         hier_parent_mat = self.__connect_hier()
@@ -101,7 +104,7 @@ class MergeHier(base_component.Component):
         """creates all nodes connected to hier"""
         # connecting hier
         hier_parent_mat = nw.create_node("blendMatrix", "hierParentMatrixBlend")
-        for xform_index, hier_attr in enumerate(self.container_node["hierParentMatricies"]):
+        for xform_index, hier_attr in enumerate(self.container_node[self._IN_HIER_PAR_MAT]):
             if xform_index == 0:
                 hier_parent_mat["inputMatrix"] << hier_attr
             else:
@@ -125,10 +128,10 @@ class MergeHier(base_component.Component):
             if index != 0:
                 clamp = nw.create_node("clampRange", f"component{index}_clamp")
                 if index == 1:
-                    clamp["input"] << self.container_node["hierBlend"]
+                    clamp["input"] << self.container_node[self._IN_HIER_BLEND]
                 else:
                     component_weight = nw.create_node("subtract", name=f"component{index}_envelope")
-                    component_weight["input1"] << self.container_node["hierBlend"]
+                    component_weight["input1"] << self.container_node[self._IN_HIER_BLEND]
                     component_weight["input2"].set(index-1)
                     clamp["input"] << component_weight["output"]
                     added_nodes.append(component_weight)
@@ -206,7 +209,7 @@ class MergeHier(base_component.Component):
                     raise RuntimeError(f"{source_component.container_node} has mismatched len. expecting {xform_len} got {component_len}")
                 if source_component.container_node == self.container_node.get_container_node():
                     raise RuntimeError("source container cannot be parent container")
-                if not issubclass(type(source_component), base_component.Hierarchy):
+                if not issubclass(type(source_component), b_comp.Hierarchy):
                     raise RuntimeError(f"{source_component.container_node} is not hierarchy component")
                 
             for hier_index, source_component in enumerate(source_components):
@@ -217,7 +220,7 @@ class MergeHier(base_component.Component):
                     self_loc_matrix = self.container_node[HIER_DATA.INPUT_XFORM][hier_index][HIER_DATA.INPUT_LOC_MATRIX][xform_index]
                     src_out_xform[HIER_DATA.OUTPUT_LOC_MATRIX] >> self_loc_matrix
 
-                    src_container[HIER_DATA.HIER_PARENT_MATRIX] >> self.container_node["hierParentMatricies"][hier_index]
+                    src_container[HIER_DATA.HIER_PARENT_MATRIX] >> self.container_node[self._IN_HIER_PAR_MAT][hier_index]
                 # connect up output name, world matrix and init matricies 
                 curr_src_container = source_components[0].container_node
                 for index, src_out_xform in enumerate(curr_src_container[HIER_DATA.OUTPUT_XFORM]):

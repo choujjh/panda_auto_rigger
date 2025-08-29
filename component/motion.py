@@ -1,11 +1,11 @@
-import system.base_component as base_component
+import system.base_component as b_comp
 import component.control as control
 import utils.node_wrapper as nw
 import system.component_data as component_data
 import system.component_enum_data as component_enum_data
 import maya.cmds as cmds
 
-class FK(base_component.Motion):
+class FK(b_comp.Motion):
     """Given a hierarchy creates an FK chain to accompany it"""
 
     class_namespace = "FK"
@@ -15,18 +15,18 @@ class FK(base_component.Motion):
         #qol variables
         added_nodes = []
         HIER_DATA =self.HIER_DATA
-        color = kwargs["control_color"]
+        color = kwargs[self._KWG_CNTRL_CLR]
 
         # connecting source component
-        source_component = kwargs["source_component"]
-        self._connect_source_hier_component(source_component=source_component, connect_hierarchy=kwargs["connect_hierarchy"])
+        source_component = kwargs[self._KWG_SRC_COMP]
+        self._connect_source_hier_component(source_component=source_component, connect_hierarchy=kwargs[self._KWG_CONN_HIER])
 
         prev_ws_attr = self.container_node[HIER_DATA.HIER_PARENT_MATRIX]
         prev_inv_attr = self.container_node[HIER_DATA.HIER_PARENT_INIT_INV_MATRIX]
         for index, input_xform in enumerate(self.input_node[self.HIER_DATA.INPUT_XFORM]):
             control_inst = control.Circle.create(
                 instance_name=input_xform[HIER_DATA.INPUT_XFORM_NAME], 
-                axis_vec=source_component.container_node["primaryVec"].value, 
+                axis_vec=source_component.container_node[self._PRM_VEC].value, 
                 parent=self, 
                 color=color)
             for attr in ["sx", "sy", "sz"]:
@@ -40,33 +40,42 @@ class FK(base_component.Motion):
             ws_mult_matrix["matrixIn"][1] << prev_inv_attr
             ws_mult_matrix["matrixIn"][2] << prev_ws_attr
             ws_mult_matrix["matrixIn"][3] << self.transform_node["worldInverseMatrix"][0]
-            ws_mult_matrix["matrixSum"] >> control_inst.container_node["offsetMatrix"]
+            ws_mult_matrix["matrixSum"] >> control_inst.container_node[b_comp.Control._IN_OFF_MAT]
             
-            prev_ws_attr = control_inst.container_node["worldMatrix"]
+            prev_ws_attr = control_inst.container_node[b_comp.Control._OUT_WS_MAT]
             prev_inv_attr = self.input_node[HIER_DATA.INPUT_XFORM][index][HIER_DATA.INPUT_WORLD_INV_MATRIX]
 
             self._set_output_xform_attrs(
                 index=index,
-                output_world_matrix=control_inst.container_node["worldMatrix"]
+                output_world_matrix=control_inst.container_node[b_comp.Control._OUT_WS_MAT]
             )
         self.container_node.add_nodes(*added_nodes)
 
-class SimpleIK(base_component.Motion):
+class SimpleIK(b_comp.Motion):
     """Given the SimpleLimb creates a 2 chain IK chain"""
     class_namespace = "simple_IK"
     root_transform_name = "ik_grp"
 
+    _IK = "IK"
+    _IK_END_MAT = "IKEndMatrix"
+    _IK_END_INIT_INV_MAT = "IKEndInitInvMatrix"
+    _IK_STRETCH_ENAB = "ikStretchEnabled"
+    _IK_SOFT_BLEND_START = "softIKBlendStart"
+    _IK_SOFT_IK_ENAB = "softIKEnabled"
+    _IK_BLEND_TYP = "blendType"
+    _IK_BLEND_CRV = "blendCurve"
+
     def _get_input_node_build_attr_data(self):
         node_data = super()._get_input_node_build_attr_data()
         node_data.extend_attr_data(
-            component_data.AttrData("IK", type_="compound", parent="input"),
-            component_data.AttrData("IKEndMatrix", type_="matrix", parent="IK"),
-            component_data.AttrData("IKEndInitInvMatrix", type_="matrix", parent="IK"),
-            component_data.AttrData("IKStretchEnabled", type_="bool", parent="IK", value=True),
-            component_data.AttrData("softIKBlendStart", type_="double", parent="IK", value=0.9, min=0, max=1),
-            component_data.AttrData("softIKEnabled", type_="bool", parent="IK"),
-            component_data.AttrData("blendType", type_=component_enum_data.SoftIKBlendTypes.smoothStep, parent="IK"),
-            component_data.AttrData("blendCurve", type_=component_enum_data.SoftIKBlendCurve.quadratic, parent="IK"),
+            component_data.AttrData(self._IK, type_="compound", parent=self._IN),
+            component_data.AttrData(self._IK_END_MAT, type_="matrix", parent=self._IK),
+            component_data.AttrData(self._IK_END_INIT_INV_MAT, type_="matrix", parent=self._IK),
+            component_data.AttrData(self._IK_STRETCH_ENAB, type_="bool", parent=self._IK, value=True),
+            component_data.AttrData(self._IK_SOFT_BLEND_START, type_="double", parent=self._IK, value=0.9, min=0, max=1),
+            component_data.AttrData(self._IK_SOFT_IK_ENAB, type_="bool", parent=self._IK),
+            component_data.AttrData(self._IK_BLEND_TYP, type_=component_enum_data.SoftIKBlendTypes.smoothStep, parent=self._IK),
+            component_data.AttrData(self._IK_BLEND_CRV, type_=component_enum_data.SoftIKBlendCurve.quadratic, parent=self._IK),
         )
         return node_data
 
@@ -95,11 +104,11 @@ class SimpleIK(base_component.Motion):
         mult_node["matrixIn"][2] << parent_world_matrix
         mult_node["matrixIn"][3] << self.transform_node["worldInverseMatrix"][0]
 
-        control_inst.container_node["offsetMatrix"] << mult_node["matrixSum"]
+        control_inst.container_node[b_comp.Control._IN_OFF_MAT] << mult_node["matrixSum"]
         self.container_node.add_nodes(mult_node)
 
         return control_inst
-    def __create_dist_nodes(self, root_control:base_component.Control, end_control:base_component.Control):
+    def __create_dist_nodes(self, root_control:b_comp.Control, end_control:b_comp.Control):
         """Creates distance nodes for ik calculations. curr_len is the distance between root and end controls
 
         Args:
@@ -117,8 +126,8 @@ class SimpleIK(base_component.Motion):
         len2_node["inMatrix1"] << input_xforms[1][self.HIER_DATA.INPUT_WORLD_MATRIX]
         len2_node["inMatrix2"] << input_xforms[2][self.HIER_DATA.INPUT_WORLD_MATRIX]
         curr_len_node = nw.create_node("distanceBetween", "curr_total_dist")
-        curr_len_node["inMatrix1"] << root_control.container_node["worldMatrix"]
-        curr_len_node["inMatrix2"] << end_control.container_node["worldMatrix"]
+        curr_len_node["inMatrix1"] << root_control.container_node[b_comp.Control._OUT_WS_MAT]
+        curr_len_node["inMatrix2"] << end_control.container_node[b_comp.Control._OUT_WS_MAT]
 
         self.container_node.add_nodes(len1_node, len2_node, curr_len_node)
         return len1_node["distance"], len2_node["distance"], curr_len_node["distance"]
@@ -166,7 +175,7 @@ class SimpleIK(base_component.Motion):
                 f"float $len1Scalar = 1.0;",
                 f"float $len2Scalar = 1.0;\n",
 
-                f"if ({self.container_node['softIKEnabled']}) {{",
+                f"if ({self.container_node[self._IK_SOFT_IK_ENAB]}) {{",
                 f"\t$len1Scalar = sqrt({cos0_squared_attr}+pow({solved_height_attr}, 2));",
                 f"\t$len2Scalar = sqrt(1 - ($lenRatio * pow({init_height_attr}, 2)) + ($lenRatio * pow({solved_height_attr}, 2)));\n",
                 "}",
@@ -192,7 +201,7 @@ class SimpleIK(base_component.Motion):
 
         # creating blending for new height
         remap_cos = nw.create_node("remapValue", "soft_ik_cos_remap")
-        remap_cos["inputMin"] << self.container_node["softIKBlendStart"]
+        remap_cos["inputMin"] << self.container_node[self._IK_SOFT_BLEND_START]
         remap_cos["inputValue"] << cos_build_data["cos0"]
 
         smooth_step = nw.create_node("smoothStep", "soft_ik_smoothStep_blend")
@@ -204,12 +213,12 @@ class SimpleIK(base_component.Motion):
         cubic_mult["input"][0] << remap_cos["outValue"]
 
         blend_type_choice = nw.create_node("choice", "soft_ik_blendType_choice")
-        blend_type_choice["selector"] << self.container_node["blendType"]
+        blend_type_choice["selector"] << self.container_node[self._IK_BLEND_TYP]
         blend_type_choice["input"][0] << smooth_step["output"]
         blend_type_choice["input"][1] << cubic_mult["output"]
 
         blend_curve_choice = nw.create_node("choice", "soft_ik_blendCurve_choice")
-        blend_curve_choice["selector"] << self.container_node["blendCurve"]
+        blend_curve_choice["selector"] << self.container_node[self._IK_BLEND_CRV]
         blend_curve_choice["input"][0] << cos_build_data["linearHeight"]
         blend_curve_choice["input"][1] << cos_build_data["quadraticHeight"]
         blend_curve_choice["input"][2] << cos_build_data["cubicHeight"]
@@ -287,19 +296,19 @@ class SimpleIK(base_component.Motion):
 
                 "float $topRSin = 1;",
 
-                f"if ({self.container_node['tertiaryVecX']} != 0.0) {{",
+                f"if ({self.container_node[self._TER_VEC_X]} != 0.0) {{",
                 f"\t{loc_xform1_row['input']} = 1;",
                 f"\t\tif ({loc_xform1_row['outputZ']} != 0) {{",
                 f"\t\t\t$topRSin = {loc_xform1_row['outputZ']};",
                 "\t}",
                 "}",
-                f"else if ({self.container_node['tertiaryVecY']} != 0.0) {{",
+                f"else if ({self.container_node[self._TER_VEC_Y]} != 0.0) {{",
                 f"\t{loc_xform1_row['input']} = 0;",
                 f"\t\t\tif ({loc_xform1_row['outputZ']} != 0) {{",
                 f"\t\t$topRSin = {loc_xform1_row['outputZ']};",
                 "\t}",
                 "}",
-                f"else if ({self.container_node['tertiaryVecZ']} != 0.0) {{",
+                f"else if ({self.container_node[self._TER_VEC_Z]} != 0.0) {{",
                 f"\t{loc_xform1_row['input']} = 0;",
                 f"\t\t\tif ({loc_xform1_row['outputY']} != 0) {{",
                 f"\t\t$topRSin = {loc_xform1_row['outputY']};",
@@ -326,7 +335,7 @@ class SimpleIK(base_component.Motion):
                 "}",
 
 
-                f"else if ({self.container_node['IKStretchEnabled']} && $currLen > $totalLen) {{",
+                f"else if ({self.container_node[self._IK_STRETCH_ENAB]} && $currLen > $totalLen) {{",
                 "\t$scalar = $currLen/$totalLen;",
                 "\t$len1 = $len1 * $scalar;",
                 "\t$len2 = $len2 * $scalar;\n",
@@ -416,19 +425,19 @@ class SimpleIK(base_component.Motion):
                     expression_str.extend([                       
                         f"matrix $rot_matrix{index}[3][3] = <<1.0, 0.0, 0.0; 0.0, 1.0, 0.0; 0.0, 0.0, 1.0>>;\n",
 
-                        f"if({self.container_node['tertiaryVecX']} != 0.0) {{",
+                        f"if({self.container_node[self._TER_VEC_X]} != 0.0) {{",
                         f"\t$rot_matrix{index}[1][1] = {cos};",
                         f"\t$rot_matrix{index}[1][2] = {topRSin};",
                         f"\t$rot_matrix{index}[2][1] = {botLSin};",
                         f"\t$rot_matrix{index}[2][2] = {cos};",
                         "}",
-                        f"else if({self.container_node['tertiaryVecY']} != 0.0) {{",
+                        f"else if({self.container_node[self._TER_VEC_Y]} != 0.0) {{",
                         f"\t$rot_matrix{index}[0][0] = {cos};",
                         f"\t$rot_matrix{index}[0][2] = {topRSin};",
                         f"\t$rot_matrix{index}[2][0] = {botLSin};",
                         f"\t$rot_matrix{index}[2][2] = {cos};",
                         "}",
-                        f"else if({self.container_node['tertiaryVecZ']} != 0.0) {{",
+                        f"else if({self.container_node[self._TER_VEC_Z]} != 0.0) {{",
                         f"\t$rot_matrix{index}[0][0] = {cos};",
                         f"\t$rot_matrix{index}[0][1] = {topRSin};",
                         f"\t$rot_matrix{index}[1][0] = {botLSin};",
@@ -449,15 +458,15 @@ class SimpleIK(base_component.Motion):
                 if index != 0:
                     length = ik_build_data_node[f"length{index}"]
                     expression_str.extend([
-                        f"{rot_loc_matrix['in30']} = {self.container_node['primaryVecX']} * {length};",
-                        f"{rot_loc_matrix['in31']} = {self.container_node['primaryVecY']} * {length};",
-                        f"{rot_loc_matrix['in32']} = {self.container_node['primaryVecZ']} * {length};",
+                        f"{rot_loc_matrix['in30']} = {self.container_node[self._PRM_VEC_X]} * {length};",
+                        f"{rot_loc_matrix['in31']} = {self.container_node[self._PRM_VEC_Y]} * {length};",
+                        f"{rot_loc_matrix['in32']} = {self.container_node[self._PRM_VEC_Z]} * {length};",
 
                     ])
             expression_str.extend([
-                f"\n{rot2_point_matrix['inPointX']}={ik_build_data_node['length2']} * {self.container_node['primaryVecX']};",
-                f"{rot2_point_matrix['inPointY']}={ik_build_data_node['length2']} * {self.container_node['primaryVecY']};",
-                f"{rot2_point_matrix['inPointZ']}={ik_build_data_node['length2']} * {self.container_node['primaryVecZ']};"
+                f"\n{rot2_point_matrix['inPointX']}={ik_build_data_node['length2']} * {self.container_node[self._PRM_VEC_X]};",
+                f"{rot2_point_matrix['inPointY']}={ik_build_data_node['length2']} * {self.container_node[self._PRM_VEC_Y]};",
+                f"{rot2_point_matrix['inPointZ']}={ik_build_data_node['length2']} * {self.container_node[self._PRM_VEC_Z]};"
             ])
             return "\n".join(expression_str)
         loc_rot_matricies = []
@@ -507,7 +516,7 @@ class SimpleIK(base_component.Motion):
             expression_str.append("")
 
             for index, axis in enumerate(["X", "Y", "Z"]):
-                for transform, vec_name in zip(["Trans", "Rot"], ["secondaryVec", "primaryVec"]):
+                for transform, vec_name in zip(["Trans", "Rot"], [self._SEC_VEC, self._PRM_VEC]):
                     for extreme in ["max", "min"]:
                         dest_attr = pole_vec_control[f"{extreme}{transform}{axis}LimitEnable"]
                         src_attr = self.input_node[vec_name][index]
@@ -529,10 +538,10 @@ class SimpleIK(base_component.Motion):
         aim_matrix["inputMatrix"]
         aim_matrix["inputMatrix"] << root_cntrl_ws_mat
         aim_matrix["primaryTargetMatrix"] << end_cntrl_ws_mat
-        aim_matrix["primaryInputAxis"] << self.container_node["primaryVec"]
+        aim_matrix["primaryInputAxis"] << self.container_node[self._PRM_VEC]
         aim_matrix["secondaryTargetMatrix"] << root_cntrl_ws_mat
-        aim_matrix["secondaryInputAxis"] << self.container_node["secondaryVec"]
-        aim_matrix["secondaryTargetVector"] << self.container_node["secondaryVec"]
+        aim_matrix["secondaryInputAxis"] << self.container_node[self._SEC_VEC]
+        aim_matrix["secondaryTargetVector"] << self.container_node[self._SEC_VEC]
 
         mult_matrix = nw.create_node("multMatrix", name="pole_vec_start_scale_comp")
         mult_matrix["matrixIn"][0] << aim_matrix["outputMatrix"]
@@ -542,7 +551,7 @@ class SimpleIK(base_component.Motion):
         vec_mult = nw.create_node("multiplyDivide", "pole_vec_len_vec")
         for attr_name in ["X", "Y", "Z"]:
             vec_mult[f"input1{attr_name}"] << ik_build_data_node["poleVecLen"]
-        vec_mult["input2"] << self.container_node["primaryVec"]
+        vec_mult["input2"] << self.container_node[self._PRM_VEC]
 
         # getting ws point 
         pole_vec_ws_translate = nw.create_node("pointMatrixMult", "pole_vec_translate")
@@ -556,7 +565,7 @@ class SimpleIK(base_component.Motion):
             tx_attr=pole_vec_ws_translate["outputX"],
             ty_attr=pole_vec_ws_translate["outputY"],
             tz_attr=pole_vec_ws_translate["outputZ"])
-        pole_vec_parent_4x4["output"] >> pole_cntrl_inst.container_node["offsetMatrix"]
+        pole_vec_parent_4x4["output"] >> pole_cntrl_inst.container_node[b_comp.Control._IN_OFF_MAT]
 
         # pole vec expression
         pole_vec_expression_str = __pole_vec_expression_str(pole_vec_control=pole_cntrl_inst.transform_node)
@@ -569,9 +578,9 @@ class SimpleIK(base_component.Motion):
         return pole_cntrl_inst
 
     def _override_build(self, **kwargs):
-        source_component = kwargs["source_component"]
-        control_color = kwargs["control_color"]
-        self._connect_source_hier_component(source_component, connect_hierarchy=kwargs["connect_hierarchy"])
+        source_component = kwargs[self._KWG_SRC_COMP]
+        control_color = kwargs[self._KWG_CNTRL_CLR]
+        self._connect_source_hier_component(source_component, connect_hierarchy=kwargs[self._KWG_CONN_HIER])
 
         # controls
         root_control = self.__setup_ik_control(
@@ -583,8 +592,8 @@ class SimpleIK(base_component.Motion):
         end_control = self.__setup_ik_control(
             name="end",
             input_xform_index=2,
-            parent_init_inv_matrix=self.container_node["IKEndInitInvMatrix"],
-            parent_world_matrix=self.container_node["IKEndMatrix"],
+            parent_init_inv_matrix=self.container_node[self._IK_END_INIT_INV_MAT],
+            parent_world_matrix=self.container_node[self._IK_END_MAT],
             color=control_color)
 
         # get all expression calculations
@@ -595,18 +604,18 @@ class SimpleIK(base_component.Motion):
         loc_matricies, xform2_rot_point = self.__create_local_matrix_nodes(ik_build_data_node=ik_build_data)
         pole_cntrl_inst = self.__create_pole_vec_nodes(
             ik_build_data_node=ik_build_data,
-            root_cntrl_ws_mat=root_control.container_node["worldMatrix"],
-            end_cntrl_ws_mat=end_control.container_node["worldMatrix"],
+            root_cntrl_ws_mat=root_control.container_node[b_comp.Control._OUT_WS_MAT],
+            end_cntrl_ws_mat=end_control.container_node[b_comp.Control._OUT_WS_MAT],
             color=control_color)
         
         # create aim matrix
         ik_base_mat_aim = nw.create_node("aimMatrix", "ik_base_mat")
-        ik_base_mat_aim["inputMatrix"] << root_control.container_node["worldMatrix"]
-        ik_base_mat_aim["primaryTargetMatrix"] << end_control.container_node["worldMatrix"]
-        ik_base_mat_aim["primaryInputAxis"] << self.container_node["primaryVec"]
-        ik_base_mat_aim["secondaryTargetMatrix"] << pole_cntrl_inst.container_node["worldMatrix"]
-        ik_base_mat_aim["secondaryInputAxis"] << self.container_node["secondaryVec"]
-        ik_base_mat_aim["secondaryTargetVector"] << self.container_node["secondaryVec"]
+        ik_base_mat_aim["inputMatrix"] << root_control.container_node[b_comp.Control._OUT_WS_MAT]
+        ik_base_mat_aim["primaryTargetMatrix"] << end_control.container_node[b_comp.Control._OUT_WS_MAT]
+        ik_base_mat_aim["primaryInputAxis"] << self.container_node[self._PRM_VEC]
+        ik_base_mat_aim["secondaryTargetMatrix"] << pole_cntrl_inst.container_node[b_comp.Control._OUT_WS_MAT]
+        ik_base_mat_aim["secondaryInputAxis"] << self.container_node[self._SEC_VEC]
+        ik_base_mat_aim["secondaryTargetVector"] << self.container_node[self._SEC_VEC]
         ik_base_mat_aim["secondaryMode"] = 2
 
         # connecting to world matrix and local matrix
@@ -634,7 +643,7 @@ class SimpleIK(base_component.Motion):
         
         xform2_world_matrix = self._create_orient_translate_blend(
             name="xform2_ws",
-            matrix_attr=end_control.container_node["worldMatrix"],
+            matrix_attr=end_control.container_node[b_comp.Control._OUT_WS_MAT],
             tx_attr=xform2_rot_point["outputX"],
             ty_attr=xform2_rot_point["outputY"],
             tz_attr=xform2_rot_point["outputZ"]
