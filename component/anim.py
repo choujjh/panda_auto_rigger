@@ -1,12 +1,14 @@
-import system.base_component as b_comp
+import system.base_component as base_comp
 import component.motion as motion
-import component.hierarchy as hierarchy
+import component.misc as misc
 import system.component_data as component_data
 import utils.node_wrapper as nw
 import component.control as control
+import component.setup as setup
 
-class SimpleLimbAnim(b_comp.Anim):
+class SimpleLimbAnim(base_comp.Anim):
     """Simple Limb Anim component (has a merged fk, ik, and a settings control). used in conjunction with simpleLimb setup"""
+    setup_component = setup.SimpleLimb
 
     _IN_SET_CNTRL_XFORM_FOLLOW = "settingCntrlXformFollow"
     _IN_SET_CNTRL_INIT_MAT = "settingCntrlInitMatrix"
@@ -30,7 +32,7 @@ class SimpleLimbAnim(b_comp.Anim):
         ik_inst = motion.SimpleIK.create(source_component=self, connect_hierarchy=True, control_color=control_color, parent=self)
         fk_inst = motion.FK.create(source_component=self, connect_hierarchy=True, control_color=control_color, parent=self)
 
-        merge_hier_inst = hierarchy.MergeHier.create(source_components = [fk_inst, ik_inst], parent=self)
+        merge_hier_inst = misc.MergeHier.create(source_components = [fk_inst, ik_inst], parent=self)
 
         for index in range(len(self.container_node[HIER_DATA.OUTPUT_XFORM])):
             merge_output_xform = merge_hier_inst.container_node[HIER_DATA.OUTPUT_XFORM][index]
@@ -57,7 +59,7 @@ class SimpleLimbAnim(b_comp.Anim):
             for axis in ["x", "y", "z"]:
                 settings_cntrl_inst.transform_node[f"{attr}{axis}"].set_locked(True)
                 settings_cntrl_inst.transform_node[f"{attr}{axis}"].set_keyable(False)
-        settings_cntrl_inst.container_node[b_comp.Control._IN_OFF_MAT] << set_mult_matrix["matrixSum"]
+        settings_cntrl_inst.container_node[base_comp.Control._IN_OFF_MAT] << set_mult_matrix["matrixSum"]
         set_transform = settings_cntrl_inst.transform_node
 
         set_transform.add_attr("_", type="enum", enumName="FK_IK:")
@@ -82,8 +84,3 @@ class SimpleLimbAnim(b_comp.Anim):
         self_container = self.container_node
         src_container[source_component._IN_SET_CNTRL_XFORM_FOLLOW] >> self_container[self._IN_SET_CNTRL_XFORM_FOLLOW]
         src_container[source_component._OUT_SET_CNTRL_INIT_MAT] >> self_container[self._IN_SET_CNTRL_INIT_MAT]
-        
-
-        
-
-

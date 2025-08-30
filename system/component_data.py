@@ -41,7 +41,6 @@ class NodeData():
         # adding attrs
         num_children_dict = self.__get_num_children_dict()
 
-        # reorganizing data #TODO make a better implementation
         data_list = []
         for data in self.node_attr_dict.values():
             data_added = False
@@ -73,6 +72,7 @@ class NodeData():
                 else:
                     node[data.name] = data.value
 
+        for data in data_list:
             # locking
             if data.locked:
                 node[data.name].set_locked(True)

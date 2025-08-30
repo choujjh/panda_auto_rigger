@@ -1,11 +1,11 @@
-import system.base_component as b_comp
+import system.base_component as base_comp
 import component.control as control
 import utils.node_wrapper as nw
 import system.component_data as component_data
 import system.component_enum_data as component_enum_data
 import maya.cmds as cmds
 
-class FK(b_comp.Motion):
+class FK(base_comp.Motion):
     """Given a hierarchy creates an FK chain to accompany it"""
 
     class_namespace = "FK"
@@ -40,18 +40,18 @@ class FK(b_comp.Motion):
             ws_mult_matrix["matrixIn"][1] << prev_inv_attr
             ws_mult_matrix["matrixIn"][2] << prev_ws_attr
             ws_mult_matrix["matrixIn"][3] << self.transform_node["worldInverseMatrix"][0]
-            ws_mult_matrix["matrixSum"] >> control_inst.container_node[b_comp.Control._IN_OFF_MAT]
+            ws_mult_matrix["matrixSum"] >> control_inst.container_node[base_comp.Control._IN_OFF_MAT]
             
-            prev_ws_attr = control_inst.container_node[b_comp.Control._OUT_WS_MAT]
+            prev_ws_attr = control_inst.container_node[base_comp.Control._OUT_WS_MAT]
             prev_inv_attr = self.input_node[HIER_DATA.INPUT_XFORM][index][HIER_DATA.INPUT_WORLD_INV_MATRIX]
 
             self._set_output_xform_attrs(
                 index=index,
-                output_world_matrix=control_inst.container_node[b_comp.Control._OUT_WS_MAT]
+                output_world_matrix=control_inst.container_node[base_comp.Control._OUT_WS_MAT]
             )
         self.container_node.add_nodes(*added_nodes)
 
-class SimpleIK(b_comp.Motion):
+class SimpleIK(base_comp.Motion):
     """Given the SimpleLimb creates a 2 chain IK chain"""
     class_namespace = "simple_IK"
     root_transform_name = "ik_grp"
@@ -104,11 +104,11 @@ class SimpleIK(b_comp.Motion):
         mult_node["matrixIn"][2] << parent_world_matrix
         mult_node["matrixIn"][3] << self.transform_node["worldInverseMatrix"][0]
 
-        control_inst.container_node[b_comp.Control._IN_OFF_MAT] << mult_node["matrixSum"]
+        control_inst.container_node[base_comp.Control._IN_OFF_MAT] << mult_node["matrixSum"]
         self.container_node.add_nodes(mult_node)
 
         return control_inst
-    def __create_dist_nodes(self, root_control:b_comp.Control, end_control:b_comp.Control):
+    def __create_dist_nodes(self, root_control:base_comp.Control, end_control:base_comp.Control):
         """Creates distance nodes for ik calculations. curr_len is the distance between root and end controls
 
         Args:
@@ -126,8 +126,8 @@ class SimpleIK(b_comp.Motion):
         len2_node["inMatrix1"] << input_xforms[1][self.HIER_DATA.INPUT_WORLD_MATRIX]
         len2_node["inMatrix2"] << input_xforms[2][self.HIER_DATA.INPUT_WORLD_MATRIX]
         curr_len_node = nw.create_node("distanceBetween", "curr_total_dist")
-        curr_len_node["inMatrix1"] << root_control.container_node[b_comp.Control._OUT_WS_MAT]
-        curr_len_node["inMatrix2"] << end_control.container_node[b_comp.Control._OUT_WS_MAT]
+        curr_len_node["inMatrix1"] << root_control.container_node[base_comp.Control._OUT_WS_MAT]
+        curr_len_node["inMatrix2"] << end_control.container_node[base_comp.Control._OUT_WS_MAT]
 
         self.container_node.add_nodes(len1_node, len2_node, curr_len_node)
         return len1_node["distance"], len2_node["distance"], curr_len_node["distance"]
@@ -565,7 +565,7 @@ class SimpleIK(b_comp.Motion):
             tx_attr=pole_vec_ws_translate["outputX"],
             ty_attr=pole_vec_ws_translate["outputY"],
             tz_attr=pole_vec_ws_translate["outputZ"])
-        pole_vec_parent_4x4["output"] >> pole_cntrl_inst.container_node[b_comp.Control._IN_OFF_MAT]
+        pole_vec_parent_4x4["output"] >> pole_cntrl_inst.container_node[base_comp.Control._IN_OFF_MAT]
 
         # pole vec expression
         pole_vec_expression_str = __pole_vec_expression_str(pole_vec_control=pole_cntrl_inst.transform_node)
@@ -604,16 +604,16 @@ class SimpleIK(b_comp.Motion):
         loc_matricies, xform2_rot_point = self.__create_local_matrix_nodes(ik_build_data_node=ik_build_data)
         pole_cntrl_inst = self.__create_pole_vec_nodes(
             ik_build_data_node=ik_build_data,
-            root_cntrl_ws_mat=root_control.container_node[b_comp.Control._OUT_WS_MAT],
-            end_cntrl_ws_mat=end_control.container_node[b_comp.Control._OUT_WS_MAT],
+            root_cntrl_ws_mat=root_control.container_node[base_comp.Control._OUT_WS_MAT],
+            end_cntrl_ws_mat=end_control.container_node[base_comp.Control._OUT_WS_MAT],
             color=control_color)
         
         # create aim matrix
         ik_base_mat_aim = nw.create_node("aimMatrix", "ik_base_mat")
-        ik_base_mat_aim["inputMatrix"] << root_control.container_node[b_comp.Control._OUT_WS_MAT]
-        ik_base_mat_aim["primaryTargetMatrix"] << end_control.container_node[b_comp.Control._OUT_WS_MAT]
+        ik_base_mat_aim["inputMatrix"] << root_control.container_node[base_comp.Control._OUT_WS_MAT]
+        ik_base_mat_aim["primaryTargetMatrix"] << end_control.container_node[base_comp.Control._OUT_WS_MAT]
         ik_base_mat_aim["primaryInputAxis"] << self.container_node[self._PRM_VEC]
-        ik_base_mat_aim["secondaryTargetMatrix"] << pole_cntrl_inst.container_node[b_comp.Control._OUT_WS_MAT]
+        ik_base_mat_aim["secondaryTargetMatrix"] << pole_cntrl_inst.container_node[base_comp.Control._OUT_WS_MAT]
         ik_base_mat_aim["secondaryInputAxis"] << self.container_node[self._SEC_VEC]
         ik_base_mat_aim["secondaryTargetVector"] << self.container_node[self._SEC_VEC]
         ik_base_mat_aim["secondaryMode"] = 2
@@ -643,7 +643,7 @@ class SimpleIK(b_comp.Motion):
         
         xform2_world_matrix = self._create_orient_translate_blend(
             name="xform2_ws",
-            matrix_attr=end_control.container_node[b_comp.Control._OUT_WS_MAT],
+            matrix_attr=end_control.container_node[base_comp.Control._OUT_WS_MAT],
             tx_attr=xform2_rot_point["outputX"],
             ty_attr=xform2_rot_point["outputY"],
             tz_attr=xform2_rot_point["outputZ"]

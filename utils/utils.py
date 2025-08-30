@@ -352,7 +352,7 @@ def apply_shader_group(shapes:list, shader:nw.Node):
     shader_sg = get_shader_sg(shader)
 
     cmds.sets(shapes, e=True, forceElement=str(shader_sg))
-def apply_display_color(nodes:list, color:Union[list, component_enum_data.Color, nw.Attr]):
+def apply_display_color(nodes:list, color:Union[list, component_enum_data.Color, nw.Attr, nw.Node]):
     display_attrs = ["overrideEnabled", "overrideRGBColors", "overrideColorRGB"]
     for node in nodes:
         if not issubclass(type(node), nw.Node):
@@ -375,9 +375,27 @@ def apply_display_color(nodes:list, color:Union[list, component_enum_data.Color,
             rgb = get_rgb_from_index(color.value)
         elif isinstance(color, nw.Attr):
             node["overrideColorRGB"] << color
-
+        elif isinstance(color, nw.Node) and color.has_attr("color"):
+            node["overrideColorRGB"] << color["color"]
         if rgb is not None:
             node["overrideColorRGB"] = rgb
+
+def strip_characters(orig_str:str, strip_str:str, leading=True, trailing=True):
+    """given an original string strip trailing and leading characters specified by strip str
+
+    Args:
+        strip_string (str): 
+        leading (bool, optional): Defaults to True.
+        trailing (bool, optional): Defaults to True.
+
+    Returns:
+        str:
+    """
+    if leading:
+        orig_str = orig_str.lstrip(strip_str)
+    if trailing:
+        orig_str = orig_str.strip(strip_str)
+    return orig_str
 
 class Namespace:
     """Class of static functions to handle namespaces"""
@@ -456,7 +474,7 @@ class Namespace:
         Returns:
             str:
         """
-        return re.sub(r'^:+|:+$', '', namespace)
+        return strip_characters(namespace, ":")
     
     @classmethod
     def add_outer_colons(cls, namespace:str):

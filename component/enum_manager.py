@@ -1,7 +1,7 @@
 from typing import Union
 
 import system.component_enum_data as component_enum_data
-import system.base_component as b_comp
+import system.base_component as base_comp
 import utils.node_wrapper as nw
 import system.component_data as component_data
 import utils.utils as utils
@@ -28,7 +28,7 @@ def axis_vec_choice_node(choice_node_name, enum_attr:nw.Attr=None):
 
     return choice_node
 
-class AxisVector(b_comp.SingletonComponent):
+class AxisVector(base_comp.SingletonComponent):
     """Component of axis vectors that creates vectors from the enum"""
     class_namespace="axis_vec_manager"
     _OUT_AXIS = "axis"
@@ -56,7 +56,7 @@ class AxisVector(b_comp.SingletonComponent):
 
         self.output_node[self._OUT_AXIS].set_locked(True)
 
-class Color(b_comp.SingletonComponent):
+class Color(base_comp.SingletonComponent):
     """Component of colors that creates shaders from color enum"""
     class_namespace="color_manager"
 

@@ -57,8 +57,8 @@ class Component():
     _BLD_COMP_TYPE = "componentType"
     _BLD_INST_NAME = "instanceName"
     _OUT = "output"
-    _CONTR_PAR_COMP = "parentComponent"
-    _CONTR_CHLD_COMP = "childComponents"
+    _CNTNR_PAR_COMP = "parentComponent"
+    _CNTNR_CHLD_COMP = "childComponents"
 
     def __init__(self, container_node:nw.Node=None):
         """initializes component with container nodes
@@ -128,9 +128,16 @@ class Component():
         """
         if type(self).root_transform_name is not None:
             return self.input_node
+    @property
+    def child_components(self)->list:
+        containers = [attr.get_dest_connections()[0].node for attr in self.container_node[self._CNTNR_CHLD_COMP]]
+        components = [get_component(container) for container in containers]
+        return components
+    
     @classmethod
     def get_class_name(cls)->str:
         return utils.class_type_to_str(cls)
+    
 
     #namespace functions
     @property
@@ -213,8 +220,9 @@ class Component():
             side = self.input_node["hierSide"].value
             if side != self.__namespace_cache["hier_side"]:
                 self.__namespace_cache["hier_side"] = side
-                
-                if side is not None and side != "":
+                if (side is not None and 
+                    side != "" and 
+                    side != 0):
                     instance_namespace = f"{component_enum_data.CharacterSide.get(side).value}_"
 
         instance_name = None
@@ -264,8 +272,8 @@ class Component():
             comp_data.NodeData:
         """
         return component_data.NodeData(
-            component_data.AttrData(name=self._CONTR_PAR_COMP, type_="message"),
-            component_data.AttrData(name=self._CONTR_CHLD_COMP, type_="message", multi=True),
+            component_data.AttrData(name=self._CNTNR_PAR_COMP, type_="message"),
+            component_data.AttrData(name=self._CNTNR_CHLD_COMP, type_="message", multi=True),
         )
 
     @classmethod
@@ -309,9 +317,9 @@ class Component():
             
             # connecting parent and child components
             if parent is not None:
-                if parent.has_attr(self._CONTR_CHLD_COMP):
-                    child_component_len = len(parent[self._CONTR_CHLD_COMP])
-                    parent[self._CONTR_CHLD_COMP][child_component_len] >> self.container_node[self._CONTR_PAR_COMP]
+                if parent.has_attr(self._CNTNR_CHLD_COMP):
+                    child_component_len = len(parent[self._CNTNR_CHLD_COMP])
+                    parent[self._CNTNR_CHLD_COMP][child_component_len] >> self.container_node[self._CNTNR_PAR_COMP]
 
                     # parenting transforms
                     parent_component = get_component(parent)
@@ -835,9 +843,44 @@ class Motion(Hierarchy):
 
 class Anim(Motion):
     """Base class for anim autorigging components. Derived from Hierarchy"""
+    import component.setup as setup
     component_type = component_enum_data.ComponentType.anim
+    setup_component = setup.Setup
     root_transform_name = "grp"
     class_namespace = "anim"
+    _HIER_SIDE = "hierSide"
+    _KWG_HIER_SIDE = "HIER_SIDE"
+
+    def _get_input_node_build_attr_data(self):
+        node_data = super()._get_input_node_build_attr_data()
+        node_data.extend_attr_data(
+            component_data.AttrData(self._HIER_SIDE, type_=component_enum_data.CharacterSide.none, parent=self._IN)
+        )
+        return node_data 
+
+    @classmethod
+    def create(cls, 
+        source_component, 
+        connect_hierarchy=True, 
+        control_color=None, 
+        hier_side:component_enum_data.CharacterSide=component_enum_data.CharacterSide.none, 
+        instance_name=None, 
+        parent=None, **kwargs):
+
+        kwargs[cls._KWG_CNTRL_CLR]=control_color
+        kwargs[cls._KWG_SRC_COMP] = source_component
+        kwargs[cls._KWG_CONN_HIER] = connect_hierarchy
+
+        component_inst = cls()
+        component_inst._pre_build(instance_name=instance_name, hier_side=hier_side, parent=parent)
+        component_inst._override_build(**kwargs)
+        component_inst._post_build()
+
+        return component_inst
+    
+    def _pre_build(self, instance_name=None, hier_side=component_enum_data.CharacterSide.none,  parent=None):
+        super()._pre_build(instance_name, parent)
+        self.input_node[self._HIER_SIDE]=hier_side.name
 
 class Control(Component):
     """A Base class for all control autorigging components. Derived from Component
@@ -1078,6 +1121,131 @@ class Control(Component):
             if attr.has_src_connection():
                 ~attr
             transform_node[name] >> attr           
+
+class Character(Component):
+    component_type = component_enum_data.ComponentType.character
+    class_namespace = "char"
+    root_transform_name = "grp"
+
+    _IN_COLOR_CONST = "colorConst"
+    _IN_AXIS_VEC_CONST = "axisVecConst"
+    _SETUP_COLOR = "setupColor"
+    @property 
+    def setup_node(self)->nw.Node:
+        """Node that all incoming connections come through this node
+
+        Returns:
+            nw.Node:
+        """
+        if self.container_node is not None:
+            return self._get_node_data_from_cache("setup_node")
+    @property 
+    def anim_node(self)->nw.Node:
+        """Node that all incoming connections come through this node
+
+        Returns:
+            nw.Node:
+        """
+        if self.container_node is not None:
+            return self._get_node_data_from_cache("anim_node")
+
+    def _get_input_node_build_attr_data(self):
+        node_data = super()._get_input_node_build_attr_data()
+
+        for enum_parent, enum_item in zip([self._IN_COLOR_CONST, self._IN_AXIS_VEC_CONST], [component_enum_data.Color, component_enum_data.AxisEnum]):
+            attr_data = [component_data.AttrData(enum_parent, type_="compound", publish=True)]
+            for color_item in enum_item:
+                if enum_parent == self._IN_COLOR_CONST:
+                    values = utils.get_rgb_from_index(color_item)
+                    suffix = "RGB"
+                else:
+                    values = color_item.value
+                    suffix = "XYZ"
+                attr_data.append(component_data.AttrData(color_item.name, type_="double3", parent=enum_parent, locked=True))
+                for index in range(3):
+                    attr_data.append(component_data.AttrData(
+                        f"{color_item.name}{suffix[index]}", 
+                        type_="double", 
+                        parent=color_item.name, value=values[index]))
+            node_data.extend_attr_data(*attr_data)
+
+        return node_data
+
+    def _get_char_color_side_name(self, char_side:component_enum_data.CharacterSide):
+        return f"{char_side.name}Color"
+
+    def get_color_shader(self, char_side:Union[component_enum_data.CharacterSide, str], set_color:component_enum_data.Color=None):
+        """Gets shader for character side. creates if not created yet
+
+        Args:
+            char_side (Union[component_enum_data.CharacterSide, str]):
+            set_color component_enum_data.Color: defaults to None
+
+        Returns:
+            nw.Node: shader
+        """
+        if isinstance(char_side, str):
+            char_side_color_name = char_side
+        else:
+            char_side_color_name = self._get_char_color_side_name(char_side)
+
+        shader = None
+        if self.container_node.has_attr(char_side_color_name):
+            choice = self.container_node[char_side_color_name].get_dest_connections()[0].node
+            shader = choice["output"].get_dest_connections()[0].node
+        else:
+            color_side_node_data = component_data.NodeData(
+                component_data.AttrData(char_side_color_name, type_=component_enum_data.Color)
+            )
+            color_side_node_data.add_attrs_to_node(self.input_node)
+            self.container_node.publish_attr(self.input_node[char_side_color_name], attr_bind_name=char_side_color_name)
+            # choice node
+            char_side_choice = nw.create_node("choice", f"{char_side_color_name}_choice")
+            for index, color_attr in enumerate(self.container_node[self._IN_COLOR_CONST]):
+                char_side_choice["input"][index] << color_attr
+            char_side_choice["selector"] << self.container_node[char_side_color_name]
+
+            shader = utils.make_lambert_shader(color=char_side_choice["output"], name=char_side_color_name)
+            shader_sg = utils.get_shader_sg(shader=shader)
+
+            self.container_node.add_nodes(char_side_choice, shader, shader_sg)
+            self.rename_nodes()
+        
+        if set_color is not None:
+            self.container_node[char_side_color_name] = set_color.name
+
+        return shader
+
+    @classmethod
+    def create(cls, instance_name:str, parent=None, **kwargs):
+        return super().create(instance_name, parent, **kwargs)
+    
+    def _pre_build(self, instance_name = None, parent=None):
+        super()._pre_build(instance_name, parent)
+
+        setup_grp = nw.create_node("transform", "setup_grp")
+        anim_grp = nw.create_node("transform", "anim_grp")
+
+        cmds.parent(str(setup_grp), str(anim_grp), str(self.transform_node))
+        self.container_node.add_nodes(setup_grp, anim_grp)
+        utils.map_to_container(setup_grp, "setup_node")
+        utils.map_to_container(anim_grp, "anim_node")
+
+        self.rename_nodes()
+
+    def _post_build(self):
+        for component in self.child_components:
+            if (component.container_node[self._BLD_COMP_TYPE].value == 
+                component_enum_data.ComponentType.index_of(component_enum_data.ComponentType.setup)):
+                cmds.parent(str(component.transform_node), str(self.setup_node))
+            elif (component.container_node[self._BLD_COMP_TYPE].value == 
+                component_enum_data.ComponentType.index_of(component_enum_data.ComponentType.anim)):
+                cmds.parent(str(component.transform_node), str(self.anim_node))
+
+        super()._post_build()
+
+
+
 
 class SingletonComponent(Component):
     """Has instance method. only one of each singleton component exists in a character.

@@ -1,13 +1,13 @@
 import system.component_enum_data as component_enum_data
 import system.component_data as component_data
 import maya.cmds as cmds
-import system.base_component as b_comp
+import system.base_component as base_comp
 import utils.node_wrapper as nw
 import component.enum_manager as enum_manager
 import utils.utils as utils
 from typing import Union
 
-def swap_control(to_replace: Union[nw.Container, nw.Transform, b_comp.Control], replace_component:type):
+def swap_control(to_replace: Union[nw.Container, nw.Transform, base_comp.Control], replace_component:type):
     """Replaces the shape of one control with another
 
     Args:
@@ -19,16 +19,16 @@ def swap_control(to_replace: Union[nw.Container, nw.Transform, b_comp.Control], 
         RuntimeError: if to_replace is a transform and has no container
         RuntimeError: if no component found
     """
-    if not issubclass(replace_component, b_comp.Control):
+    if not issubclass(replace_component, base_comp.Control):
         raise RuntimeError(f"{replace_component} is not a control class")
         
     if isinstance(to_replace, nw.Container):
-        to_replace = b_comp.get_component(to_replace)
+        to_replace = base_comp.get_component(to_replace)
     elif isinstance(to_replace, nw.Transform):
         container = to_replace.get_container_node()
         if container is None:
             raise RuntimeError(f"{to_replace} does not have component")
-        to_replace = b_comp.get_component(container)
+        to_replace = base_comp.get_component(container)
     if to_replace is None:
         raise RuntimeError(f"no source component found")
     
@@ -42,12 +42,12 @@ def swap_control(to_replace: Union[nw.Container, nw.Transform, b_comp.Control], 
         cntrl_transform=to_replace.transform_node, 
         component_container=to_replace.container_node)
 
-class Circle(b_comp.Control):
+class Circle(base_comp.Control):
     """A circle nurbs curve control"""
     
     def _create_shapes(self, axis_vec):
         return [cmds.circle(normal=axis_vec)[0]]
-class Axis(b_comp.Control):
+class Axis(base_comp.Control):
     """A axis nurbs curve control with a red, green, and blue axis pointers"""
     can_set_color = False
     
@@ -67,7 +67,7 @@ class Axis(b_comp.Control):
             color=utils.get_rgb_from_index(component_enum_data.Color.blue))
         
         return [x_axis, y_axis, z_axis]
-class BoxControl(b_comp.Control):
+class BoxControl(base_comp.Control):
     """A box nurbs curve control"""
     
     def _create_shapes(self, axis_vec):
@@ -84,13 +84,13 @@ class BoxControl(b_comp.Control):
         ])
         
         return [box]
-class Diamond(b_comp.Control):
+class Diamond(base_comp.Control):
     """A diamond nurbs surface control"""
     
     def _create_shapes(self, axis_vec):
         diamond = cmds.sphere(axis=axis_vec, sections=4, spans=2, degree=1)[0]
         return [diamond]
-class DiamondWire(b_comp.Control):
+class DiamondWire(base_comp.Control):
     """A diamond nurbs curve control"""
     
     def _create_shapes(self, axis_vec):
@@ -103,7 +103,7 @@ class DiamondWire(b_comp.Control):
             [0, 1, 0]
         ])
         return [diamond]
-class Gear(b_comp.Control):
+class Gear(base_comp.Control):
     """A gear nurbs curve control"""
     
     def _create_shapes(self, axis_vec):
@@ -142,7 +142,7 @@ class Gear(b_comp.Control):
         ])
         
         return [inner_shape, outer_shape]
-class Gimbal(b_comp.Control):
+class Gimbal(base_comp.Control):
     can_set_color = False
     
     def _create_shapes(self, axis_vec):
@@ -161,7 +161,7 @@ class Gimbal(b_comp.Control):
             color=utils.get_rgb_from_index(component_enum_data.Color.blue))
         
         return [circle1, circle2, circle3]
-class Pyramid4(b_comp.Control):
+class Pyramid4(base_comp.Control):
     """A pyramid nurbs curve control"""
     
     def _create_shapes(self, axis_vec):
@@ -171,13 +171,13 @@ class Pyramid4(b_comp.Control):
             [-1, 0, -1], [1, 0, -1]
         ])
         return [pyramid]
-class Sphere(b_comp.Control):
+class Sphere(base_comp.Control):
     """A sphere nurbs surface control"""
     
     def _create_shapes(self, axis_vec):
         sphere = cmds.sphere(axis=axis_vec)[0]
         return [sphere]
-class Locator(b_comp.Control):
+class Locator(base_comp.Control):
     """A locator control"""
 
     _LOC_SCALE = "locScale_test"

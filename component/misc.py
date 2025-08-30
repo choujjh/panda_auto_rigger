@@ -1,4 +1,4 @@
-import system.base_component as b_comp
+import system.base_component as base_comp
 import system.component_data as component_data
 import component.control as control
 import utils.node_wrapper as nw
@@ -6,7 +6,7 @@ import utils.utils as utils
 import maya.cmds as cmds
 from typing import Union
 
-class VisualizeHier(b_comp.Hierarchy):
+class VisualizeHier(base_comp.Hierarchy):
     """Helps visualize and debug hierarchies by creating chains for world space and local visualization"""
     root_transform_name = "v_grp"
     class_namespace = "hier_vis"
@@ -40,14 +40,14 @@ class VisualizeHier(b_comp.Hierarchy):
             
             # setting up the rest of ws matrix
             cmds.parent(str(control_ws_inst.transform_node), str(ws_grp))
-            input_xform[HIER_DATA.INPUT_WORLD_MATRIX] >> control_ws_inst.container_node[b_comp.Control._IN_OFF_MAT]
+            input_xform[HIER_DATA.INPUT_WORLD_MATRIX] >> control_ws_inst.container_node[base_comp.Control._IN_OFF_MAT]
 
             # setting up the rest of local matrix
             cmds.parent(str(control_loc_inst.transform_node), str(prev_loc_transform))
             if index != 0:
-                input_xform[HIER_DATA.INPUT_LOC_MATRIX] >> control_loc_inst.container_node[b_comp.Control._IN_OFF_MAT]
+                input_xform[HIER_DATA.INPUT_LOC_MATRIX] >> control_loc_inst.container_node[base_comp.Control._IN_OFF_MAT]
             else:
-                input_xform[HIER_DATA.INPUT_WORLD_MATRIX] >> control_loc_inst.container_node[b_comp.Control._IN_OFF_MAT]
+                input_xform[HIER_DATA.INPUT_WORLD_MATRIX] >> control_loc_inst.container_node[base_comp.Control._IN_OFF_MAT]
             prev_loc_transform = control_loc_inst.transform_node
 
             # connecting to component output
@@ -57,7 +57,7 @@ class VisualizeHier(b_comp.Hierarchy):
 
         self.container_node.add_nodes(ws_grp)
 
-class MergeHier(b_comp.Component):
+class MergeHier(base_comp.Component):
     class_namespace="merge_hier"
     HIER_DATA = component_data.HierData
 
@@ -209,7 +209,7 @@ class MergeHier(b_comp.Component):
                     raise RuntimeError(f"{source_component.container_node} has mismatched len. expecting {xform_len} got {component_len}")
                 if source_component.container_node == self.container_node.get_container_node():
                     raise RuntimeError("source container cannot be parent container")
-                if not issubclass(type(source_component), b_comp.Hierarchy):
+                if not issubclass(type(source_component), base_comp.Hierarchy):
                     raise RuntimeError(f"{source_component.container_node} is not hierarchy component")
                 
             for hier_index, source_component in enumerate(source_components):
