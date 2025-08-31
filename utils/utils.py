@@ -416,7 +416,7 @@ class Namespace:
             if namespace == "":
                 return ":"
             return name.split("|")[-1].rpartition(":")[0]
-    
+    @classmethod
     def get_parent_namespace(cls, name:str):
         """gets parent portion of the namespace
 
@@ -427,7 +427,6 @@ class Namespace:
             str: parent namespace
         """
         return cls.get_namespace(cls.get_namespace(name))
-            
     @classmethod
     def strip_namespace(cls, name:str):
         """strip namespace from the object name
@@ -442,7 +441,6 @@ class Namespace:
             return name
         else:
             return name.rpartition(":")[-1]
-    
     @classmethod
     def delete(cls, namespace:str):
         """delete namespace
@@ -451,7 +449,6 @@ class Namespace:
             namespace (str):
         """
         cmds.namespace(removeNamespace=namespace)
-
     @classmethod
     def exists(cls, namespace:str):
         """Returns if namespace exists
@@ -463,7 +460,6 @@ class Namespace:
             bool:
         """
         return cmds.namespace(exists=namespace)
-        
     @classmethod
     def strip_outer_colons(cls, namespace:str):
         """Strips outer colos of namespace
@@ -475,7 +471,6 @@ class Namespace:
             str:
         """
         return strip_characters(namespace, ":")
-    
     @classmethod
     def add_outer_colons(cls, namespace:str):
         """Adds outer colons for namespace
@@ -487,7 +482,6 @@ class Namespace:
             str:
         """
         return ":{}:".format(re.sub(r'^:+|:+$', '', namespace))
-    
     @classmethod
     def add_namespace(cls, namespace:str):
         """Adds namespace
@@ -501,7 +495,6 @@ class Namespace:
         # add an index at the end of a namespace
         cmds.namespace(addNamespace=cls.strip_outer_colons(namespace))
         return namespace
-    
     @classmethod
     def child_namespaces(cls, namespace:str):
         """Returns list of child namespaces in given namespace
@@ -519,7 +512,6 @@ class Namespace:
         if child_namespaces is None:
             return []
         return child_namespaces
-
     @classmethod
     def empty(cls, namespace:str):
         """Returns if namespace is empty of nodes and child namespaces
@@ -538,7 +530,6 @@ class Namespace:
         if child_nodes is None and child_namespaces is None:
             return True
         return False
-    
     @classmethod
     def equal_namespace(cls, namespace1:str, namespace2:str):
         """checks to see if namespaces are the same
@@ -551,6 +542,14 @@ class Namespace:
             bool:
         """
         return cls.strip_outer_colons(namespace1) == cls.strip_outer_colons(namespace2)
+    @classmethod
+    def rename(cls, old_name:str, new_name:str):
+        new_name_parent = cls.get_namespace(new_name)
+        if not cls.exists(new_name_parent):
+            cls.add_namespace(new_name_parent)
+        new_name = cls.strip_namespace(new_name)
+        cmds.namespace(rename=[old_name, new_name], parent=new_name_parent)
+
 
 def identity_matrix():
     """Returns identity matrix in an array

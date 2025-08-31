@@ -34,9 +34,9 @@ class Component():
         output_node (nw.Node): Node that all outgoing connections go through this node
         transform_node (nw.Node): Transform node (also input node). if no transform node 
         is created returns None
-        full_namespace (str): namespace with all parent namespaces included
-        short_namespace (str): components full namespace (without parent namespaces)
-        instance_namespace (str): instance name + side
+        # full_namespace (str): namespace with all parent namespaces included
+        # short_namespace (str): components full namespace (without parent namespaces)
+        # instance_namespace (str): instance name + side
 
         _IN (str): str constant for input
         _BLD_DATA (str): str constant for buildData
@@ -44,8 +44,8 @@ class Component():
         _BLD_COMP_TYPE (str): str constant for componentType
         _BLD_INST_NAME (str): str constant for instanceName
         _OUT (str): str constant for output
-        _CONTR_PAR_COMP (str): str constant for parentComponent
-        _CONTR_CHLD_COMP (str): str constant for childComponents
+        _CNTNR_PAR_COMP (str): str constant for parentComponent
+        _CNTNR_CHLD_COMP (str): str constant for childComponents
     """
     component_type = component_enum_data.ComponentType.component
     root_transform_name = None
@@ -68,7 +68,7 @@ class Component():
             (incase component is already existing). Defaults to None.
         """
         self.__node_data_cache = {}
-        self.__namespace_cache = {"full_namespace":"", "short_namespace":"", "instance_namespace":"", "hier_side":"", "instance_name":""}
+        # self.__namespace_cache = {"full_namespace":"", "short_namespace":"", "instance_namespace":"", "hier_side":"", "instance_name":""}
         if container_node is not None:
             self.__node_data_cache["container_node"] = container_node
     def _get_node_data_from_cache(self, key:str) -> nw.Node:
@@ -138,104 +138,31 @@ class Component():
     def get_class_name(cls)->str:
         return utils.class_type_to_str(cls)
     
-
-    #namespace functions
-    @property
-    def full_namespace(self):
-        """namespace with all parent namespaces included
-
-        Returns:
-            str:
-        """
-        self.__update_full_namespace()
-        return self.__namespace_cache["full_namespace"]
-    @property
-    def short_namespace(self):
-        """components full namespace (without parent namespaces)
-
-        Returns:
-            str:
-        """
-        self.__update_short_namespace()
-        return self.__namespace_cache["short_namespace"]
-    @property
-    def instance_namespace(self):
-        """instance name + side
-
-        Returns:
-            str:
-        """
-        self.__update_instance_namespace()
-        return self.__namespace_cache["instance_namespace"]
-    def __update_full_namespace(self):
-        """Updates full_namespace"""
-
-        parent_container = None
-        if self.container_node is not None:
-            parent_container = self.container_node.get_container_node()
-        short_namespace = self.short_namespace
-        full_namespace = ""
-        cached_full_namespace = self.__namespace_cache["full_namespace"]
-        if parent_container is None:
-            if cached_full_namespace.find(short_namespace) != 1:
-                full_namespace = f":{short_namespace}"
+    def get_namespace(self, instance_name:str=None):
+        parent_container = self.container_node.get_container_node()
+        if parent_container is not None:
+            parent_namespace = utils.Namespace.get_namespace(name=parent_container.name)
         else:
-            parent_namespace = utils.Namespace.get_namespace(str(parent_container))
-            if cached_full_namespace.find(parent_namespace) != 0:
-                full_namespace = f"{utils.Namespace.get_namespace(str(parent_container))}:{short_namespace}"
-            else:
-                cached_full_namespace = cached_full_namespace.replace(parent_namespace, "", 1)
-                if cached_full_namespace.find(short_namespace) != 1:
-                    full_namespace = f"{utils.Namespace.get_namespace(str(parent_container))}:{short_namespace}"
-                    
-        if full_namespace != "":
-            self.__namespace_cache["full_namespace"] = full_namespace
-    def __update_short_namespace(self):
-        """Updates short_namespace"""
+            parent_namespace = ""
 
-        instance_namespace = self.instance_namespace
-        short_namespace = ""
-
-        if instance_namespace is not None and instance_namespace != "":
-            if not self.__namespace_cache["short_namespace"].startswith(f"{instance_namespace}__"):
-                short_namespace = f"{instance_namespace}__{type(self).class_namespace}"
-        else:
-            if self.__namespace_cache["short_namespace"] != type(self).class_namespace:
-                short_namespace = type(self).class_namespace
-
-        if short_namespace != "":
-            self.__namespace_cache["short_namespace"] = short_namespace
-        if type(self).class_namespace == None or type(self).class_namespace == "":
-            self.__namespace_cache["short_namespace"] = short_namespace.replace("__", "")
-    def __update_instance_namespace(self):
-        """Update instance namespace"""
-
-        instance_namespace = ""
-
-        if self.input_node is None:
-            return
-
-        side = None
         if self.input_node.has_attr("hierSide"):
-            side = self.input_node["hierSide"].value
-            if side != self.__namespace_cache["hier_side"]:
-                self.__namespace_cache["hier_side"] = side
-                if (side is not None and 
-                    side != "" and 
-                    side != 0):
-                    instance_namespace = f"{component_enum_data.CharacterSide.get(side).value}_"
+            hier_side_index = self.input_node['hierSide'].value
+            prefix = f"{component_enum_data.CharacterSide.get(hier_side_index).name}_"
+            if prefix == f"{component_enum_data.CharacterSide.none.name}_":
+                prefix == ""
+        else:
+            prefix = ""
+        if instance_name is None:
+            instance_name = ""
+            inst_name_attr = self.input_node[self._BLD_INST_NAME]
+            if inst_name_attr.value is not None and inst_name_attr.value != "":
+                instance_name = f"{inst_name_attr.value}_"
+        else:
+            instance_name = utils.strip_characters(instance_name, "_")
+            instance_name = f"{instance_name}_"
+        postfix = type(self).class_namespace
 
-        instance_name = None
-        if self.input_node.has_attr(self._BLD_INST_NAME):
-            instance_name = self.input_node[self._BLD_INST_NAME].value
-            if instance_name != self.__namespace_cache["instance_name"]:
-                self.__namespace_cache["instance_name"] = instance_name
-                
-                if instance_name is not None and instance_name!= "":
-                    instance_namespace = f"{instance_namespace}{instance_name}"
-
-        if instance_namespace != "":
-            self.__namespace_cache["instance_namespace"] = instance_namespace
+        return f"{parent_namespace}:{prefix}{instance_name}{postfix}"
 
     # node add attr data
     def _get_input_node_build_attr_data(self) -> component_data.NodeData:
@@ -382,45 +309,64 @@ class Component():
 
         input_node_attr_data.publish_attr_data_attributes(input_node)
         container_node_attr_data.publish_attr_data_attributes(self.container_node)
-
     def rename_nodes(self):
         """Renames all nodes found in the container with the component namespace"""
 
-        def rename_node(node, full_namespace):
-            if not node.name.startswith(full_namespace):
+        NAME_CLS = utils.Namespace
+
+        namespace = self.get_namespace()
+        prev_namespace = NAME_CLS.get_namespace(self.container_node.name)
+
+        # seeing if instance name needs to be changed
+        if not NAME_CLS.equal_namespace(prev_namespace, namespace) and NAME_CLS.exists(namespace):
+            inst_name_base = self.input_node[self._BLD_INST_NAME].value
+            if inst_name_base == None or inst_name_base == "":
+                inst_name_base = "temp"
+            else:
+                inst_name_base = utils.strip_trailing_numbers(inst_name_base)
+            index = 1
+            while NAME_CLS.exists(self.get_namespace(f"{inst_name_base}{index}")):
+                index += 1
+            self.input_node[self._BLD_INST_NAME] = f"{inst_name_base}{index}"
+            namespace = self.get_namespace()
+
+        # add namespace if it doesn't exist
+        if NAME_CLS.exists(prev_namespace) and not NAME_CLS.exists(namespace) and prev_namespace!= ":":
+            NAME_CLS.rename(prev_namespace, namespace)
+        if not NAME_CLS.exists(namespace):
+            NAME_CLS.add_namespace(namespace)
+
+        # renames container
+        if not self.container_node.name.startswith(namespace):
+            strip_namespace_node = utils.Namespace.strip_namespace(self.container_node.name)
+            self.container_node.rename(f"{namespace}:{strip_namespace_node}")
+
+        # renaming nodes
+        for node in [node for node in self.container_node.get_nodes() if node.type_!="container"]:
+            if not node.name.startswith(namespace):
                 strip_namespace_node = utils.Namespace.strip_namespace(node.name)
-                node.rename(f"{full_namespace}:{strip_namespace_node}")
-        full_namespace = self.full_namespace
-        prev_namespace = utils.Namespace.get_namespace(self.container_node.name)
+                node.rename(f"{namespace}:{strip_namespace_node}")
 
-        # if you need to add the namespace
-        if not utils.Namespace.equal_namespace(full_namespace, prev_namespace):
-            # if namespace doesn't exist
-            if utils.Namespace.exists(full_namespace):
-                parent_namespace = utils.Namespace.get_namespace(full_namespace)
-                child_namespaces = [utils.Namespace.strip_namespace(x) for x in utils.Namespace.child_namespaces(parent_namespace)]
-                # add something to instance namespace if it's none
-                if (self.input_node[self._BLD_INST_NAME].value == "" or self.input_node[self._BLD_INST_NAME].value is None):
-                    self.input_node[self._BLD_INST_NAME] = "temp"
-                # getting just the instance_namespace portion of children namespaces
-                child_namespaces = [x.split("__", 1)[0] for x in child_namespaces if x.startswith(utils.strip_trailing_numbers(self.instance_namespace))]
-                if child_namespaces != []:
-                    highest_trailing_number = utils.get_max_trailing_number(child_namespaces)
-                    instance_name = utils.strip_trailing_numbers(self.input_node[self._BLD_INST_NAME].value)
-                    self.input_node[self._BLD_INST_NAME] = f"{instance_name}{int(highest_trailing_number + 1)}"
+        # if prev namespace is empty, delete it
+        if NAME_CLS.exists(prev_namespace) and NAME_CLS.empty(prev_namespace):
+            NAME_CLS.delete(prev_namespace)
+    def get_parent_type_component(self, parent_type:component_enum_data.ComponentType):
+        """given a type gets the closest parent component of that type
 
-                # give it a unique namespace by giving instance_namespace a new value
-                full_namespace = self.full_namespace
-            
-            utils.Namespace.add_namespace(full_namespace)
-        rename_node(self.container_node, full_namespace)
-        for node in self.container_node.get_nodes():
-            # TODO replace later with if it's a component not just a container
-            if node.type_ != "container":
-                rename_node(node, full_namespace)
-        # check if nothing else in namespace delete
-        if utils.Namespace.empty(prev_namespace):
-            utils.Namespace.delete(prev_namespace)
+        Args:
+            parent_type (component_enum_data.ComponentType):
+
+        Returns:
+            Component:
+        """
+        container = self.container_node
+        while container is not None and container[self._BLD_COMP_TYPE].value != component_enum_data.ComponentType.index_of(parent_type):
+            container = container.get_container_node()
+        if container is not None:
+            return get_component(container)
+        else:
+            cmds.warning(f"parent component of type {parent_type.name} not found")
+            return None
 
 class Hierarchy(Component):
     """A Class meant to be inherited for all hierarchy classes. hierarchy in this
@@ -1225,11 +1171,18 @@ class Character(Component):
 
         setup_grp = nw.create_node("transform", "setup_grp")
         anim_grp = nw.create_node("transform", "anim_grp")
+        for node in [setup_grp, anim_grp]:
+            for attr in ["tx","ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz"]:
+                node[attr].set_locked(True)
+                node[attr].set_keyable(False)
 
         cmds.parent(str(setup_grp), str(anim_grp), str(self.transform_node))
         self.container_node.add_nodes(setup_grp, anim_grp)
         utils.map_to_container(setup_grp, "setup_node")
         utils.map_to_container(anim_grp, "anim_node")
+
+        self.container_node.publish_attr(setup_grp["visibility"], "setupVisibility")
+        self.container_node.publish_attr(anim_grp["visibility"], "animVisibility")
 
         self.rename_nodes()
 
@@ -1243,29 +1196,46 @@ class Character(Component):
                 cmds.parent(str(component.transform_node), str(self.anim_node))
 
         super()._post_build()
+    def axis_vec_choice_node(self, choice_node_name, enum_attr:nw.Attr=None):
+        """creates a choice node for axis vectors. allows enum to generate a vector
 
-
-
-
-class SingletonComponent(Component):
-    """Has instance method. only one of each singleton component exists in a character.
-    usually used for enum conversion data (enum->vec)
-
-    Attributes:
-        __cls_instance (cls):
-    """
-    component_type = component_enum_data.ComponentType.manager
-    __cls_instance = None
-
-    @classmethod
-    def instance(cls):
-        """Gets the instance of class. create one of not created
+        Args:
+            choice_node_name (str):
 
         Returns:
-            cls:
+            nw.Node: choice node
         """
-        if cls.__cls_instance is None:
-            cls.__cls_instance = cls.create()
-            return cls.__cls_instance
-        else:
-            return cls.__cls_instance
+        choice_node = nw.create_node("choice", name=f"{choice_node_name}AxisVecChoice")
+
+        for index, item in enumerate(component_enum_data.AxisEnum):
+            self.container_node[self._IN_AXIS_VEC_CONST][item.name] >> choice_node["input"][index]
+        if enum_attr is not None:
+            enum_attr  >> choice_node["selector"]
+
+        return choice_node
+
+
+
+
+# class SingletonComponent(Component):
+#     """Has instance method. only one of each singleton component exists in a character.
+#     usually used for enum conversion data (enum->vec)
+
+#     Attributes:
+#         __cls_instance (cls):
+#     """
+#     component_type = component_enum_data.ComponentType.manager
+#     __cls_instance = None
+
+#     @classmethod
+#     def instance(cls):
+#         """Gets the instance of class. create one of not created
+
+#         Returns:
+#             cls:
+#         """
+#         if cls.__cls_instance is None:
+#             cls.__cls_instance = cls.create()
+#             return cls.__cls_instance
+#         else:
+#             return cls.__cls_instance

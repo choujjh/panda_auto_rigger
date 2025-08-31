@@ -3,7 +3,6 @@ import system.component_data as component_data
 import maya.cmds as cmds
 import system.base_component as base_comp
 import utils.node_wrapper as nw
-import component.enum_manager as enum_manager
 import utils.utils as utils
 from typing import Union
 
