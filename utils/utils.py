@@ -379,7 +379,17 @@ def apply_display_color(nodes:list, color:Union[list, component_enum_data.Color,
             node["overrideColorRGB"] << color["color"]
         if rgb is not None:
             node["overrideColorRGB"] = rgb
+def list_mult(list_:list, value:float):
+    """Multiplies every element in list by the value
 
+    Args:
+        list_ (list): 
+        value (float): 
+
+    Returns:
+        list:
+    """
+    return [x*value for x in list_]
 def strip_characters(orig_str:str, strip_str:str, leading=True, trailing=True):
     """given an original string strip trailing and leading characters specified by strip str
 
@@ -721,3 +731,5 @@ class Matrix(om2.MMatrix):
             list:
         """
         return om2.QuaternionOrPoint().setValue(self)
+class Vector(om2.MVector):
+    pass

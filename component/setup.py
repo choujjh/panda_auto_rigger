@@ -92,7 +92,7 @@ class Setup(base_comp.Hierarchy):
             # creating control
             control_inst = control.Locator.create(instance_name=input_xform[self.HIER_DATA.INPUT_XFORM_NAME], parent=self, color=control_color)
             control_container = control_inst.container_node
-            control_container[self._LOC_SCALE] << self.input_node[self._LOC_SCALE]
+            control_container[control_inst._LOC_SCALE] << self.input_node[self._LOC_SCALE]
             control_container[base_comp.Control._IN_OFF_MAT] = utils.translate_to_matrix([0, index*1.5, 0])
 
             # connecting to output
@@ -106,14 +106,14 @@ class SimpleLimb(Setup):
     """3 xform that aim and align to each other. middle xform stays inbetween and orients correctly to whatever the angle the other 2 xform make"""
 
     _IN_SET_CNTRL_XFORM_FOLLOW = "settingCntrlXformFollow"
-    _IN_SET_CNTRL_INIT_MAT = "inputSettingCntrlInitMatrix"
-    _OUT_SET_CNTRL_INIT_MAT = "outputSettingCntrlInitMatrix"
+    _IN_SET_CNTRL_LOC_MAT = "inputSettingCntrlLocMatrix"
+    _OUT_SET_CNTRL_LOC_MAT = "outputSettingCntrlLocMatrix"
 
     def _get_input_node_build_attr_data(self):
         node_data = super()._get_input_node_build_attr_data()
         node_data.extend_attr_data(
-            component_data.AttrData(self._IN_SET_CNTRL_XFORM_FOLLOW, type_="long", publish=True, min=0, max=2),
-            component_data.AttrData(self._IN_SET_CNTRL_INIT_MAT, type_="matrix", publish=True),
+            component_data.AttrData(self._IN_SET_CNTRL_XFORM_FOLLOW, type_="long", publish=True, min=0, max=2, value=2),
+            component_data.AttrData(self._IN_SET_CNTRL_LOC_MAT, type_="matrix", publish=True),
         )
 
         return node_data
@@ -121,7 +121,7 @@ class SimpleLimb(Setup):
     def _get_output_node_build_attr_data(self):
         node_data = super()._get_output_node_build_attr_data()
         node_data.extend_attr_data(
-            component_data.AttrData(self._OUT_SET_CNTRL_INIT_MAT, type_="matrix", publish=True),
+            component_data.AttrData(self._OUT_SET_CNTRL_LOC_MAT, type_="matrix", publish=True),
         )
 
         return node_data
@@ -230,11 +230,21 @@ class SimpleLimb(Setup):
         
         #guide xform
         settings_cntrl_inst = control.Locator.create(instance_name="settingsGuide", parent=self, color=control_color)
-        settings_cntrl_inst.transform_node["tz"] = -2
-        settings_cntrl_inst.transform_node["rz"] = 90
-        settings_cntrl_inst.container_node[base_comp.Control._IN_OFF_MAT] >> self.container_node[self._IN_SET_CNTRL_INIT_MAT]
-        settings_cntrl_inst.container_node[base_comp.Control._OUT_WS_MAT] >> self.container_node[self._OUT_SET_CNTRL_INIT_MAT]
-        self.container_node[self._IN_SET_CNTRL_XFORM_FOLLOW] = 2
+        choice_node = nw.create_node("choice", "settings_cntrl_xform_choice")
+        xform_attrs = self._get_output_xform_attrs()
+        for index, attr in enumerate(xform_attrs.values()):
+            matrix_src = attr[self.HIER_DATA.OUTPUT_INIT_MATRIX].get_src_connection()
+            choice_node["input"][index] << matrix_src
+        choice_node["selector"] << self.container_node[self._IN_SET_CNTRL_XFORM_FOLLOW]
+        settings_cntrl_inst.transform_node["t"] = utils.list_mult(self.container_node[self._SEC_VEC].value, -2.5)
+        rot_vec = utils.Vector([0, 1, 0]) ^ utils.Vector(self.container_node[self._TER_VEC].value)
+        settings_cntrl_inst.transform_node["r"] = rot_vec * 90
+        settings_cntrl_inst.transform_node["s"] = [0.7, 0.7, 0.7]
+        settings_cntrl_inst.promote_attr_to_keyable(self.container_node[self._IN_SET_CNTRL_XFORM_FOLLOW])
+        
+        settings_cntrl_inst.container_node[base_comp.Control._IN_OFF_MAT] << choice_node["output"]
+        settings_cntrl_inst.container_node[base_comp.Control._OUT_LOC_MAT] >> self.container_node[self._OUT_SET_CNTRL_LOC_MAT]
+        self.container_node.add_nodes(choice_node)
 
     def __create_mid_interp_matrix(self, source_matrix:nw.Attr, target_matrix:nw.Attr):
         """Creates all nodes to have the middle interp matrix

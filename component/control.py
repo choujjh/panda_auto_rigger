@@ -3,7 +3,6 @@ import system.component_data as component_data
 import maya.cmds as cmds
 import system.base_component as base_comp
 import utils.node_wrapper as nw
-import utils.utils as utils
 from typing import Union
 
 def swap_control(to_replace: Union[nw.Container, nw.Transform, base_comp.Control], replace_component:type):
@@ -179,7 +178,7 @@ class Sphere(base_comp.Control):
 class Locator(base_comp.Control):
     """A locator control"""
 
-    _LOC_SCALE = "locScale_test"
+    _LOC_SCALE = "locScale"
 
     def _get_input_node_build_attr_data(self):
         node_data = super()._get_input_node_build_attr_data()

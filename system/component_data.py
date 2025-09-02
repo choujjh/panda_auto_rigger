@@ -444,38 +444,3 @@ class HierData:
             NodeData:
         """
         return cls.__gen_hier_nodeData(cls.OUTPUT_XFORM, cls.get_output_data_names(), multi=True)
-        
-class ControlSetupData():
-    """A class that takes Control data and saves it to be inputed into a control
-    setup node
-
-    Attributes:
-        attrs (list): attributes to be promoted on this control and the override names accompanying them
-        control_setup (dict): dict to apply to control setup node later
-    """
-
-    def __init__(self, *attrs, control_class = None, **control_setup):
-        """_summary_
-
-        Args:
-            attrs (list(set)): [("attr_name", "control_attr_name")]
-            control_class (type, optional): _description_. Defaults to None.
-            control_setup (dict): control setup kwargs to apply data to later
-        """
-        import component.control as control
-        self.control_setup_dict = control_setup
-        if "controlClass" not in control_setup.keys():
-            if control_class is None:
-                control_setup["controlClass"] = control.Circle
-            else:
-                control_setup["controlClass"] = control_class
-        self.attrs = list(attrs)
-
-    def add_attr(self, *attrs):
-        """Adds attrs to the attrs list
-
-        Args:
-            attrs (): attrs to add
-
-        """
-        self.attrs.extend(attrs)

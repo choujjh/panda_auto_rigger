@@ -68,7 +68,6 @@ class Component():
             (incase component is already existing). Defaults to None.
         """
         self.__node_data_cache = {}
-        # self.__namespace_cache = {"full_namespace":"", "short_namespace":"", "instance_namespace":"", "hier_side":"", "instance_name":""}
         if container_node is not None:
             self.__node_data_cache["container_node"] = container_node
     def _get_node_data_from_cache(self, key:str) -> nw.Node:
@@ -147,9 +146,9 @@ class Component():
 
         if self.input_node.has_attr("hierSide"):
             hier_side_index = self.input_node['hierSide'].value
-            prefix = f"{component_enum_data.CharacterSide.get(hier_side_index).name}_"
-            if prefix == f"{component_enum_data.CharacterSide.none.name}_":
-                prefix == ""
+            prefix = f"{component_enum_data.CharacterSide.get(hier_side_index).value}_"
+            if prefix == f"{component_enum_data.CharacterSide.none.value}_":
+                prefix = ""
         else:
             prefix = ""
         if instance_name is None:
@@ -789,13 +788,13 @@ class Motion(Hierarchy):
 
 class Anim(Motion):
     """Base class for anim autorigging components. Derived from Hierarchy"""
-    import component.setup as setup
     component_type = component_enum_data.ComponentType.anim
-    setup_component = setup.Setup
+    setup_component = None
     root_transform_name = "grp"
     class_namespace = "anim"
     _HIER_SIDE = "hierSide"
-    _KWG_HIER_SIDE = "HIER_SIDE"
+    _KWG_HIER_SIDE = "hier_side"
+    _KWG_SETUP_CLR = "setup_color"
 
     def _get_input_node_build_attr_data(self):
         node_data = super()._get_input_node_build_attr_data()
@@ -806,14 +805,16 @@ class Anim(Motion):
 
     @classmethod
     def create(cls, 
-        source_component, 
+        source_component=None, 
         connect_hierarchy=True, 
         control_color=None, 
+        setup_color=None,
         hier_side:component_enum_data.CharacterSide=component_enum_data.CharacterSide.none, 
         instance_name=None, 
         parent=None, **kwargs):
 
         kwargs[cls._KWG_CNTRL_CLR]=control_color
+        kwargs[cls._KWG_SETUP_CLR]=setup_color
         kwargs[cls._KWG_SRC_COMP] = source_component
         kwargs[cls._KWG_CONN_HIER] = connect_hierarchy
 
@@ -964,7 +965,7 @@ class Control(Component):
 
         Args:
             color (Union[component_enum_data.Color, list, nw.Node]): 
-        """
+        # """
         import component.enum_manager as enum_manager
         
         if self.container_node[self._IN_HAS_CLR].is_locked():
@@ -975,6 +976,8 @@ class Control(Component):
             surface_shapes = [shape for shape in self.transform_node.get_shapes() if shape.type_ == "mesh" or shape.type_ == "nurbsSurface"]
             if isinstance(color, nw.Node) and color.type_ == "lambert":
                 shader = color
+            # elif isinstance(color, component_enum_data.Color):
+            #     rgb = utils.get_rgb_from_index(color.value)
             elif isinstance(color, component_enum_data.Color):
                 shader = enum_manager.Color.get_shader(color)
             if isinstance(color, list):
@@ -1066,8 +1069,8 @@ class Control(Component):
             transform_node.add_attr(**kwargs)
             if attr.has_src_connection():
                 ~attr
-            transform_node[name] >> attr           
-
+            transform_node[name] >> attr          
+       
 class Character(Component):
     component_type = component_enum_data.ComponentType.character
     class_namespace = "char"
@@ -1075,25 +1078,7 @@ class Character(Component):
 
     _IN_COLOR_CONST = "colorConst"
     _IN_AXIS_VEC_CONST = "axisVecConst"
-    _SETUP_COLOR = "setupColor"
-    @property 
-    def setup_node(self)->nw.Node:
-        """Node that all incoming connections come through this node
-
-        Returns:
-            nw.Node:
-        """
-        if self.container_node is not None:
-            return self._get_node_data_from_cache("setup_node")
-    @property 
-    def anim_node(self)->nw.Node:
-        """Node that all incoming connections come through this node
-
-        Returns:
-            nw.Node:
-        """
-        if self.container_node is not None:
-            return self._get_node_data_from_cache("anim_node")
+    _SETUP_CLR = "setupColor"
 
     def _get_input_node_build_attr_data(self):
         node_data = super()._get_input_node_build_attr_data()
@@ -1169,33 +1154,23 @@ class Character(Component):
     def _pre_build(self, instance_name = None, parent=None):
         super()._pre_build(instance_name, parent)
 
-        setup_grp = nw.create_node("transform", "setup_grp")
-        anim_grp = nw.create_node("transform", "anim_grp")
-        for node in [setup_grp, anim_grp]:
-            for attr in ["tx","ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz"]:
-                node[attr].set_locked(True)
-                node[attr].set_keyable(False)
+        import component.anim as anim
 
-        cmds.parent(str(setup_grp), str(anim_grp), str(self.transform_node))
-        self.container_node.add_nodes(setup_grp, anim_grp)
-        utils.map_to_container(setup_grp, "setup_node")
-        utils.map_to_container(anim_grp, "anim_node")
-
-        self.container_node.publish_attr(setup_grp["visibility"], "setupVisibility")
-        self.container_node.publish_attr(anim_grp["visibility"], "animVisibility")
+        m_color = component_enum_data.Color.yellow
+        m_char_side = component_enum_data.CharacterSide.mid
+        m_char_shader = self.get_color_shader(m_char_side, set_color=m_color)
+        setup_color = component_enum_data.Color.purple
+        setup_char_side = self._SETUP_CLR
+        setup_char_shader = self.get_color_shader(setup_char_side, set_color=setup_color)
+        anim.SingleXform.create(
+            instance_name="root", 
+            parent=self, 
+            hier_side=component_enum_data.CharacterSide.mid, 
+            control_color=m_char_shader, 
+            setup_color=setup_char_shader)
 
         self.rename_nodes()
-
-    def _post_build(self):
-        for component in self.child_components:
-            if (component.container_node[self._BLD_COMP_TYPE].value == 
-                component_enum_data.ComponentType.index_of(component_enum_data.ComponentType.setup)):
-                cmds.parent(str(component.transform_node), str(self.setup_node))
-            elif (component.container_node[self._BLD_COMP_TYPE].value == 
-                component_enum_data.ComponentType.index_of(component_enum_data.ComponentType.anim)):
-                cmds.parent(str(component.transform_node), str(self.anim_node))
-
-        super()._post_build()
+        
     def axis_vec_choice_node(self, choice_node_name, enum_attr:nw.Attr=None):
         """creates a choice node for axis vectors. allows enum to generate a vector
 
@@ -1213,29 +1188,27 @@ class Character(Component):
             enum_attr  >> choice_node["selector"]
 
         return choice_node
+    
+class SingletonComponent(Component):
+    """Has instance method. only one of each singleton component exists in a character.
+    usually used for enum conversion data (enum->vec)
 
+    Attributes:
+        __cls_instance (cls):
+    """
+    component_type = component_enum_data.ComponentType.manager
+    __cls_instance = None
 
+    @classmethod
+    def instance(cls):
+        """Gets the instance of class. create one of not created
 
-
-# class SingletonComponent(Component):
-#     """Has instance method. only one of each singleton component exists in a character.
-#     usually used for enum conversion data (enum->vec)
-
-#     Attributes:
-#         __cls_instance (cls):
-#     """
-#     component_type = component_enum_data.ComponentType.manager
-#     __cls_instance = None
-
-#     @classmethod
-#     def instance(cls):
-#         """Gets the instance of class. create one of not created
-
-#         Returns:
-#             cls:
-#         """
-#         if cls.__cls_instance is None:
-#             cls.__cls_instance = cls.create()
-#             return cls.__cls_instance
-#         else:
-#             return cls.__cls_instance
+        Returns:
+            cls:
+        """
+        if cls.__cls_instance is None:
+            cls.__cls_instance = cls.create()
+            return cls.__cls_instance
+        else:
+            return cls.__cls_instance
+ 
