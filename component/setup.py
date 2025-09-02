@@ -185,13 +185,15 @@ class SimpleLimb(Setup):
             control_inst2_orient.transform_node[attr].set_keyable(False)
         control_inst2_orient.container_node[control_inst2_orient._LOC_SCALE] << self.container_node[self._LOC_SCALE]
 
-        char_component = self.get_parent_type_component(component_enum_data.ComponentType.character)
-        if char_component is None:
-            raise ValueError("character component not found")
+        char_component = self.get_parent_type_component(component_enum_data.ComponentType.character, disable_warning=True)
+        if char_component is not None:
+            create_axis_vec = char_component.axis_vec_choice_node
+        else:
+            create_axis_vec = enum_manager.axis_vec_choice_node
         # axis vectors
-        primary_vec = char_component.axis_vec_choice_node(choice_node_name="primary_vec", enum_attr=self.container_node[self._IN_PRMY_AXIS])
+        primary_vec = create_axis_vec(choice_node_name="primary_vec", enum_attr=self.container_node[self._IN_PRMY_AXIS])
         primary_vec["output"] >> self.container_node[self._PRM_VEC]
-        secondary_vec = char_component.axis_vec_choice_node(choice_node_name="secondary_vec", enum_attr=self.container_node[self._IN_SEC_AXIS])
+        secondary_vec = create_axis_vec(choice_node_name="secondary_vec", enum_attr=self.container_node[self._IN_SEC_AXIS])
         secondary_vec["output"] >> self.container_node[self._SEC_VEC]
         tertiary_vec = nw.create_node("crossProduct", "tertiary_vec")
         tertiary_vec["input1"] << primary_vec["output"]

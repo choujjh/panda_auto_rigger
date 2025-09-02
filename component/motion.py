@@ -26,7 +26,7 @@ class FK(base_comp.Motion):
         for index, input_xform in enumerate(self.input_node[self.HIER_DATA.INPUT_XFORM]):
             control_inst = control.Circle.create(
                 instance_name=input_xform[HIER_DATA.INPUT_XFORM_NAME], 
-                axis_vec=source_component.container_node[self._PRM_VEC].value, 
+                axis_vec=self.container_node[self._PRM_VEC].value, 
                 parent=self, 
                 color=color)
             for attr in ["sx", "sy", "sz"]:

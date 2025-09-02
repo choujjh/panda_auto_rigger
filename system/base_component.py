@@ -34,9 +34,6 @@ class Component():
         output_node (nw.Node): Node that all outgoing connections go through this node
         transform_node (nw.Node): Transform node (also input node). if no transform node 
         is created returns None
-        # full_namespace (str): namespace with all parent namespaces included
-        # short_namespace (str): components full namespace (without parent namespaces)
-        # instance_namespace (str): instance name + side
 
         _IN (str): str constant for input
         _BLD_DATA (str): str constant for buildData
@@ -349,7 +346,7 @@ class Component():
         # if prev namespace is empty, delete it
         if NAME_CLS.exists(prev_namespace) and NAME_CLS.empty(prev_namespace):
             NAME_CLS.delete(prev_namespace)
-    def get_parent_type_component(self, parent_type:component_enum_data.ComponentType):
+    def get_parent_type_component(self, parent_type:component_enum_data.ComponentType, disable_warning=False):
         """given a type gets the closest parent component of that type
 
         Args:
@@ -364,7 +361,8 @@ class Component():
         if container is not None:
             return get_component(container)
         else:
-            cmds.warning(f"parent component of type {parent_type.name} not found")
+            if not disable_warning:
+                cmds.warning(f"parent component of type {parent_type.name} not found")
             return None
 
 class Hierarchy(Component):
@@ -378,7 +376,7 @@ class Hierarchy(Component):
     """
     class_namespace = "hier"
     component_type = component_enum_data.ComponentType.hier
-    _has_input_init_matricies = False
+    # _has_input_init_matricies = False
 
     HIER_DATA = component_data.HierData
     IO_ENUM = component_enum_data.IO
@@ -398,12 +396,8 @@ class Hierarchy(Component):
     _KWG_SRC_COMP = "source_component"
     _KWG_CONN_HIER = "connect_hierarchy"
 
-    @property
-    def has_input_init_matricies(self):
-        return type(self)._has_input_init_matricies
-
     @classmethod
-    def create(cls, source_component:Component, connect_hierarchy:bool=True, instance_name = None, parent=None, **kwargs):
+    def create(cls, source_component:Component=None, connect_hierarchy:bool=True, instance_name = None, parent=None, **kwargs):
         kwargs[cls._KWG_SRC_COMP] = source_component
         kwargs[cls._KWG_CONN_HIER] = connect_hierarchy
         return super().create(instance_name, parent, **kwargs)
@@ -411,7 +405,7 @@ class Hierarchy(Component):
     def _get_input_node_build_attr_data(self):
         node_data = super()._get_input_node_build_attr_data()
         node_data.extend_attr_data(self.HIER_DATA.get_hier_data())
-        node_data.extend_attr_data(self.HIER_DATA.get_input_xform_data(self.has_input_init_matricies))
+        node_data.extend_attr_data(self.HIER_DATA.get_input_xform_data())
         return node_data
     def _get_output_node_build_attr_data(self):
         node_data = super()._get_output_node_build_attr_data()
@@ -430,12 +424,11 @@ class Hierarchy(Component):
         for index, output_xform in output_xforms.items():
             # init inverse matrix
             self.__populate_name(index)
-            if self.has_input_init_matricies:
-                added_nodes.extend(self.__populate_world_matrix(
-                    index=index,
-                    world_matrix_attr=output_xform[HIER_DATA.OUTPUT_INIT_MATRIX],
-                    world_matrix_inv_attr=output_xform[HIER_DATA.OUTPUT_INIT_INV_MATRIX],
-                    is_init_matrix=True))
+            added_nodes.extend(self.__populate_world_matrix(
+                index=index,
+                world_matrix_attr=output_xform[HIER_DATA.OUTPUT_INIT_MATRIX],
+                world_matrix_inv_attr=output_xform[HIER_DATA.OUTPUT_INIT_INV_MATRIX],
+                is_init_matrix=True))
             added_nodes.extend(self.__populate_world_matrix(
                 index=index,
                 world_matrix_attr=output_xform[HIER_DATA.OUTPUT_WORLD_MATRIX],
@@ -469,6 +462,7 @@ class Hierarchy(Component):
         elif output_ws_src is not None:
             if output_ws_src.node.has_attr(self._BLD_INST_NAME):
                 output_ws_src.node[self._BLD_INST_NAME] >> output_name
+    # perhaps you need to rewrite it
     def __populate_world_matrix(self, index:int, world_matrix_attr:nw.Attr, world_matrix_inv_attr:nw.Attr, is_init_matrix:bool=False):
         """Given the index tries to connect or set the output init matrix and output inverse init matrix
 
@@ -510,9 +504,9 @@ class Hierarchy(Component):
                     new_matrix_src >> world_matrix_attr
 
         elif is_init_matrix and len(input_xform.keys()) == len(output_xform.keys()):
-            if matrix_src is None and self.has_input_init_matricies:
+            if matrix_src is None:
                 input_xform[self.HIER_DATA.INPUT_INIT_MATRIX] >> world_matrix_attr
-            if inv_matrix_src is None and self.has_input_init_matricies:
+            if inv_matrix_src is None:
                 input_xform[self.HIER_DATA.INPUT_INIT_INV_MATRIX] >> world_matrix_inv_attr
         return added_nodes
     def __populate_loc_matrix(self, index:int):
@@ -582,7 +576,7 @@ class Hierarchy(Component):
             indicies = range(len(self.input_node[self.HIER_DATA.INPUT_XFORM]))
         else:
             indicies = utils.make_iterable(index)
-        return {index:{key: self.input_node[self.HIER_DATA.INPUT_XFORM][index][key] for key in self.HIER_DATA.get_input_data_names(self.has_input_init_matricies)} for index in indicies}
+        return {index:{key: self.input_node[self.HIER_DATA.INPUT_XFORM][index][key] for key in self.HIER_DATA.INPUT_DATA_NAMES} for index in indicies}
     def _get_output_xform_attrs(self, index:Union[int, list]=None):
         """Gets a dict of output xforms given indicies. returns all if index is None
 
@@ -593,7 +587,7 @@ class Hierarchy(Component):
             indicies = range(len(self.output_node[self.HIER_DATA.OUTPUT_XFORM]))
         else:
             indicies = utils.make_iterable(index)
-        return {index:{key: self.output_node[self.HIER_DATA.OUTPUT_XFORM][index][key] for key in self.HIER_DATA.get_output_data_names()} for index in indicies}
+        return {index:{key: self.output_node[self.HIER_DATA.OUTPUT_XFORM][index][key] for key in self.HIER_DATA.OUTPUT_DATA_NAMES} for index in indicies}
     def _set_input_xform_attrs(
             self, 
             index:int, 
@@ -616,10 +610,7 @@ class Hierarchy(Component):
             input_loc_matrix (nw.Attr, optional): Defaults to None.
         """
         input_xform_matricies = self._get_input_xform_attrs(index=index)[index]
-        if self.has_input_init_matricies:
-            source_attr_list = [input_xform_name, input_init_matrix, input_init_inv_matrix, input_world_matrix, input_world_inv_matrix, input_loc_matrix]
-        else:
-            source_attr_list = [input_xform_name, input_world_matrix, input_world_inv_matrix, input_loc_matrix]
+        source_attr_list = [input_xform_name, input_init_matrix, input_init_inv_matrix, input_world_matrix, input_world_inv_matrix, input_loc_matrix]
         input_data_names = self.HIER_DATA.get_input_data_names(self.has_input_init_matricies)
         if len(source_attr_list) != len(input_data_names):
             raise RuntimeError("source_attr_list and OUPUT_DATA_NAMES mismatched lengths")
@@ -651,7 +642,7 @@ class Hierarchy(Component):
         """
         output_xform = self._get_output_xform_attrs(index)[index]
         source_attr_list = [output_xform_name, output_init_matrix, output_init_inv_matrix, output_world_matrix, output_world_inv_matrix, output_loc_matrix]
-        output_data_names = self.HIER_DATA.get_output_data_names()
+        output_data_names = self.HIER_DATA.OUTPUT_DATA_NAMES
         if len(source_attr_list) != len(output_data_names):
             raise RuntimeError("source_attr_list and OUPUT_DATA_NAMES mismatched lengths")
         for source_attr, output_attr in zip(source_attr_list, output_data_names):
@@ -692,7 +683,7 @@ class Hierarchy(Component):
                 raise RuntimeError("source parent component does not have input xforms")
 
             if connect_hierarchy:
-                for hier_attr_name in HIER_DATA.get_hier_data_names():
+                for hier_attr_name in HIER_DATA.HIER_DATA_NAMES:
                     if source_container.has_attr(hier_attr_name):
                         source_container[hier_attr_name] >> self_container[hier_attr_name]
 
@@ -705,19 +696,6 @@ class Hierarchy(Component):
                 # for loop through attributes to connect
                 for src_name, self_input_name in HIER_DATA.get_paired_names(src=src_type, dest=self.IO_ENUM.input):
                     src_xform[src_name] >> input_xform[self_input_name]
-
-                # connecting up the init matricies
-                if self.has_input_init_matricies:
-                    self_xform = self.container_node[HIER_DATA.INPUT_XFORM][index]
-                    self_init_mat = self_xform[HIER_DATA.INPUT_INIT_MATRIX]
-                    self_init_inv_mat = self_xform[HIER_DATA.INPUT_INIT_INV_MATRIX]
-                else:
-                    self_xform = self.container_node[HIER_DATA.OUTPUT_XFORM][index]
-                    self_init_mat = self_xform[HIER_DATA.OUTPUT_INIT_MATRIX]
-                    self_init_inv_mat = self_xform[HIER_DATA.OUTPUT_INIT_INV_MATRIX]
-
-                source_container[HIER_DATA.OUTPUT_XFORM][index][HIER_DATA.OUTPUT_INIT_MATRIX] >> self_init_mat
-                source_container[HIER_DATA.OUTPUT_XFORM][index][HIER_DATA.OUTPUT_INIT_INV_MATRIX] >> self_init_inv_mat
                     
             # connecting axis vectors
             for attr in [self._PRM_VEC, self._SEC_VEC, self._TER_VEC]:
@@ -766,15 +744,15 @@ class Motion(Hierarchy):
     def _get_input_node_build_attr_data(self):
         node_data = super()._get_input_node_build_attr_data()
         node_data.extend_attr_data(
-            component_data.AttrData(self._PRM_VEC, type_="double3", parent=self._IN),
+            component_data.AttrData(self._PRM_VEC, type_="double3", parent=self._IN, value=[1, 0, 0]),
             component_data.AttrData(self._PRM_VEC_X, type_="double", parent=self._PRM_VEC),
             component_data.AttrData(self._PRM_VEC_Y, type_="double", parent=self._PRM_VEC),
             component_data.AttrData(self._PRM_VEC_Z, type_="double", parent=self._PRM_VEC),
-            component_data.AttrData(self._SEC_VEC, type_="double3", parent=self._IN),
+            component_data.AttrData(self._SEC_VEC, type_="double3", parent=self._IN, value=[0, 1, 0]),
             component_data.AttrData(self._SEC_VEC_X, type_="double", parent=self._SEC_VEC),
             component_data.AttrData(self._SEC_VEC_Y, type_="double", parent=self._SEC_VEC),
             component_data.AttrData(self._SEC_VEC_Z, type_="double", parent=self._SEC_VEC),
-            component_data.AttrData(self._TER_VEC, type_="double3", parent=self._IN),
+            component_data.AttrData(self._TER_VEC, type_="double3", parent=self._IN, value=[0, 0, 1]),
             component_data.AttrData(self._TER_VEC_X, type_="double", parent=self._TER_VEC),
             component_data.AttrData(self._TER_VEC_Y, type_="double", parent=self._TER_VEC),
             component_data.AttrData(self._TER_VEC_Z, type_="double", parent=self._TER_VEC),
@@ -782,7 +760,7 @@ class Motion(Hierarchy):
         return node_data
 
     @classmethod
-    def create(cls, source_component, connect_hierarchy=True, control_color=None, instance_name=None, parent=None, **kwargs):
+    def create(cls, source_component=None, connect_hierarchy=True, control_color=None, instance_name=None, parent=None, **kwargs):
         kwargs[cls._KWG_CNTRL_CLR]=control_color
         return super().create(source_component, connect_hierarchy, instance_name, parent, **kwargs)
 
@@ -976,8 +954,6 @@ class Control(Component):
             surface_shapes = [shape for shape in self.transform_node.get_shapes() if shape.type_ == "mesh" or shape.type_ == "nurbsSurface"]
             if isinstance(color, nw.Node) and color.type_ == "lambert":
                 shader = color
-            # elif isinstance(color, component_enum_data.Color):
-            #     rgb = utils.get_rgb_from_index(color.value)
             elif isinstance(color, component_enum_data.Color):
                 shader = enum_manager.Color.get_shader(color)
             if isinstance(color, list):
@@ -1170,7 +1146,7 @@ class Character(Component):
             setup_color=setup_char_shader)
 
         self.rename_nodes()
-        
+
     def axis_vec_choice_node(self, choice_node_name, enum_attr:nw.Attr=None):
         """creates a choice node for axis vectors. allows enum to generate a vector
 

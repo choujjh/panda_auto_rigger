@@ -58,7 +58,7 @@ class SimpleLimbAnim(base_comp.Anim):
         settings_cntrl_inst.container_node[base_comp.Control._IN_OFF_MAT] << set_mult_matrix["matrixSum"]
         set_transform = settings_cntrl_inst.transform_node
 
-        #promoting to settings attr
+        # promoting to settings attr
         set_transform.add_attr("_", type="enum", enumName="FK_IK:")
         set_transform["_"].set_locked(True)
         set_transform["_"].set_keyable(True)
