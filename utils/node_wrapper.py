@@ -2,7 +2,6 @@ from maya.api import OpenMaya as om2
 import maya.cmds as cmds
 from typing import Union
 import utils.om as utils_om
-from utils.utils import snake_to_camel
 import utils.apiundo as apiundo
 import re as re
 
@@ -50,7 +49,24 @@ def exists(node):
         bool: if node still exists
     """
     return cmds.objExists(str(node))
+def _snake_to_camel(snake_str):
+    """Snake case to camel case
 
+    Args:
+        snake_str (str):
+
+    Returns:
+        str:
+    """
+    # Split the string by underscores
+    if snake_str.find("fk") > 0:
+        snake_str = snake_str.replace("fk","FK")
+    if snake_str.find("ik") > 0:
+        snake_str = snake_str.replace("ik","IK")
+    components = snake_str.split('_')
+    # Capitalize the first letter of each component except the first one, and join them
+    camel_case_str = components[0] + ''.join(x.title() for x in components[1:])
+    return camel_case_str
 class Node():
     """A class to wrap around OpenMaya objects (MObject, MFnDependencyNode) and 
     provides useful functionality such as getting attributes, and other 
@@ -162,7 +178,7 @@ class Node():
 
         new_kwargs = {}
         for key in kwargs:
-            new_kwargs[snake_to_camel(key)] = kwargs[key]
+            new_kwargs[_snake_to_camel(key)] = kwargs[key]
 
         cmds.addAttr(str(self), longName=long_name, **new_kwargs)
 
@@ -231,11 +247,11 @@ class Node():
 
         # delete history
         cmds.delete(str(self), constructionHistory=True)
-        children = cmds.listRelatives(str(self), allDescendents=True)
+        children = cmds.listRelatives(str(self), allDescendents=True, fullPath=True)
 
         all_children = [self]
         if children is not None:
-            all_children.extend([Node(x) for x in children])
+            all_children.extend([wrap_node(x) for x in children])
 
         # unpublish
         node_container = self.get_container_node()
@@ -495,7 +511,7 @@ class Container(Node):
         conversionNodes = []
         for node in args:
             node_conversionNodes = cmds.listConnections(node, source=True, destination=True)
-            node_conversionNodes = cmds.ls(node_conversionNodes, type='unitConversion')
+            node_conversionNodes = cmds.ls(node_conversionNodes, type='unitConversion', long=True)
             conversionNodes.extend(node_conversionNodes)
         args.extend(conversionNodes)
         cmds.container(str(self), addNode=args, edit=True, iha=include_hierarchy_above, ihb=include_hierarchy_below, inc=include_network, force=force)
@@ -524,7 +540,7 @@ class Container(Node):
 
         remove_list = args.copy()
         for node in args:
-            curr_remove_nodes = cmds.listRelatives(node, allDescendents=all_descendents)
+            curr_remove_nodes = cmds.listRelatives(node, allDescendents=all_descendents, fullPath=True)
             if curr_remove_nodes is not None:
                 remove_list.extend(curr_remove_nodes)
         cmds.container(str(self), edit=True, removeNode=remove_list, force=True)
@@ -671,10 +687,10 @@ class Transform(Node):
         Returns:
             list(Node): list of shapes wrapped by Node
         """
-        shapes = cmds.listRelatives(str(self), shapes=True)
+        shapes = cmds.listRelatives(str(self), shapes=True, fullPath=True)
         if shapes is None:
             return []
-        return [Node(shape) for shape in shapes]
+        return [wrap_node(shape) for shape in shapes]
     def freeze_transforms(self):
         """Freezes the transforms of the given node"""
         transform_locked_attrs = self.get_transform_locked_attrs()
@@ -686,7 +702,7 @@ class Transform(Node):
         cmds.makeIdentity(str(self), apply=True)
 
         if scale[0] * scale[1] * scale[2] < 0:
-            shapes = [wrap_node(x) for x in cmds.listRelatives(str(self), shapes=True)]
+            shapes = [wrap_node(x) for x in cmds.listRelatives(str(self), shapes=True, fullPath=True)]
             for x in shapes:
                 if x.type_ == "nurbsSurface":
                     cmds.reverseSurface(str(x))

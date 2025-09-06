@@ -1,5 +1,6 @@
 import system.base_component as base_comp
 import system.component_data as component_data
+import system.component_enum_data as component_enum_data
 import component.control as control
 import utils.node_wrapper as nw
 import utils.utils as utils
@@ -12,8 +13,6 @@ class VisualizeHier(base_comp.Hierarchy):
     class_namespace = "hier_vis"
 
     def _override_build(self, **kwargs):
-        source_component= kwargs[self._KWG_SRC_COMP]
-
         HIER_DATA = self.HIER_DATA
 
         ws_grp = nw.create_node("transform", "worldSpace_grp")
@@ -25,9 +24,7 @@ class VisualizeHier(base_comp.Hierarchy):
 
         prev_loc_transform = loc_grp
 
-        self._connect_source_hier_component(source_component=source_component, connect_hierarchy=kwargs[self._KWG_CONN_HIER])
-
-        input_xforms = self._get_input_xform_attrs()
+        input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
         for index, input_xform in input_xforms.items():            
             # making controls
             control_ws_inst = control.Axis.create(instance_name=f"{input_xform[HIER_DATA.INPUT_XFORM_NAME].value}_ws", parent=self)
@@ -51,7 +48,7 @@ class VisualizeHier(base_comp.Hierarchy):
             prev_loc_transform = control_loc_inst.transform_node
 
             # connecting to component output
-            output_xform = self._get_output_xform_attrs(index=index)[index]
+            output_xform = self.get_xform_attrs(xform_type=self.IO_ENUM.output, index=index)
             for input_name, output_name in HIER_DATA.get_paired_names(self.IO_ENUM.input, self.IO_ENUM.output):
                 input_xform[input_name] >> output_xform[output_name]
 
@@ -60,13 +57,14 @@ class VisualizeHier(base_comp.Hierarchy):
 class MergeHier(base_comp.Component):
     class_namespace="merge_hier"
     HIER_DATA = component_data.HierData
+    IO_ENUM = component_enum_data.IO
 
     _IN_HIER_PAR_MAT = "hierParentMatricies"
     _IN_HIER_BLEND = "hierBlend"
-    _KWG_SRC_COMP = "source_component"
+    _KWG_SRC_COMPS = "source_components"
 
-    def _get_input_node_build_attr_data(self):
-        node_data = super()._get_input_node_build_attr_data()
+    def _input_build_attr_data(self):
+        node_data = super()._input_build_attr_data()
 
         node_data.extend_attr_data(self.HIER_DATA.get_hier_data())
 
@@ -79,23 +77,30 @@ class MergeHier(base_comp.Component):
         
         return node_data
     
-    def _get_output_node_build_attr_data(self):
-        node_data = super()._get_output_node_build_attr_data()
+    def _output_build_attr_data(self):
+        node_data = super()._output_build_attr_data()
         node_data.extend_attr_data(self.HIER_DATA.get_output_xform_data())
 
         return node_data
 
     @classmethod
     def create(cls, source_components=[], instance_name = None, parent=None, **kwargs):
-        kwargs[cls._KWG_SRC_COMP] = utils.make_iterable(source_components)
+        kwargs[cls._KWG_SRC_COMPS] = utils.make_iterable(source_components)
                 
-        return super().create(instance_name, parent, **kwargs)
+        pre_build_kwargs={
+            cls._KWG_INST_NAME:instance_name,
+            cls._KWG_PARENT:parent,
+            cls._KWG_SRC_COMPS:source_components
+        }
+        build_kwargs={}
+        post_build_kwargs={}
+        return cls._filtered_create(pre_build_kwargs=pre_build_kwargs, build_kwargs=build_kwargs, post_build_kwargs=post_build_kwargs)
     
+    def _pre_build(self, instance_name = None, parent=None, source_components=[], **pre_build_kwargs):
+        super()._pre_build(instance_name, parent, **pre_build_kwargs)
+        self._connect_source_hier_components(source_components=source_components)
 
     def _override_build(self, **kwargs):
-        source_components = kwargs[self._KWG_SRC_COMP]
-
-        self._connect_source_hier_components(source_components=source_components)
         hier_parent_mat = self.__connect_hier()
         blend_weight_attrs = self.__blend_weights()
         self.__blend_matricies(hier_parent_mat=hier_parent_mat, blend_weight_attrs=blend_weight_attrs)
@@ -236,15 +241,27 @@ class MergeHier(base_comp.Component):
 
         else:
             raise RuntimeError("source component needs to be iterable")
-    def _get_output_xform_attrs(self, index:Union[int, list]=None):
-        """Gets a dict of output xforms given indicies. returns all if index is None
+    def get_xform_attrs(self, xform_type:component_enum_data.IO, index:Union[int, list]=None):
+        """Gets a dict of xforms given indicies and type of xform. returns all if index is None
 
+        Args:
+            xform_type (component_enum_data.IO): selects input or output xform
+            index (int, list):
         Returns:
-            list:
+            dict: 
         """
+        
         if index is None:
-            indicies = range(len(self.output_node[self.HIER_DATA.OUTPUT_XFORM]))
+            if xform_type == self.IO_ENUM.input:
+                indicies = range(len(self.input_node[self.HIER_DATA.INPUT_XFORM]))
+            else:
+                indicies = range(len(self.output_node[self.HIER_DATA.OUTPUT_XFORM]))
         else:
             indicies = utils.make_iterable(index)
-        return {index:{key: self.output_node[self.HIER_DATA.OUTPUT_XFORM][index][key] for key in self.HIER_DATA.get_output_data_names()} for index in indicies}
-    
+        xform_names = self.HIER_DATA.get_xform_names(xform_type=xform_type)
+        xform_parent_name = self.HIER_DATA.get_xform_parent_name(xform_type=xform_type)
+        xform_data = {index:{key: self.container_node[xform_parent_name][index][key] for key in xform_names} for index in indicies}
+        if len(indicies) == 1:
+            return list(xform_data.values())[0]
+        else:
+            return xform_data

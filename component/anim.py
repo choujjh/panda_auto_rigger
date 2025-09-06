@@ -2,6 +2,7 @@ import system.base_component as base_comp
 import component.motion as motion
 import component.misc as misc
 import system.component_data as component_data
+import system.component_enum_data as component_enum_data
 import utils.node_wrapper as nw
 import component.control as control
 import component.setup as setup
@@ -13,18 +14,19 @@ class SimpleLimbAnim(base_comp.Anim):
     _IN_SET_CNTRL_XFORM_FOLLOW = "settingCntrlXformFollow"
     _IN_SET_CNTRL_LOC_MAT = "settingCntrlLocMatrix"
 
-    def _get_input_node_build_attr_data(self):
-        node_data = super()._get_input_node_build_attr_data()
+    def _input_build_attr_data(self):
+        node_data = super()._input_build_attr_data()
         node_data.extend_attr_data(
             component_data.AttrData(self._IN_SET_CNTRL_XFORM_FOLLOW, type_="long", publish=True, min=0, max=2, value=2),
             component_data.AttrData(self._IN_SET_CNTRL_LOC_MAT, type_="matrix", publish=True)
         )
         return node_data
-
-    def _override_build(self, **kwargs):
+    @classmethod
+    def create(cls, instance_name = None, parent = None, primary_axis = component_enum_data.AxisEnum.x, secondary_axis = component_enum_data.AxisEnum.y, source_component = None, connect_hierarchy = True, connect_axis_vecs = True, control_color=None, setup_color=None, hier_side = component_enum_data.CharacterSide.none):
+        return super().create(instance_name, parent, 3, primary_axis, secondary_axis, source_component, connect_hierarchy, connect_axis_vecs, control_color, setup_color, hier_side)
+    
+    def _override_build(self, control_color=None, setup_color=None, **build_kwargs):
         HIER_DATA = self.HIER_DATA
-        control_color = kwargs[self._KWG_CNTRL_CLR]
-        setup_color = kwargs[self._KWG_SETUP_CLR]
 
         setup_inst = self.setup_component.create(source_component=self, parent=self, control_color=setup_color)
 
@@ -36,7 +38,7 @@ class SimpleLimbAnim(base_comp.Anim):
         for index in range(len(self.container_node[HIER_DATA.OUTPUT_XFORM])):
             merge_output_xform = merge_hier_inst.container_node[HIER_DATA.OUTPUT_XFORM][index]
             self_output_xform = self.container_node[HIER_DATA.OUTPUT_XFORM][index]
-            for attr_name in component_data.HierData.get_output_data_names(init_matricies=False):
+            for attr_name in component_data.HierData.OUTPUT_DATA_NAMES:
                 merge_output_xform[attr_name] >> self_output_xform[attr_name]
 
         # settings control
@@ -79,10 +81,11 @@ class SingleXform(base_comp.Anim):
     """Single Joint Component"""
     setup_component = setup.Setup
 
-    def _override_build(self, **kwargs):
-        control_color = kwargs[self._KWG_CNTRL_CLR]
-        setup_color = kwargs[self._KWG_SETUP_CLR]
+    @classmethod
+    def create(cls, instance_name = None, parent = None, primary_axis = component_enum_data.AxisEnum.x, secondary_axis = component_enum_data.AxisEnum.y, source_component = None, connect_hierarchy = True, connect_axis_vecs = True, control_color=None, setup_color=None, hier_side = component_enum_data.CharacterSide.none):
+        return super().create(instance_name, parent, 1, primary_axis, secondary_axis, source_component, connect_hierarchy, connect_axis_vecs, control_color, setup_color, hier_side)
 
+    def _override_build(self, control_color=None, setup_color=None, **kwargs):
         setup_inst = control.Locator.create(instance_name=f"{self.container_node[self._BLD_INST_NAME].value}_setup", parent=self, color=setup_color)
         setup_inst.container_node[setup_inst._IN_OFF_MAT] << self.transform_node["worldInverseMatrix"][0]
 
@@ -95,10 +98,11 @@ class SingleXform(base_comp.Anim):
 
         self.container_node.add_nodes(cntrl_mult_matrix)
 
-        self._set_output_xform_attrs(
+        self._set_xform_attrs(
             index=0,
-            output_init_matrix=setup_inst.container_node[setup_inst._OUT_WS_MAT],
-            output_init_inv_matrix=setup_inst.container_node[setup_inst._OUT_WS_INV_MAT],
-            output_world_matrix=cntrl_inst.container_node[setup_inst._OUT_WS_MAT],
-            output_world_inv_matrix=cntrl_inst.container_node[setup_inst._OUT_WS_INV_MAT],
+            xform_type=self.IO_ENUM.output,
+            init_matrix=setup_inst.container_node[setup_inst._OUT_WS_MAT],
+            init_inv_matrix=setup_inst.container_node[setup_inst._OUT_WS_INV_MAT],
+            world_matrix=cntrl_inst.container_node[setup_inst._OUT_WS_MAT],
+            world_inv_matrix=cntrl_inst.container_node[setup_inst._OUT_WS_INV_MAT],
         )

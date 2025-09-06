@@ -1,5 +1,6 @@
 import system.base_component as base_comp
 import component.anim as anim
+import component.setup as setup
 import system.component_enum_data as component_enum_data
 
 class CustomCharacter(base_comp.Character):

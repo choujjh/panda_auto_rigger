@@ -11,15 +11,10 @@ class FK(base_comp.Motion):
     class_namespace = "FK"
     root_transform_name = "fk_grp"
     
-    def _override_build(self, **kwargs):
+    def _override_build(self, control_color=None, **build_kwargs):
         #qol variables
         added_nodes = []
         HIER_DATA =self.HIER_DATA
-        color = kwargs[self._KWG_CNTRL_CLR]
-
-        # connecting source component
-        source_component = kwargs[self._KWG_SRC_COMP]
-        self._connect_source_hier_component(source_component=source_component, connect_hierarchy=kwargs[self._KWG_CONN_HIER])
 
         prev_ws_attr = self.container_node[HIER_DATA.HIER_PARENT_MATRIX]
         prev_inv_attr = self.container_node[HIER_DATA.HIER_PARENT_INIT_INV_MATRIX]
@@ -28,7 +23,7 @@ class FK(base_comp.Motion):
                 instance_name=input_xform[HIER_DATA.INPUT_XFORM_NAME], 
                 axis_vec=self.container_node[self._PRM_VEC].value, 
                 parent=self, 
-                color=color)
+                color=control_color)
             for attr in ["sx", "sy", "sz"]:
                 control_inst.transform_node[attr].set_locked(True)
                 control_inst.transform_node[attr].set_keyable(False)
@@ -45,9 +40,10 @@ class FK(base_comp.Motion):
             prev_ws_attr = control_inst.container_node[base_comp.Control._OUT_WS_MAT]
             prev_inv_attr = self.input_node[HIER_DATA.INPUT_XFORM][index][HIER_DATA.INPUT_WORLD_INV_MATRIX]
 
-            self._set_output_xform_attrs(
+            self._set_xform_attrs(
                 index=index,
-                output_world_matrix=control_inst.container_node[base_comp.Control._OUT_WS_MAT]
+                xform_type=self.IO_ENUM.output,
+                world_matrix=control_inst.container_node[base_comp.Control._OUT_WS_MAT]
             )
         self.container_node.add_nodes(*added_nodes)
 
@@ -65,8 +61,8 @@ class SimpleIK(base_comp.Motion):
     _IK_BLEND_TYP = "blendType"
     _IK_BLEND_CRV = "blendCurve"
 
-    def _get_input_node_build_attr_data(self):
-        node_data = super()._get_input_node_build_attr_data()
+    def _input_build_attr_data(self):
+        node_data = super()._input_build_attr_data()
         node_data.extend_attr_data(
             component_data.AttrData(self._IK, type_="compound", parent=self._IN),
             component_data.AttrData(self._IK_END_MAT, type_="matrix", parent=self._IK),
@@ -92,7 +88,7 @@ class SimpleIK(base_comp.Motion):
         Returns
             base_component.Control:
         """
-        input_xform = self._get_input_xform_attrs(index=input_xform_index)[input_xform_index]
+        input_xform = self.get_xform_attrs(xform_type=self.IO_ENUM.input, index=input_xform_index)
         control_inst = control.BoxControl.create(instance_name=input_xform[self.HIER_DATA.INPUT_XFORM_NAME], parent=self, color=color)
         for attr_name in ["sx", "sy", "sz"]:
             control_inst.transform_node[attr_name].set_locked(True)
@@ -117,7 +113,7 @@ class SimpleIK(base_comp.Motion):
         Returns:
             len1_node:nw.Node, len2_node:nw.Node, curr_len_nodenw.Node:
         """
-        input_xforms = self._get_input_xform_attrs()
+        input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
 
         len1_node = nw.create_node("distanceBetween", "len1_init_dist")
         len1_node["inMatrix1"] << input_xforms[0][self.HIER_DATA.INPUT_WORLD_MATRIX]
@@ -519,7 +515,7 @@ class SimpleIK(base_comp.Motion):
                 for transform, vec_name in zip(["Trans", "Rot"], [self._SEC_VEC, self._PRM_VEC]):
                     for extreme in ["max", "min"]:
                         dest_attr = pole_vec_control[f"{extreme}{transform}{axis}LimitEnable"]
-                        src_attr = self.input_node[vec_name][index]
+                        src_attr = self.container_node[vec_name][index]
                         expression_str.append(f"{dest_attr} = ({src_attr} == 0);")
                 expression_str.append("")
                 
@@ -577,11 +573,7 @@ class SimpleIK(base_comp.Motion):
         self.container_node.add_nodes(aim_matrix, vec_mult, pole_vec_expression)
         return pole_cntrl_inst
 
-    def _override_build(self, **kwargs):
-        source_component = kwargs[self._KWG_SRC_COMP]
-        control_color = kwargs[self._KWG_CNTRL_CLR]
-        self._connect_source_hier_component(source_component, connect_hierarchy=kwargs[self._KWG_CONN_HIER])
-
+    def _override_build(self, control_color=None, **kwargs):
         # controls
         root_control = self.__setup_ik_control(
             name="root", 
@@ -631,10 +623,11 @@ class SimpleIK(base_comp.Motion):
             else:
                 local_mat_attr = loc_matrix["output"]
 
-            self._set_output_xform_attrs(
+            self._set_xform_attrs(
                 index=index,
-                output_world_matrix=mult_matrix["matrixSum"],
-                output_loc_matrix=local_mat_attr
+                xform_type=self.IO_ENUM.output,
+                world_matrix=mult_matrix["matrixSum"],
+                loc_matrix=local_mat_attr
             )
             xform_output_nodes.append(mult_matrix)
             if index == 1:
@@ -648,9 +641,8 @@ class SimpleIK(base_comp.Motion):
             ty_attr=xform2_rot_point["outputY"],
             tz_attr=xform2_rot_point["outputZ"]
         )
-        self._set_output_xform_attrs(index=2, output_world_matrix=xform2_world_matrix["output"])
+        self._set_xform_attrs(index=2, xform_type=self.IO_ENUM.output, world_matrix=xform2_world_matrix["output"])
 
-        
         self.container_node.add_nodes(ik_base_mat_aim, *xform_output_nodes)
 
         

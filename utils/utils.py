@@ -4,6 +4,8 @@ import re
 import math
 from maya.api import OpenMaya as om2
 from typing import Union
+import utils.node_wrapper as nw
+import system.component_enum_data as component_enum_data
 
 def camel_to_snake(camel_str):
     """Camel case to snake case.
@@ -40,23 +42,6 @@ def snake_to_camel(snake_str):
     # Capitalize the first letter of each component except the first one, and join them
     camel_case_str = components[0] + ''.join(x.title() for x in components[1:])
     return camel_case_str
-
-import utils.node_wrapper as nw
-def map_to_container(node:nw.Node, node_message_name:str, container_message_name:str ="container_node"):
-    """Maps the node to the container by creating an attribute on both and connectiong
-    them
-
-    Args:
-        node (nw.Node): 
-        node_message_name (str): 
-        container_message_name (str, optional): Defaults to "container_node".
-    """
-    container = node.get_container_node()
-
-    if container is not None:
-        node.add_attr(long_name=container_message_name, type="message")
-        container.add_attr(long_name=node_message_name, type="message")
-        container[node_message_name] >> node[container_message_name]
 
 def get_classes_from_package(package, excluded_classes:list=[]):
     """Gets the classes from package
@@ -213,20 +198,6 @@ def unnest_dict(curr_dict:dict):
 
     return return_dict
 
-import system.component_enum_data as component_enum_data
-def get_rgb_from_index(index:Union[int, component_enum_data.Color]):
-    """Gets rgb from maya's color index
-
-    Args:
-        index (int):
-
-    Returns:
-        list(float): 3 values making up the rgb of the color
-    """
-    if not isinstance(index, int):
-        index = index.value
-    return cmds.colorIndex(index, query=True)
-
 def make_valid_maya_name(name:str):
     """Makes string into a maya name without throwing a warning
 
@@ -296,6 +267,33 @@ def make_len(curr_list:list, len_:int, default=0.0):
         return curr_list[:len_]
     return curr_list
 
+def get_rgb_from_index(index:Union[int, component_enum_data.Color]):
+    """Gets rgb from maya's color index
+
+    Args:
+        index (int):
+
+    Returns:
+        list(float): 3 values making up the rgb of the color
+    """
+    if not isinstance(index, int):
+        index = index.value
+    return cmds.colorIndex(index, query=True)
+def map_to_container(node:nw.Node, node_message_name:str, container_message_name:str ="container_node"):
+    """Maps the node to the container by creating an attribute on both and connectiong
+    them
+
+    Args:
+        node (nw.Node): 
+        node_message_name (str): 
+        container_message_name (str, optional): Defaults to "container_node".
+    """
+    container = node.get_container_node()
+
+    if container is not None:
+        node.add_attr(long_name=container_message_name, type="message")
+        container.add_attr(long_name=node_message_name, type="message")
+        container[node_message_name] >> node[container_message_name]
 def make_lambert_shader(color:Union[component_enum_data.Color, list, nw.Attr], name:str=None):
     """creates a lambert shader
 
@@ -559,8 +557,6 @@ class Namespace:
             cls.add_namespace(new_name_parent)
         new_name = cls.strip_namespace(new_name)
         cmds.namespace(rename=[old_name, new_name], parent=new_name_parent)
-
-
 def identity_matrix():
     """Returns identity matrix in an array
 
@@ -573,7 +569,6 @@ def identity_matrix():
         0.0, 0.0, 1.0, 0.0,
         0.0, 0.0, 0.0, 1.0
     ]
-
 def zero_matrix():
     """Returns zero matrix in an array
 
@@ -581,7 +576,6 @@ def zero_matrix():
         list:
     """
     return [0.0 for x in range(16)]
-
 def translate_to_matrix(translation):
     """Returns translation matrix in an array
 
@@ -597,7 +591,6 @@ def translate_to_matrix(translation):
     matrix[14] = translation[2]
 
     return matrix
-
 def scale_matrix(scale):
     """Returns translation matrix in an array
 

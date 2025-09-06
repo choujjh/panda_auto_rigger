@@ -306,6 +306,18 @@ class HierData:
         src_names = input_names if src == component_enum_data.IO.input else output_names
         dest_names = input_names if dest == component_enum_data.IO.input else output_names
         return [(src_name, dest_name) for src_name, dest_name in zip(src_names, dest_names)]
+    @classmethod
+    def get_xform_names(cls, xform_type:component_enum_data.IO):
+        if xform_type == component_enum_data.IO.input:
+            return cls.INPUT_DATA_NAMES
+        else:
+            return cls.OUTPUT_DATA_NAMES
+    @classmethod
+    def get_xform_parent_name(cls, xform_type:component_enum_data.IO):
+        if xform_type == component_enum_data.IO.input:
+            return cls.INPUT_XFORM
+        else:
+            return cls.OUTPUT_XFORM
 
     @classmethod
     def is_hier_attr(cls, attr:nw.Attr):

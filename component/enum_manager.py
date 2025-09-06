@@ -37,8 +37,8 @@ class AxisVector(base_comp.SingletonComponent):
         super().__init__(container_node)
         self.self_component = None
     
-    def _get_output_node_build_attr_data(self):
-        node_data = super()._get_output_node_build_attr_data()
+    def _output_build_attr_data(self):
+        node_data = super()._output_build_attr_data()
 
         attr_data = [component_data.AttrData(self._OUT_AXIS, type_="compound", parent=self._OUT)]
         for item in component_enum_data.AxisEnum:
@@ -61,8 +61,8 @@ class Color(base_comp.SingletonComponent):
     class_namespace="color_manager"
 
     _OUT_COLOR = "color"
-    def _get_output_node_build_attr_data(self):
-        node_data = super()._get_output_node_build_attr_data()
+    def _output_build_attr_data(self):
+        node_data = super()._output_build_attr_data()
 
         attr_data = [component_data.AttrData(self._OUT_COLOR, type_="compound", parent=self._OUT)]
         for item in component_enum_data.Color:
@@ -78,6 +78,8 @@ class Color(base_comp.SingletonComponent):
         for color_enum in component_enum_data.Color:
             index_color = utils.get_rgb_from_index(color_enum.value)
             self.output_node[self._OUT_COLOR][color_enum.name] = index_color
+
+        # self.output_node[self._OUT_COLOR].set_locked(True)
 
     @classmethod
     def get_shader(cls, color:component_enum_data.Color):

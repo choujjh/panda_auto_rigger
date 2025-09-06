@@ -4,7 +4,7 @@ import system.component_enum_data as component_enum_data
 import component.control as control
 import utils.utils as utils
 import utils.node_wrapper as nw
-import component.enum_manager as enum_manager
+from typing import Union
 
 class Setup(base_comp.Hierarchy):
     """A Base class for setup autorigging components. Derived from Hierarchy"""
@@ -12,78 +12,62 @@ class Setup(base_comp.Hierarchy):
     component_type = component_enum_data.ComponentType.setup
     class_namespace = "setup_"
 
-    _IN_PRMY_AXIS = "primaryAxis"
-    _IN_SEC_AXIS = "secondaryAxis"
+    # _IN_PRMY_AXIS = "primaryAxis"
+    # _IN_SEC_AXIS = "secondaryAxis"
     _LOC_SCALE = "locScale"
-    _HIER_SIDE = "hierSide"
-    _KWG_NUM_XFORMS = "num_xforms"
-    _KWG_PRMY_AXIS = "primary_axis"
-    _KWG_SEC_AXIS = "secondary_axis"
-    _KWG_HIER_SIDE = "hier_side"
+    # _KWG_NUM_XFORMS = "num_xforms"
+    # _KWG_PRMY_AXIS = "primary_axis"
+    # _KWG_SEC_AXIS = "secondary_axis"
 
-    def _get_input_node_build_attr_data(self):
-        node_data = super()._get_input_node_build_attr_data()
+    def _input_build_attr_data(self):
+        node_data = super()._input_build_attr_data()
         node_data.extend_attr_data(
-            component_data.AttrData(self._HIER_SIDE, type_=component_enum_data.CharacterSide.none, parent=self._IN),
-            component_data.AttrData(self._IN_PRMY_AXIS, type_=component_enum_data.AxisEnum.x, publish=True),
-            component_data.AttrData(self._IN_SEC_AXIS, type_=component_enum_data.AxisEnum.y, publish=True),
             component_data.AttrData(self._LOC_SCALE, type_="double", publish=True, value=1, min=0.1),
         )
         return node_data
-    def _get_output_node_build_attr_data(self):
-        node_data = super()._get_output_node_build_attr_data()
-        node_data.extend_attr_data(
-            component_data.AttrData(self._PRM_VEC, type_="double3", parent=self._OUT),
-            component_data.AttrData(self._PRM_VEC_X, type_="double", parent=self._PRM_VEC),
-            component_data.AttrData(self._PRM_VEC_Y, type_="double", parent=self._PRM_VEC),
-            component_data.AttrData(self._PRM_VEC_Z, type_="double", parent=self._PRM_VEC),
-            component_data.AttrData(self._SEC_VEC, type_="double3", parent=self._OUT),
-            component_data.AttrData(self._SEC_VEC_X, type_="double", parent=self._SEC_VEC),
-            component_data.AttrData(self._SEC_VEC_Y, type_="double", parent=self._SEC_VEC),
-            component_data.AttrData(self._SEC_VEC_Z, type_="double", parent=self._SEC_VEC),
-            component_data.AttrData(self._TER_VEC, type_="double3", parent=self._OUT),
-            component_data.AttrData(self._TER_VEC_X, type_="double", parent=self._TER_VEC),
-            component_data.AttrData(self._TER_VEC_Y, type_="double", parent=self._TER_VEC),
-            component_data.AttrData(self._TER_VEC_Z, type_="double", parent=self._TER_VEC),
-        )
-        return node_data
+    # def _output_build_attr_data(self):
+    #     node_data = super()._output_build_attr_data()
+    #     node_data.extend_attr_data(
+    #         component_data.AttrData(self._PRM_VEC, type_="double3", parent=self._OUT),
+    #         component_data.AttrData(self._PRM_VEC_X, type_="double", parent=self._PRM_VEC),
+    #         component_data.AttrData(self._PRM_VEC_Y, type_="double", parent=self._PRM_VEC),
+    #         component_data.AttrData(self._PRM_VEC_Z, type_="double", parent=self._PRM_VEC),
+    #         component_data.AttrData(self._SEC_VEC, type_="double3", parent=self._OUT),
+    #         component_data.AttrData(self._SEC_VEC_X, type_="double", parent=self._SEC_VEC),
+    #         component_data.AttrData(self._SEC_VEC_Y, type_="double", parent=self._SEC_VEC),
+    #         component_data.AttrData(self._SEC_VEC_Z, type_="double", parent=self._SEC_VEC),
+    #         component_data.AttrData(self._TER_VEC, type_="double3", parent=self._OUT),
+    #         component_data.AttrData(self._TER_VEC_X, type_="double", parent=self._TER_VEC),
+    #         component_data.AttrData(self._TER_VEC_Y, type_="double", parent=self._TER_VEC),
+    #         component_data.AttrData(self._TER_VEC_Z, type_="double", parent=self._TER_VEC),
+    #     )
+    #     return node_data
 
     @classmethod
-    def create(
-        cls, 
-        instance_name=None, 
-        parent=None, 
-        num_xforms=3, 
-        control_color=None,
-        hier_side:component_enum_data.CharacterSide=component_enum_data.CharacterSide.none,
-        primary_axis:component_enum_data.MayaEnumAttr=component_enum_data.AxisEnum.x, 
-        secondary_axis:component_enum_data.MayaEnumAttr=component_enum_data.AxisEnum.y, 
-        **kwargs):
+    def create(cls, 
+               instance_name:Union[str, nw.Attr]=None, 
+               parent:base_comp.Component=None, 
+               init_num_xforms:Union[int, tuple]=3, 
+               source_component:base_comp.Component=None, 
+               connect_hierarchy:bool=True, 
+               connect_axis_vecs:bool=True, 
+               control_color=None):
+        pre_build_kwargs={
+            cls._KWG_INST_NAME: instance_name, 
+            cls._KWG_PARENT:parent,
+            cls._KWG_SRC_COMP:source_component,
+            cls._KWG_CONN_HIER:connect_hierarchy,
+            cls._KWG_CONN_AXS_VEC:connect_axis_vecs,
+            cls._KWG_INIT_NUM_XFORMS:init_num_xforms}
+        build_kwargs={
+            cls._KWG_CNTR_CLR:control_color
+        }
+        post_build_kwargs={}
 
-        kwargs[cls._KWG_NUM_XFORMS] = num_xforms
-        kwargs[cls._KWG_PRMY_AXIS] = primary_axis
-        kwargs[cls._KWG_SEC_AXIS] = secondary_axis
-        kwargs[cls._KWG_CNTRL_CLR] = control_color
-
-        component_inst = cls()
-        component_inst._pre_build(instance_name=instance_name, hier_side=hier_side, parent=parent)
-        component_inst._override_build(**kwargs)
-        component_inst._post_build()
-
-        return component_inst
+        return cls._filtered_create(pre_build_kwargs=pre_build_kwargs, build_kwargs=build_kwargs, post_build_kwargs=post_build_kwargs)
     
-    def _pre_build(self, instance_name=None, hier_side=component_enum_data.CharacterSide.none,  parent=None):
-        super()._pre_build(instance_name, parent)
-        self.input_node[self._HIER_SIDE]=hier_side.name
-
-    def _override_build(self, **kwargs):
-        num_xforms = kwargs[self._KWG_NUM_XFORMS]
-        control_color = kwargs[self._KWG_CNTRL_CLR]
-
-        self.container_node[self._IN_PRMY_AXIS] = component_enum_data.get_index_of_item(kwargs[self._KWG_PRMY_AXIS])
-        self.container_node[self._IN_SEC_AXIS] = component_enum_data.get_index_of_item(kwargs[self._KWG_SEC_AXIS])
-
-        input_xforms = self._get_input_xform_attrs(utils.length_index_list(num_xforms))
+    def _override_build(self, control_color=None, **kwargs):
+        input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
         for index, input_xform in input_xforms.items():
 
             # setting name
@@ -96,12 +80,12 @@ class Setup(base_comp.Hierarchy):
             control_container[base_comp.Control._IN_OFF_MAT] = utils.translate_to_matrix([0, index*1.5, 0])
 
             # connecting to output
-            self._set_output_xform_attrs(
-                index,
-                output_init_matrix=control_container[base_comp.Control._OUT_WS_MAT],
-                output_world_matrix=control_container[base_comp.Control._OUT_WS_MAT],
+            self._set_xform_attrs(
+                index=index,
+                xform_type=self.IO_ENUM.output,
+                init_matrix=control_container[base_comp.Control._OUT_WS_MAT],
+                world_matrix=control_container[base_comp.Control._OUT_WS_MAT],
             )
-        
 class SimpleLimb(Setup):
     """3 xform that aim and align to each other. middle xform stays inbetween and orients correctly to whatever the angle the other 2 xform make"""
 
@@ -109,8 +93,8 @@ class SimpleLimb(Setup):
     _IN_SET_CNTRL_LOC_MAT = "inputSettingCntrlLocMatrix"
     _OUT_SET_CNTRL_LOC_MAT = "outputSettingCntrlLocMatrix"
 
-    def _get_input_node_build_attr_data(self):
-        node_data = super()._get_input_node_build_attr_data()
+    def _input_build_attr_data(self):
+        node_data = super()._input_build_attr_data()
         node_data.extend_attr_data(
             component_data.AttrData(self._IN_SET_CNTRL_XFORM_FOLLOW, type_="long", publish=True, min=0, max=2, value=2),
             component_data.AttrData(self._IN_SET_CNTRL_LOC_MAT, type_="matrix", publish=True),
@@ -118,42 +102,37 @@ class SimpleLimb(Setup):
 
         return node_data
     
-    def _get_output_node_build_attr_data(self):
-        node_data = super()._get_output_node_build_attr_data()
+    def _output_build_attr_data(self):
+        node_data = super()._output_build_attr_data()
         node_data.extend_attr_data(
             component_data.AttrData(self._OUT_SET_CNTRL_LOC_MAT, type_="matrix", publish=True),
         )
 
         return node_data
         
-
     @classmethod
-    def create(
-        cls, 
-        instance_name=None, 
-        parent=None, 
-        control_color=None,
-        hier_side:component_enum_data.CharacterSide=component_enum_data.CharacterSide.none,
-        primary_axis:component_enum_data.MayaEnumAttr=component_enum_data.AxisEnum.x, 
-        secondary_axis:component_enum_data.MayaEnumAttr=component_enum_data.AxisEnum.y, 
-        **kwargs):
+    def create(cls, 
+               instance_name:Union[str, nw.Attr]=None, 
+               parent:base_comp.Component=None,
+               source_component:base_comp.Component=None, 
+               connect_hierarchy:bool=True, 
+               connect_axis_vecs:bool=True, 
+               control_color=None):
+        pre_build_kwargs={
+            cls._KWG_INST_NAME: instance_name, 
+            cls._KWG_PARENT:parent,
+            cls._KWG_SRC_COMP:source_component,
+            cls._KWG_CONN_HIER:connect_hierarchy,
+            cls._KWG_CONN_AXS_VEC:connect_axis_vecs,
+            cls._KWG_INIT_NUM_XFORMS:3}
+        build_kwargs={
+            cls._KWG_CNTR_CLR:control_color
+        }
+        post_build_kwargs={}
 
-        kwargs[cls._KWG_PRMY_AXIS] = primary_axis
-        kwargs[cls._KWG_SEC_AXIS] = secondary_axis
-        kwargs[cls._KWG_CNTRL_CLR] = control_color
-        component_inst = super().create(instance_name=instance_name, hier_side=hier_side, parent=parent, **kwargs)
-        return component_inst
-    
-    def _override_build(self, **kwargs):
-        control_color = kwargs[self._KWG_CNTRL_CLR]
+        return cls._filtered_create(pre_build_kwargs=pre_build_kwargs, build_kwargs=build_kwargs, post_build_kwargs=post_build_kwargs)
 
-        self.container_node[self._IN_PRMY_AXIS] = component_enum_data.get_index_of_item(kwargs[self._KWG_PRMY_AXIS])
-        self.container_node[self._IN_SEC_AXIS] = component_enum_data.get_index_of_item(kwargs[self._KWG_SEC_AXIS])
-
-        input_xforms = self._get_input_xform_attrs(utils.length_index_list(3))
-        for index, input_xform in input_xforms.items():
-            input_xform[self.HIER_DATA.INPUT_XFORM_NAME].set(f"xform{index}")
-
+    def _override_build(self, control_color, **kwargs):
         # creating controls
         control_inst0 = control.Locator.create(
             instance_name=self.input_node[self.HIER_DATA.INPUT_XFORM][0][self.HIER_DATA.INPUT_XFORM_NAME], 
@@ -185,22 +164,6 @@ class SimpleLimb(Setup):
             control_inst2_orient.transform_node[attr].set_keyable(False)
         control_inst2_orient.container_node[control_inst2_orient._LOC_SCALE] << self.container_node[self._LOC_SCALE]
 
-        char_component = self.get_parent_type_component(component_enum_data.ComponentType.character, disable_warning=True)
-        if char_component is not None:
-            create_axis_vec = char_component.axis_vec_choice_node
-        else:
-            create_axis_vec = enum_manager.axis_vec_choice_node
-        # axis vectors
-        primary_vec = create_axis_vec(choice_node_name="primary_vec", enum_attr=self.container_node[self._IN_PRMY_AXIS])
-        primary_vec["output"] >> self.container_node[self._PRM_VEC]
-        secondary_vec = create_axis_vec(choice_node_name="secondary_vec", enum_attr=self.container_node[self._IN_SEC_AXIS])
-        secondary_vec["output"] >> self.container_node[self._SEC_VEC]
-        tertiary_vec = nw.create_node("crossProduct", "tertiary_vec")
-        tertiary_vec["input1"] << primary_vec["output"]
-        tertiary_vec["input2"] << secondary_vec["output"]
-        tertiary_vec["output"] >> self.container_node[self._TER_VEC]
-        self.container_node.add_nodes(primary_vec, secondary_vec, tertiary_vec)
-
         # mid interp matrix
         mid_interp_matrix, xform2_translate = self.__create_mid_interp_matrix(
             control_inst0.container_node[base_comp.Control._OUT_WS_MAT], 
@@ -210,18 +173,14 @@ class SimpleLimb(Setup):
         # xform0
         xform0_ws_mat_attr, xform0_inv_attr = self.__create_xform0(
             guide_transform0_ws_mat=control_inst0.container_node[base_comp.Control._OUT_WS_MAT], 
-            guide_transform1_ws_mat=control_inst1.container_node[base_comp.Control._OUT_WS_MAT], 
-            primary_vec=primary_vec["output"], 
-            secondary_vec=secondary_vec["output"])
+            guide_transform1_ws_mat=control_inst1.container_node[base_comp.Control._OUT_WS_MAT])
 
         # xform1
         xform1_ws_mat_attr, xform1_inv_attr = self.__create_xform1(
             guide_transform1_ws_mat=control_inst1.container_node[base_comp.Control._OUT_WS_MAT], 
             guide_transform2_ws_mat=control_inst2_translate.container_node[base_comp.Control._OUT_WS_MAT],
             xform0_ws_mat=xform0_ws_mat_attr,
-            xform0_inv_mat=xform0_inv_attr,
-            primary_vec=primary_vec["output"],
-            tertiary_vec=tertiary_vec["output"])
+            xform0_inv_mat=xform0_inv_attr)
         
         # xform2
         self.__create_xform2(
@@ -233,7 +192,7 @@ class SimpleLimb(Setup):
         #guide xform
         settings_cntrl_inst = control.Locator.create(instance_name="settingsGuide", parent=self, color=control_color)
         choice_node = nw.create_node("choice", "settings_cntrl_xform_choice")
-        xform_attrs = self._get_output_xform_attrs()
+        xform_attrs = self.get_xform_attrs(xform_type=self.IO_ENUM.output)
         for index, attr in enumerate(xform_attrs.values()):
             matrix_src = attr[self.HIER_DATA.OUTPUT_INIT_MATRIX].get_src_connection()
             choice_node["input"][index] << matrix_src
@@ -300,7 +259,7 @@ class SimpleLimb(Setup):
         # adding nodes to container
         self.container_node.add_nodes(aim_matrix, *translate_row_nodes, mid_matrix_inbetween_4x4, *average_nodes, scale_comp)
         return scale_comp["matrixSum"], translate_row_nodes[1]
-    def __create_xform0(self, guide_transform0_ws_mat:nw.Attr, guide_transform1_ws_mat:nw.Attr, primary_vec:nw.Attr, secondary_vec:nw.Attr):
+    def __create_xform0(self, guide_transform0_ws_mat:nw.Attr, guide_transform1_ws_mat:nw.Attr):
         """ Creates all xform0 nodes
 
         Args:
@@ -318,9 +277,9 @@ class SimpleLimb(Setup):
         # aim matrix ws
         aim_node["inputMatrix"] << guide_transform0_ws_mat
         aim_node["primaryTargetMatrix"] << guide_transform1_ws_mat
-        aim_node["primaryInputAxis"] << primary_vec
+        aim_node["primaryInputAxis"] << self.container_node[self._PRM_VEC]
         aim_node["secondaryTargetMatrix"] << guide_transform0_ws_mat
-        aim_node["secondaryInputAxis"] << secondary_vec
+        aim_node["secondaryInputAxis"] << self.container_node[self._SEC_VEC]
         aim_node["secondaryTargetVector"] = [0, 0, 1]
         aim_node["secondaryMode"] = 2
 
@@ -335,17 +294,18 @@ class SimpleLimb(Setup):
         mat_inv["inputMatrix"] << pick_mat["outputMatrix"]
 
         # connect to output xform
-        self._set_output_xform_attrs(
+        self._set_xform_attrs(
             index = 0,
-            output_init_matrix=pick_mat["outputMatrix"],
-            output_init_inv_matrix=mat_inv["outputMatrix"],
-            output_world_matrix=pick_mat["outputMatrix"],
-            output_loc_matrix=pick_mat["outputMatrix"]
+            xform_type=self.IO_ENUM.output,
+            init_matrix=pick_mat["outputMatrix"],
+            init_inv_matrix=mat_inv["outputMatrix"],
+            world_matrix=pick_mat["outputMatrix"],
+            loc_matrix=pick_mat["outputMatrix"]
         )
 
         self.container_node.add_nodes(aim_node, pick_mat, mat_inv)
         return pick_mat["outputMatrix"], mat_inv["outputMatrix"]
-    def __create_xform1(self, guide_transform1_ws_mat:nw.Attr, guide_transform2_ws_mat:nw.Attr, xform0_ws_mat:nw.Attr,  xform0_inv_mat:nw.Attr, primary_vec:nw.Attr, tertiary_vec:nw.Attr):
+    def __create_xform1(self, guide_transform1_ws_mat:nw.Attr, guide_transform2_ws_mat:nw.Attr, xform0_ws_mat:nw.Attr,  xform0_inv_mat:nw.Attr):
         """Creates all xform1 nodes
 
         Args:
@@ -365,10 +325,10 @@ class SimpleLimb(Setup):
         # aim matrix ws
         aim_node["inputMatrix"] << guide_transform1_ws_mat
         aim_node["primaryTargetMatrix"] << guide_transform2_ws_mat
-        aim_node["primaryInputAxis"] << primary_vec
+        aim_node["primaryInputAxis"] << self.container_node[self._PRM_VEC]
         aim_node["secondaryTargetMatrix"] << xform0_ws_mat
-        aim_node["secondaryInputAxis"] << tertiary_vec
-        aim_node["secondaryTargetVector"] << tertiary_vec
+        aim_node["secondaryInputAxis"] << self.container_node[self._TER_VEC]
+        aim_node["secondaryTargetVector"] << self.container_node[self._TER_VEC]
         aim_node["secondaryMode"] = 2
 
         # pick out scale matrix
@@ -387,12 +347,13 @@ class SimpleLimb(Setup):
         mat_loc["matrixIn"][1] << xform0_inv_mat
 
         # connect to output xform
-        self._set_output_xform_attrs(
+        self._set_xform_attrs(
             index = 1,
-            output_init_matrix=pick_mat["outputMatrix"],
-            output_init_inv_matrix=mat_inv["outputMatrix"],
-            output_world_matrix=pick_mat["outputMatrix"],
-            output_loc_matrix=mat_loc["matrixSum"]
+            xform_type=self.IO_ENUM.output,
+            init_matrix=pick_mat["outputMatrix"],
+            init_inv_matrix=mat_inv["outputMatrix"],
+            world_matrix=pick_mat["outputMatrix"],
+            loc_matrix=mat_loc["matrixSum"]
         )
 
         self.container_node.add_nodes(aim_node, mat_inv, pick_mat, mat_loc)
@@ -422,11 +383,12 @@ class SimpleLimb(Setup):
         xform_matrix2_loc["matrixIn"][1] << xform1_inv_mat
 
         # xform2 connect to output xform
-        self._set_output_xform_attrs(
-            index = 2,
-            output_init_matrix=xform2_orient["worldMatrix"][0],
-            output_init_inv_matrix=xform2_orient["worldInverseMatrix"][0],
-            output_world_matrix=xform2_orient["worldMatrix"][0],
-            output_loc_matrix=xform_matrix2_loc["matrixSum"]
+        self._set_xform_attrs(
+            index=2,
+            xform_type=self.IO_ENUM.output,
+            init_matrix=xform2_orient["worldMatrix"][0],
+            init_inv_matrix=xform2_orient["worldInverseMatrix"][0],
+            world_matrix=xform2_orient["worldMatrix"][0],
+            loc_matrix=xform_matrix2_loc["matrixSum"]
         )
         self.container_node.add_nodes(xform_matrix2_ws, xform_matrix2_loc)
