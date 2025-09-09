@@ -76,6 +76,8 @@ class Color(base_comp.SingletonComponent):
             index_color = utils.get_rgb_from_index(color_enum.value)
             self.output_node[self._OUT_COLOR][color_enum.name] = index_color
 
+        # self.output_node[self._OUT_COLOR].set_locked(True)
+
     @classmethod
     def get_shader(cls, color:component_enum_data.Color):
         """Gets shader for a given color. Creates component if not created.

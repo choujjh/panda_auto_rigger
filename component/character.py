@@ -1,5 +1,6 @@
 import system.base_component as base_comp
 import component.anim as anim
+import component.setup as setup
 import system.component_enum_data as component_enum_data
 import utils.node_wrapper as nw
 import system.component_data as component_data

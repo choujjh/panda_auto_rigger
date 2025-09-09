@@ -3,6 +3,7 @@ import maya.cmds as cmds
 import system.base_component as base_comp
 import utils.utils as utils
 import utils.node_wrapper as nw
+from typing import Union
 
 class Circle(base_comp.Control):
     """A circle nurbs curve control"""
