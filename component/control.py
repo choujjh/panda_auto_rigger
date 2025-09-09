@@ -1,44 +1,8 @@
 import system.component_enum_data as component_enum_data
-import system.component_data as component_data
 import maya.cmds as cmds
 import system.base_component as base_comp
+import utils.utils as utils
 import utils.node_wrapper as nw
-from typing import Union
-
-def swap_control(to_replace: Union[nw.Container, nw.Transform, base_comp.Control], replace_component:type):
-    """Replaces the shape of one control with another
-
-    Args:
-        to_replace (Union[nw.Container, nw.Transform, base_component.Control]):
-        replace_component (type):
-
-    Raises:
-        RuntimeError: if no control class detected for replace component
-        RuntimeError: if to_replace is a transform and has no container
-        RuntimeError: if no component found
-    """
-    if not issubclass(replace_component, base_comp.Control):
-        raise RuntimeError(f"{replace_component} is not a control class")
-        
-    if isinstance(to_replace, nw.Container):
-        to_replace = base_comp.get_component(to_replace)
-    elif isinstance(to_replace, nw.Transform):
-        container = to_replace.get_container_node()
-        if container is None:
-            raise RuntimeError(f"{to_replace} does not have component")
-        to_replace = base_comp.get_component(container)
-    if to_replace is None:
-        raise RuntimeError(f"no source component found")
-    
-    # replace component class
-    to_replace.container_node[replace_component._BLD_COMP_CLASS] = replace_component.get_class_name()
-    # delete shapes
-    cmds.delete([str(x) for x in to_replace.transform_node.get_shapes()])
-
-    replace_inst = replace_component()
-    replace_inst._apply_shape_to_cntrl(
-        cntrl_transform=to_replace.transform_node, 
-        component_container=to_replace.container_node)
 
 class Circle(base_comp.Control):
     """A circle nurbs curve control"""
@@ -65,7 +29,7 @@ class Axis(base_comp.Control):
             color=utils.get_rgb_from_index(component_enum_data.Color.blue))
         
         return [x_axis, y_axis, z_axis]
-class BoxControl(base_comp.Control):
+class Box(base_comp.Control):
     """A box nurbs curve control"""
     
     def _create_shapes(self, axis_vec):
@@ -180,21 +144,18 @@ class Locator(base_comp.Control):
 
     _LOC_SCALE = "locScale"
 
-    def _get_input_node_build_attr_data(self):
-        node_data = super()._get_input_node_build_attr_data()
-        node_data.extend_attr_data(
-            component_data.AttrData(self._LOC_SCALE, type_="double", value=1.0, min=0.1, publish=True)
-        )
-
-        return node_data
-
     def _override_build(self, **kwargs):
         super()._override_build(**kwargs)
-
-        loc_shape = self.transform_node.get_shapes()[0]
-        loc_shape["localScaleX"] << self.input_node[self._LOC_SCALE]
-        loc_shape["localScaleY"] << self.input_node[self._LOC_SCALE]
-        loc_shape["localScaleZ"] << self.input_node[self._LOC_SCALE]
+        self.post_swap_cleanup()
 
     def _create_shapes(self, axis_vec):
         return [cmds.spaceLocator()[0]]
+    
+    def pre_swap_cleanup(self):
+        self.container_node.unpublish_attr(self.container_node[self._LOC_SCALE])
+        
+    def post_swap_cleanup(self):
+        loc_shape = self.transform_node.get_shapes()[0]
+        loc_shape["localScaleX"] >> loc_shape["localScaleY"]
+        loc_shape["localScaleX"] >> loc_shape["localScaleZ"]
+        self.container_node.publish_attr(loc_shape["localScaleX"], attr_bind_name=self._LOC_SCALE)

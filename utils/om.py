@@ -27,7 +27,7 @@ def get_dep_node(node: Union[om2.MObject, om2.MPlug, str]):
     # if can be added to a MSelectionList
     m_sel_list = om2.MSelectionList()
     if isinstance(node, str):
-        full_name = cmds.ls(node, l=True)
+        full_name = cmds.ls(str(node), long=True)
         if len(full_name) > 1:
             cmds.error(f"more than 1 object named {node}")
         node = full_name[0]

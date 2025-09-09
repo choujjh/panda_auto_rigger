@@ -303,9 +303,35 @@ class HierData:
         """
         input_names = cls.INPUT_DATA_NAMES
         output_names = cls.OUTPUT_DATA_NAMES
-        src_names = input_names if src == component_enum_data.IO.input else output_names
-        dest_names = input_names if dest == component_enum_data.IO.input else output_names
+        src_names = input_names if cls.is_input_enum(src) else output_names
+        dest_names = input_names if cls.is_input_enum(dest) else output_names
         return [(src_name, dest_name) for src_name, dest_name in zip(src_names, dest_names)]
+    
+    @classmethod
+    def is_input_enum(cls, enum:component_enum_data.IO):
+        """checks to see if it's input io
+
+        Args:
+            enum (component_enum_data.IO):
+
+        Returns:
+            bool:
+        """
+        if enum.value == component_enum_data.IO.input.value and enum.name == component_enum_data.IO.input.name:
+            return True
+        return False
+    @classmethod
+    def get_xform_names(cls, xform_type:component_enum_data.IO):
+        if cls.is_input_enum(xform_type):
+            return cls.INPUT_DATA_NAMES
+        else:
+            return cls.OUTPUT_DATA_NAMES
+    @classmethod
+    def get_xform_parent_name(cls, xform_type:component_enum_data.IO):
+        if cls.is_input_enum(xform_type):
+            return cls.INPUT_XFORM
+        else:
+            return cls.OUTPUT_XFORM
 
     @classmethod
     def is_hier_attr(cls, attr:nw.Attr):

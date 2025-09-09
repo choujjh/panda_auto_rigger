@@ -1,11 +1,8 @@
-from typing import Union
-
 import system.component_enum_data as component_enum_data
 import system.base_component as base_comp
 import utils.node_wrapper as nw
 import system.component_data as component_data
 import utils.utils as utils
-import maya.cmds as cmds
 
 
 def axis_vec_choice_node(choice_node_name, enum_attr:nw.Attr=None):
@@ -37,8 +34,8 @@ class AxisVector(base_comp.SingletonComponent):
         super().__init__(container_node)
         self.self_component = None
     
-    def _get_output_node_build_attr_data(self):
-        node_data = super()._get_output_node_build_attr_data()
+    def _output_attr_build_data(self):
+        node_data = super()._output_attr_build_data()
 
         attr_data = [component_data.AttrData(self._OUT_AXIS, type_="compound", parent=self._OUT)]
         for item in component_enum_data.AxisEnum:
@@ -61,8 +58,8 @@ class Color(base_comp.SingletonComponent):
     class_namespace="color_manager"
 
     _OUT_COLOR = "color"
-    def _get_output_node_build_attr_data(self):
-        node_data = super()._get_output_node_build_attr_data()
+    def _output_attr_build_data(self):
+        node_data = super()._output_attr_build_data()
 
         attr_data = [component_data.AttrData(self._OUT_COLOR, type_="compound", parent=self._OUT)]
         for item in component_enum_data.Color:
