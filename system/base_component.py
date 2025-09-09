@@ -1,7 +1,6 @@
 import utils.node_wrapper as nw
 import system.component_data as component_data
 import system.component_enum_data as component_enum_data
-import component.enum_manager as enum_manager
 from typing import Union
 
 import utils.utils as utils
@@ -144,6 +143,16 @@ class Component():
             components = [get_component(container) for container in containers]
 
         return components
+    
+    def get_all_descendants(self)->list:
+        descendants = self.child_components()
+
+        index = 0
+        while(index < len(descendants)):
+            curr_children = descendants[index].child_components()
+            descendants.extend(curr_children)
+            index += 1
+        return descendants
     
     @classmethod
     def get_class_name(cls)->str:
@@ -301,6 +310,7 @@ class Component():
         """Build cleanup. sets build to true and renames nodes
         """
         self.rename_nodes()
+        self.rename_children()
     
     def __create_base_nodes(self, parent_container:nw.Container=None):
         """Creates the base node (input, output, container) in the initialization
@@ -387,6 +397,11 @@ class Component():
         # if prev namespace is empty, delete it
         if NAME_CLS.exists(prev_namespace) and NAME_CLS.empty(prev_namespace):
             NAME_CLS.delete(prev_namespace)
+
+    def rename_children(self):
+        for descendant in self.get_all_descendants():
+            descendant.rename_nodes()
+
     def get_parent_type_component(self, parent_type:component_enum_data.ComponentType, disable_warning=False):
         """given a type gets the closest parent component of that type
 
@@ -1161,6 +1176,7 @@ class Anim(Hierarchy):
     def setup_component_type(self):
         """Returns class specific _setup_component_type. works for inherited classes"""
         return type(self)._setup_component_type
+    
     @property
     def setup_component(self)->setup.Setup:
         """Returns setup component
@@ -1216,7 +1232,6 @@ class Anim(Hierarchy):
             prefix = ""
         parent_namespace, curr_namespace = namespace.rsplit(":", 1)
         return f"{parent_namespace}:{prefix}{curr_namespace}"
-
     @classmethod
     def create(cls, 
                instance_name:Union[str, nw.Attr]=None, 

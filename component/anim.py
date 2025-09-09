@@ -1,33 +1,21 @@
 import system.base_component as base_comp
 import component.motion as motion
 import component.misc as misc
+import component.setup as setup
+import component.control as control
 import system.component_data as component_data
 import system.component_enum_data as component_enum_data
 import utils.node_wrapper as nw
-import component.control as control
-import component.setup as setup
 
 class SimpleLimb(base_comp.Anim):
     """Simple Limb Anim component (has a merged fk, ik, and a settings control). used in conjunction with simpleLimb setup"""
     _setup_component_type = setup.SimpleLimb
 
-    _IN_SET_CNTRL_XFORM_FOLLOW = "settingCntrlXformFollow"
-    _IN_SET_CNTRL_LOC_MAT = "settingCntrlLocMatrix"
-
-    def _input_build_attr_data(self):
-        node_data = super()._input_build_attr_data()
-        node_data.extend_attr_data(
-            component_data.AttrData(self._IN_SET_CNTRL_XFORM_FOLLOW, type_="long", publish=True, min=0, max=2, value=2),
-            component_data.AttrData(self._IN_SET_CNTRL_LOC_MAT, type_="matrix", publish=True)
-        )
-        return node_data
     @classmethod
     def create(cls, instance_name = None, parent = None, primary_axis = component_enum_data.AxisEnum.x, secondary_axis = component_enum_data.AxisEnum.y, add_settings_cntrl = True, mirror_source = None, source_component = None, connect_hierarchy = True, connect_axis_vecs = True, control_color=None, setup_color=None, hier_side = component_enum_data.CharacterSide.none):
         return super().create(instance_name, parent, 3, primary_axis, secondary_axis, add_settings_cntrl, mirror_source, source_component, connect_hierarchy, connect_axis_vecs, control_color, setup_color, hier_side)
-    # def create(cls, instance_name = None, parent = None, primary_axis = component_enum_data.AxisEnum.x, secondary_axis = component_enum_data.AxisEnum.y, source_component = None, connect_hierarchy = True, connect_axis_vecs = True, control_color=None, setup_color=None, hier_side = component_enum_data.CharacterSide.none):
-    #     return super().create(instance_name, parent, 3, primary_axis, secondary_axis, source_component, connect_hierarchy, connect_axis_vecs, control_color, setup_color, hier_side)
     
-    def _override_build(self, control_color=None, setup_color=None, **build_kwargs):
+    def _override_build(self, control_color=None, **build_kwargs):
         HIER_DATA = self.HIER_DATA
 
         ik_inst = motion.SimpleIK.create(source_component=self.setup_component, control_color=control_color, parent=self)
@@ -60,19 +48,17 @@ class SimpleLimb(base_comp.Anim):
 
 class SingleXform(base_comp.Anim):
     """Single Joint Component"""
-    _setup_component_type = setup.Setup
 
     @classmethod
-    def create(cls, instance_name = None, parent = None, primary_axis = component_enum_data.AxisEnum.x, secondary_axis = component_enum_data.AxisEnum.y, source_component = None, connect_hierarchy = True, connect_axis_vecs = True, control_color=None, setup_color=None, hier_side = component_enum_data.CharacterSide.none):
-        return super().create(instance_name, parent, 1, primary_axis, secondary_axis, source_component, connect_hierarchy, connect_axis_vecs, control_color, setup_color, hier_side)
+    def create(cls, instance_name = "single_xform", parent = None, primary_axis = component_enum_data.AxisEnum.x, secondary_axis = component_enum_data.AxisEnum.y, add_settings_cntrl = True, mirror_source = None, source_component = None, connect_hierarchy = True, connect_axis_vecs = True, control_color=None, setup_color=None, hier_side = component_enum_data.CharacterSide.none):
+        return super().create(instance_name, parent, 1, primary_axis, secondary_axis, add_settings_cntrl, mirror_source, source_component, connect_hierarchy, connect_axis_vecs, control_color, setup_color, hier_side)
 
-    def _override_build(self, control_color=None, setup_color=None, **kwargs):
-        setup_inst = control.Locator.create(instance_name=f"{self.container_node[self._BLD_INST_NAME].value}_setup", parent=self, color=setup_color)
-        setup_inst.container_node[setup_inst._IN_OFF_MAT] << self.transform_node["worldInverseMatrix"][0]
+    def _override_build(self, control_color=None, **build_kwargs):
+        setup_out_xform0 = self.setup_component.get_xform_attrs(xform_type=self.IO_ENUM.output, index=0)
+        self._set_xform_attrs(index=0, xform_type=self.IO_ENUM.input, xform_name=self.container_node[self._BLD_INST_NAME])
 
         cntrl_mult_matrix = nw.create_node("multMatrix", "cntrl_ws_offset_mat")
-        setup_inst_out_xform = setup_inst.get_xform_attrs(xform_type=self.IO_ENUM.output, index=0)
-        cntrl_mult_matrix["matrixIn"][0]  << setup_inst.get_xform_attrs(xform_type=self.IO_ENUM.output, index=0)[self.HIER_DATA.OUTPUT_WORLD_MATRIX]
+        cntrl_mult_matrix["matrixIn"][0]  << setup_out_xform0[self.HIER_DATA.OUTPUT_WORLD_MATRIX]
         cntrl_mult_matrix["matrixIn"][1]  << self.transform_node["worldInverseMatrix"][0]
 
         cntrl_inst = control.Circle.create(instance_name=self.container_node[self._BLD_INST_NAME], parent=self, build_s=4, color=control_color)
@@ -83,8 +69,10 @@ class SingleXform(base_comp.Anim):
         self._set_xform_attrs(
             index=0,
             xform_type=self.IO_ENUM.output,
-            init_matrix=setup_inst_out_xform[self.HIER_DATA.OUTPUT_INIT_MATRIX],
-            init_inv_matrix=setup_inst_out_xform[self.HIER_DATA.OUTPUT_INIT_INV_MATRIX],
+            xform_name=self.container_node[self._BLD_INST_NAME],
+            init_matrix=setup_out_xform0[self.HIER_DATA.OUTPUT_INIT_MATRIX],
+            init_inv_matrix=setup_out_xform0[self.HIER_DATA.OUTPUT_WORLD_MATRIX],
             world_matrix=cntrl_inst.container_node[cntrl_inst._OUT_WS_MAT],
             world_inv_matrix=cntrl_inst.container_node[cntrl_inst._OUT_WS_INV_MAT],
         )
+        self.rename_children()
