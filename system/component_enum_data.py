@@ -105,9 +105,12 @@ class MayaEnumAttr(Enum):
         for index, key in enumerate(enum_dict.keys()):
             value = enum_dict[key] - out_min
 
-            remap_node["value[{}].value_FloatValue".format(index)] = float(value)/out_diff
-            remap_node["value[{}].value_Position".format(index)] = interval_len * index
-            remap_node["value[{}].value_Interp".format(index)] = 1
+            remap_node[f"value[{index}].value_FloatValue"] = float(value)/out_diff
+            remap_node[f"value[{index}].value_Position"] = interval_len * index
+            remap_node[f"value[{index}].value_Interp"] = 1
+
+        # lock value attribute afterwards
+        remap_node[f"value"].set_locked(True)
 
         return remap_node
     

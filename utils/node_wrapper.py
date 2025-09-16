@@ -1069,14 +1069,16 @@ class Attr():
         elif attr_type == "matrix":
             cmds.setAttr(str(self), value, type='matrix')
         elif attr_type == "enum":
-            if not hasattr(self, "enum_list"):
-                self.enum_list = cmds.attributeQuery(self.short_name, node=str(self.node), listEnum=True)[0].split(":")
             if isinstance(value, str):
+                if not hasattr(self, "enum_list"):
+                    self.enum_list = cmds.attributeQuery(self.short_name, node=str(self.node), listEnum=True)[0].split(":")
                 index = self.enum_list.index(value)
                 if index != -1:
                     value = index
             cmds.setAttr(str(self), value)
 
+        # elif self.type_ == "long":
+        #     self.__attr_data_map__[self._plug_attr_type("kEnumAttribute")]["set"](plug, value)
         elif self._plug_attr_type(plug) in self.__attr_data_map__.keys():
             self.__attr_data_map__[self._plug_attr_type(plug)]["set"](plug, value)
         else:

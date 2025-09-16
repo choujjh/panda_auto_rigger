@@ -12,9 +12,9 @@ class SimpleLimb(base_comp.Anim):
     _setup_component_type = setup.SimpleLimb
 
     @classmethod
-    def create(cls, instance_name = None, parent = None, primary_axis = component_enum_data.AxisEnum.x, secondary_axis = component_enum_data.AxisEnum.y, add_settings_cntrl = True, mirror_source = None, source_component = None, connect_hierarchy = True, connect_axis_vecs = True, control_color=None, setup_color=None, hier_side = component_enum_data.CharacterSide.none):
-        return super().create(instance_name, parent, 3, primary_axis, secondary_axis, add_settings_cntrl, mirror_source, source_component, connect_hierarchy, connect_axis_vecs, control_color, setup_color, hier_side)
-    
+    def create(cls, instance_name = None, parent = None, primary_axis = component_enum_data.AxisEnum.x, secondary_axis = component_enum_data.AxisEnum.y, add_settings_cntrl = True, mirror_source = None, mirror_axis = component_enum_data.AxisEnum.x, source_component = None, connect_hierarchy = True, connect_axis_vecs = True, control_color=None, setup_color=None, hier_side = component_enum_data.CharacterSide.none):
+        return super().create(instance_name, parent, 3, primary_axis, secondary_axis, add_settings_cntrl, mirror_source, mirror_axis, source_component, connect_hierarchy, connect_axis_vecs, control_color, setup_color, hier_side)
+
     def _override_build(self, control_color=None, **build_kwargs):
         HIER_DATA = self.HIER_DATA
 
@@ -50,8 +50,8 @@ class SingleXform(base_comp.Anim):
     """Single Joint Component"""
 
     @classmethod
-    def create(cls, instance_name = "single_xform", parent = None, primary_axis = component_enum_data.AxisEnum.x, secondary_axis = component_enum_data.AxisEnum.y, add_settings_cntrl = True, mirror_source = None, source_component = None, connect_hierarchy = True, connect_axis_vecs = True, control_color=None, setup_color=None, hier_side = component_enum_data.CharacterSide.none):
-        return super().create(instance_name, parent, 1, primary_axis, secondary_axis, add_settings_cntrl, mirror_source, source_component, connect_hierarchy, connect_axis_vecs, control_color, setup_color, hier_side)
+    def create(cls, instance_name = None, parent = None, primary_axis = component_enum_data.AxisEnum.x, secondary_axis = component_enum_data.AxisEnum.y, add_settings_cntrl = True, mirror_source = None, mirror_axis = component_enum_data.AxisEnum.x, source_component = None, connect_hierarchy = True, connect_axis_vecs = True, control_color=None, setup_color=None, hier_side = component_enum_data.CharacterSide.none):
+        return super().create(instance_name, parent, 1, primary_axis, secondary_axis, add_settings_cntrl, mirror_source, mirror_axis, source_component, connect_hierarchy, connect_axis_vecs, control_color, setup_color, hier_side)
 
     def _override_build(self, control_color=None, **build_kwargs):
         setup_out_xform0 = self.setup_component.get_xform_attrs(xform_type=self.IO_ENUM.output, index=0)

@@ -1,5 +1,7 @@
 import utils.node_wrapper as nw
 import system.component_enum_data as component_enum_data
+from typing import Union
+import utils.utils as utils
 
 class NodeData():
     """Class to encapsulate node data to add attributes, publish attributes etc
@@ -240,9 +242,9 @@ class HierData:
         OUTPUT_WORLD_MATRIX (str):
         OUTPUT_WORLD_INV_MATRIX (str):
         OUTPUT_LOC_MATRIX (str):
-        __HIER_DATA_NAMES (list(str)):
-        __INPUT_DATA_NAMES (list(str)):
-        __OUTPUT_DATA_NAMES (list(str)):
+        HIER_DATA_NAMES (list(str)):
+        INPUT_DATA_NAMES (list(str)):
+        OUTPUT_DATA_NAMES (list(str)):
         """
 
     HIERARCHY = "hierarchy"
@@ -386,7 +388,7 @@ class HierData:
 
         return True
     @classmethod
-    def __gen_hier_nodeData(cls, parent_name:str, attr_names, multi=True):
+    def __gen_hier_node_data(cls, parent_name:str, attr_names, multi=True):
         """Given a parent name and attribute names generates the Node Data to build
         it. only sets attributes to string or matrix. (string if "Name" is in the 
         name)
@@ -413,7 +415,7 @@ class HierData:
         Returns:
             NodeData:
         """
-        return cls.__gen_hier_nodeData(cls.HIERARCHY, cls.HIER_DATA_NAMES, multi=False)
+        return cls.__gen_hier_node_data(cls.HIERARCHY, cls.HIER_DATA_NAMES, multi=False)
     @classmethod
     def get_input_xform_data(cls):
         """Returns NodeData for an input xform
@@ -424,7 +426,7 @@ class HierData:
         Returns:
             NodeData:
         """
-        return cls.__gen_hier_nodeData(cls.INPUT_XFORM, cls.INPUT_DATA_NAMES, multi=True)
+        return cls.__gen_hier_node_data(cls.INPUT_XFORM, cls.INPUT_DATA_NAMES, multi=True)
     @classmethod
     def get_output_xform_data(cls):
         """Returns NodeData for an output xform
@@ -432,4 +434,51 @@ class HierData:
         Returns:
             NodeData:
         """
-        return cls.__gen_hier_nodeData(cls.OUTPUT_XFORM, cls.OUTPUT_DATA_NAMES, multi=True)
+        return cls.__gen_hier_node_data(cls.OUTPUT_XFORM, cls.OUTPUT_DATA_NAMES, multi=True)
+
+
+class Xform():
+    def __init__(self, 
+                    xform_attr:nw.Attr=None, 
+                    xform_type:component_enum_data.IO=component_enum_data.IO.input,
+                    xform_name:Union[str, nw.Attr]=None, 
+                    init_matrix:Union[utils.Matrix, nw.Attr]=None, 
+                    init_inv_matrix:Union[utils.Matrix, nw.Attr]=None, 
+                    world_matrix:Union[utils.Matrix, nw.Attr]=None, 
+                    world_inv_matrix:Union[utils.Matrix, nw.Attr]=None, 
+                    loc_matrix:Union[utils.Matrix, nw.Attr]=None):
+        if xform_attr is not None:
+            if HierData.is_input_xform_attr(xform_attr):
+                self.xform_type = component_enum_data.IO.input
+            elif HierData.is_output_xform_attr(xform_attr):
+                self.xform_type = component_enum_data.IO.output
+            else:
+                raise RuntimeError(f"{xform_attr} is not an xform attribute")
+            
+            if HierData.is_input_enum(self.xform_type):
+                self.xform_name = xform_attr[HierData.INPUT_XFORM_NAME]
+                self.init_matrix = xform_attr[HierData.INPUT_INIT_MATRIX]
+                self.init_inv_matrix = xform_attr[HierData.INPUT_INIT_INV_MATRIX]
+                self.world_matrix = xform_attr[HierData.INPUT_WORLD_MATRIX]
+                self.world_inv_matrix = xform_attr[HierData.INPUT_WORLD_INV_MATRIX]
+                self.loc_matrix = xform_attr[HierData.INPUT_LOC_MATRIX]
+            else:
+                self.xform_name = xform_attr[HierData.OUTPUT_XFORM_NAME]
+                self.init_matrix = xform_attr[HierData.OUTPUT_INIT_MATRIX]
+                self.init_inv_matrix = xform_attr[HierData.OUTPUT_INIT_INV_MATRIX]
+                self.world_matrix = xform_attr[HierData.OUTPUT_WORLD_MATRIX]
+                self.world_inv_matrix = xform_attr[HierData.OUTPUT_WORLD_INV_MATRIX]
+                self.loc_matrix = xform_attr[HierData.OUTPUT_LOC_MATRIX]
+
+        else:
+            self.xform_type = xform_type
+            self.xform_name = xform_name
+            self.init_matrix = init_matrix
+            self.init_inv_matrix = init_inv_matrix
+            self.world_matrix = world_matrix
+            self.world_inv_matrix = world_inv_matrix
+            self.loc_matrix = loc_matrix
+
+            not_none_list = [x for x in [self.xform_name, self.init_matrix, self.init_inv_matrix, self.world_matrix, self.world_inv_matrix, self.loc_matrix] if x is not None]
+            if len(not_none_list) == 0:
+                raise RuntimeError(f"{self.__repr__()} fields cannot all be None")

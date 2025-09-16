@@ -56,7 +56,10 @@ class Setup(base_comp.Hierarchy):
         post_build_kwargs={}
 
         return cls._filtered_create(pre_build_kwargs=pre_build_kwargs, build_kwargs=build_kwargs, post_build_kwargs=post_build_kwargs)
-    
+    def _post_build(self, **post_build_kwargs):
+        if not self.container_node[self._OUT_SET_CNTRL_LOC_MAT].has_src_connection():
+            self.container_node[self._IN_SET_CNTRL_LOC_MAT] >> self.container_node[self._OUT_SET_CNTRL_LOC_MAT]
+        super()._post_build(**post_build_kwargs)
     def _override_build(self, control_color=None, **kwargs):
         input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
         for index, input_xform in input_xforms.items():
@@ -340,5 +343,86 @@ class SimpleLimb(Setup):
             loc_matrix=xform_matrix2_loc["matrixSum"]
         )
         self.container_node.add_nodes(xform_matrix2_ws, xform_matrix2_loc)
+
 class Mirror(Setup):
-    pass
+    """Class that mirrors all xforms given"""
+    
+    _IN_MIRROR_AXIS = "mirrorAxis"
+    _IN_AXIS_SCALAR = "AxisScalar"
+    _IN_NEG_AXIS_SCALAR = "negAxisScalar"
+    _IN_MIRROR_MAT = "mirrorMatrix"
+    _KWG_MIRROR_AXIS = "mirror_axis"
+
+    @classmethod
+    def create(cls, instance_name = None, parent = None, init_num_xforms = 3, mirror_axis:Union[component_enum_data.AxisEnum, nw.Attr]=component_enum_data.AxisEnum.x, source_component = None, connect_hierarchy = True, connect_axis_vecs = True, control_color=None):
+        setup_inst = super().create(instance_name, parent, init_num_xforms, source_component, connect_hierarchy, connect_axis_vecs, control_color)
+        if isinstance(mirror_axis, nw.Attr):
+            setup_inst.container_node[cls._IN_MIRROR_AXIS] << mirror_axis
+        else:
+            setup_inst.container_node[cls._IN_MIRROR_AXIS] = mirror_axis.name
+        return setup_inst
+
+    def _input_attr_build_data(self):
+        node_data = super()._input_attr_build_data()
+        node_data.extend_attr_data(
+            component_data.AttrData(self._IN_MIRROR_AXIS, type_=component_enum_data.AxisEnum.x, parent=self._IN),
+            component_data.AttrData(self._IN_AXIS_SCALAR, type_="float", value=1, locked=True, parent=self._IN),
+            component_data.AttrData(self._IN_NEG_AXIS_SCALAR, type_="float", value=-1, locked=True, parent=self._IN),
+            component_data.AttrData(self._IN_MIRROR_MAT, type_="matrix", parent=self._IN),
+        )
+        return node_data
+
+    def _override_build(self, control_color=None, **kwargs):
+        self.__create_mirror_scale_matrix()
+
+        added_nodes = []
+        input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
+        for index, input_xform in input_xforms.items():
+            mult_mat = nw.create_node("multMatrix", f"xform{index}_ws")
+            mult_mat["matrixIn"][0] << input_xform[self.HIER_DATA.INPUT_INIT_MATRIX]
+            mult_mat["matrixIn"][1] << self.container_node[self._IN_MIRROR_MAT]
+
+            pick_mat = nw.create_node("pickMatrix", f"xform{index}_noScale")
+            pick_mat["inputMatrix"] << mult_mat["matrixSum"]
+            pick_mat["useScale"] = False
+            pick_mat["useShear"] = False
+
+            aim_mat = nw.create_node("aimMatrix", f"xform{index}_realign")
+            for attr in ["inputMatrix", "primaryTargetMatrix", "secondaryTargetMatrix"]:
+                aim_mat[attr] << pick_mat["outputMatrix"]
+            aim_mat["primaryTargetVector"] = [-1, 0, 0]
+            aim_mat["secondaryTargetVector"] = [0, -1, 0]
+            for attr in ["primaryMode", "secondaryMode"]:
+                aim_mat[attr] = 1
+
+            self._set_xform_attrs(
+                index=index,
+                xform_type=self.IO_ENUM.output,
+                xform_name=input_xform[self.HIER_DATA.INPUT_XFORM_NAME],
+                init_matrix=aim_mat["outputMatrix"],
+                world_matrix=aim_mat["outputMatrix"],
+            )
+            added_nodes.extend([mult_mat, pick_mat, aim_mat])
+
+        self.container_node.add_nodes(*added_nodes)
+    def __create_mirror_scale_matrix(self):
+        x_choice = nw.create_node("choice", "xScalar")
+        y_choice = nw.create_node("choice", "YScalar")
+        z_choice = nw.create_node("choice", "ZScalar")
+        for axis_enum_index, axis in enumerate(component_enum_data.AxisEnum):
+            axis_vec = axis.value
+            for axis_index, choice_node in enumerate([x_choice, y_choice, z_choice]):
+                if abs(axis_vec[axis_index]) < 0.001:
+                    choice_node["input"][axis_enum_index] << self.container_node[self._IN_AXIS_SCALAR]
+                else:
+                    choice_node["input"][axis_enum_index] << self.container_node[self._IN_NEG_AXIS_SCALAR]
+        scale_matrix = nw.create_node("fourByFourMatrix", "scaleMat4x4")
+        scale_matrix["output"] >> self.container_node[self._IN_MIRROR_MAT]
+        x_choice["output"] >> scale_matrix["in00"]
+        x_choice["selector"] << self.container_node[self._IN_MIRROR_AXIS]
+        y_choice["output"] >> scale_matrix["in11"]
+        y_choice["selector"] << self.container_node[self._IN_MIRROR_AXIS]
+        z_choice["output"] >> scale_matrix["in22"]
+        z_choice["selector"] << self.container_node[self._IN_MIRROR_AXIS]
+
+        self.container_node.add_nodes(x_choice, y_choice, z_choice, scale_matrix)

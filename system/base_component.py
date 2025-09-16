@@ -17,7 +17,7 @@ def get_component(container_node:nw.Container):
     """
     if container_node is None:
         return None
-    if container_node.has_attr("componentClass"):
+    if container_node.has_attr("componentClass") and isinstance(container_node, nw.Container):
         component_class = utils.string_to_class(container_node["componentClass"].value)
         return component_class(container_node)
 
@@ -66,10 +66,10 @@ class Component():
             container_node (nw.Node, optional): container to initialize with 
             (incase component is already existing). Defaults to None.
         """
-        self.__node_data_cache = {}
+        self._node_data_cache = {}
         if container_node is not None:
-            self.__node_data_cache["container_node"] = container_node
-    def _get_node_data_from_cache(self, key:str) -> nw.Node:
+            self._node_data_cache["container_node"] = container_node
+    def _get_node_from_cache(self, key:str) -> nw.Node:
         """Caching function for all saved nodes so connections don't have to be 
         queried every time. if not cached yet, node is saved
 
@@ -79,14 +79,32 @@ class Component():
         Returns:
             nw.Node: node from cache
         """
-        if key not in self.__node_data_cache.keys():
+        if key not in self._node_data_cache.keys():
             if self.container_node.has_attr(key):
-                self.__node_data_cache[key] = self.container_node[key].get_dest_connections()[0].node
+                self._node_data_cache[key] = self.container_node[key].get_dest_connections()[0].node
             else:
                 cmds.warning(f"{key} does not exist on component")
                 return
         
-        return self.__node_data_cache[key]
+        return self._node_data_cache[key]
+    def _get_node_from_key(self, key:str, as_component:bool=False) ->nw.Node:
+        """Check for container before returning cached node
+
+        Args:
+            key (str):
+            as_component (bool): tries to cast node to component
+
+        Returns:
+            nw.Node:
+        """
+        if self.container_node is not None:
+            node = self._get_node_from_cache(key)
+            if as_component:
+                curr_component = get_component(node)
+                if curr_component is None:
+                    return node
+                return curr_component
+            return node    
 
     # node attr
     @property 
@@ -96,8 +114,8 @@ class Component():
         Returns:
             nw.Container:
         """
-        if "container_node" in self.__node_data_cache.keys():
-            return self.__node_data_cache["container_node"]
+        if "container_node" in self._node_data_cache.keys():
+            return self._node_data_cache["container_node"]
     @property 
     def input_node(self)->nw.Node:
         """Node that all incoming connections come through this node
@@ -105,8 +123,7 @@ class Component():
         Returns:
             nw.Node:
         """
-        if self.container_node is not None:
-            return self._get_node_data_from_cache("input_node")
+        return self._get_node_from_key("input_node")
     @property 
     def output_node(self)->nw.Node:
         """Node that all outgoing connections go through this node
@@ -114,8 +131,7 @@ class Component():
         Returns:
             nw.Node:
         """
-        if self.container_node is not None:
-            return self._get_node_data_from_cache("output_node")
+        return self._get_node_from_key("output_node")
     @property 
     def transform_node(self)->nw.Transform:
         """Transform node (also input node). if no transform node is created 
@@ -333,7 +349,7 @@ class Component():
             output_node_attr_data.add_attrs_to_node(output_node)
 
         # container node
-        self.__node_data_cache["container_node"] = nw.create_node("container", "container")
+        self._node_data_cache["container_node"] = nw.create_node("container", "container")
         container_node_attr_data = self._container_attr_build_data()
         container_node_attr_data.add_attrs_to_node(self.container_node)
         if parent_container is not None:
@@ -1163,6 +1179,9 @@ class Anim(Hierarchy):
     _IN_SET_XFORM_FOLLOW_INDEX = "settingXformFollowIndex"
     _IN_SET_CNTRL_LOC_MAT = "inputSettingCntrlLocMatrix"
     _OUT_SET_CNTRL_LOC_MAT = "outputSettingCntrlLocMatrix"
+    _MIRROR_SRC = "mirrorSource"
+    _MIRROR_DEST = "mirrorDest"
+    _MIRROR_AXIS = "mirrorAxis"
 
     _KWG_HIER_SIDE = "hier_side"
     _KWG_SETUP_CLR = "setup_color"
@@ -1170,6 +1189,7 @@ class Anim(Hierarchy):
     _KWG_SEC_AXIS = "secondary_axis"
     _KWG_ADD_SETTINGS_CNTRL = "add_settings_cntrl"
     _KWG_MIRROR_SRC = "mirror_source"
+    _KWG_MIRROR_AXIS = "mirror_axis"
     
     import component.setup as setup
     @property
@@ -1184,9 +1204,7 @@ class Anim(Hierarchy):
         Returns:
             setup.Setup:
         """
-        if self.container_node is not None:
-            if self.container_node.has_attr("setup_container"):
-                return get_component(self._get_node_data_from_cache("setup_container"))
+        return self._get_node_from_key("setup_container", as_component=True)
     @property
     def settings_component(self)->Control:
         """Returns settings component (if one exists)
@@ -1194,9 +1212,7 @@ class Anim(Hierarchy):
         Returns:
             Control:
         """
-        if self.container_node is not None:
-            if self.container_node.has_attr("settings_container"):
-                return get_component(self._get_node_data_from_cache("settings_container"))
+        return self._get_node_from_key("settings_container", as_component=True)
     @property
     def settings_guide_component(self)->Control:
         """Returns settings guide component (if one exists)
@@ -1204,9 +1220,34 @@ class Anim(Hierarchy):
         Returns:
             Control:
         """
+        return self._get_node_from_key("settings_guide_container", as_component=True)
+    @property
+    def mirror_dest_component(self)->"Anim":
+        """Get mirror destination component
+
+        Returns:
+            Anim:
+        """
+        return self._get_node_from_key(self._MIRROR_SRC, as_component=True)
+    @property
+    def mirror_src_component(self)->"Anim":
+        """Get mirror source component
+
+        Returns:
+            Anim:
+        """
         if self.container_node is not None:
-            if self.container_node.has_attr("settings_guide_container"):
-                return get_component(self._get_node_data_from_cache("settings_guide_container"))
+            if self._MIRROR_DEST not in self._node_data_cache.keys():
+                if self.container_node.has_attr(self._MIRROR_DEST):
+                    if self.container_node[self._MIRROR_DEST].has_src_connection():
+                        node = self.container_node[self._MIRROR_DEST].get_src_connection()
+                        self._node_data_cache[self._MIRROR_DEST] = node
+        if self._MIRROR_DEST in self._node_data_cache.keys():
+            node = self._node_data_cache[self._MIRROR_DEST]
+            component = get_component(node)
+            if component is not None:
+                return component
+            return node
 
     def _input_attr_build_data(self):
         node_data = super()._input_attr_build_data()
@@ -1232,6 +1273,7 @@ class Anim(Hierarchy):
             prefix = ""
         parent_namespace, curr_namespace = namespace.rsplit(":", 1)
         return f"{parent_namespace}:{prefix}{curr_namespace}"
+    
     @classmethod
     def create(cls, 
                instance_name:Union[str, nw.Attr]=None, 
@@ -1241,6 +1283,7 @@ class Anim(Hierarchy):
                secondary_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.y,
                add_settings_cntrl:bool=True,
                mirror_source:"Anim"=None,
+               mirror_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x,
                source_component:Component=None, 
                connect_hierarchy:bool=True, 
                connect_axis_vecs:bool=True, 
@@ -1260,7 +1303,8 @@ class Anim(Hierarchy):
             cls._KWG_ADD_SETTINGS_CNTRL:add_settings_cntrl,
             cls._KWG_MIRROR_SRC:mirror_source,
             cls._KWG_SETUP_CLR:setup_color,
-            cls._KWG_CNTR_CLR:control_color,}
+            cls._KWG_CNTR_CLR:control_color,
+            cls._KWG_MIRROR_AXIS:mirror_axis,}
         build_kwargs={
             cls._KWG_CNTR_CLR:control_color,
         }
@@ -1268,10 +1312,99 @@ class Anim(Hierarchy):
         
         return cls._filtered_create(pre_build_kwargs=pre_build_kwargs, build_kwargs=build_kwargs, post_build_kwargs=post_build_kwargs)
     
-    def mirror(self, control_color=None, setup_color=None):
-        pass
+    def mirror(self, control_color=None, setup_color=None, mirror_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x):
+        parent = None
+        mirror_component = type(self).create(parent=parent, source_component=self, mirror_source=self, mirror_axis=mirror_axis, control_color=control_color, setup_color=setup_color, connect_hierarchy=False, connect_axis_vecs=False)
 
-    def __set_vectors(self, mirror_source:"Anim"=None):
+        return mirror_component
+
+    def _pre_build(self, 
+                   instance_name:Union[str, nw.Attr]=None, 
+                   parent:Component=None, 
+                   init_num_xforms:Union[int, tuple]=0, 
+                   hier_side:component_enum_data.CharacterSide=component_enum_data.CharacterSide.none, 
+                   primary_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x,
+                   secondary_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.y,
+                   add_settings_cntrl:bool=True,
+                   mirror_source:"Anim"=None,
+                   mirror_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x,
+                   setup_color=None,
+                   control_color=None,
+                   source_component:Component=None, 
+                   connect_hierarchy:bool=None, 
+                   connect_axis_vec:bool=True,
+                   **pre_build_kwargs):
+        # calling super
+        super()._pre_build(
+            instance_name=instance_name, 
+            parent=parent, 
+            init_num_xforms=init_num_xforms, 
+            source_component=source_component, 
+            connect_hierarchy=connect_hierarchy, 
+            connect_axis_vec=connect_axis_vec, 
+            **pre_build_kwargs)
+        # setting values
+        self.container_node[self._HIER_SIDE]=hier_side.name
+        self.container_node[self._IN_PRM_AXIS]=primary_axis.name
+        self.container_node[self._IN_SEC_AXIS]=secondary_axis.name
+
+        # if mirror source connect other attrs from last time
+        if mirror_source is not None:
+            self.__connect_mirror_source(mirror_source=mirror_source)
+            self.input_node.add_attr(self._MIRROR_AXIS, type="enum", enumName=component_enum_data.AxisEnum.maya_enum_str())
+            self.container_node.publish_attr(self.input_node[self._MIRROR_AXIS], attr_bind_name=self._MIRROR_AXIS)
+            self.container_node[self._MIRROR_AXIS] = component_enum_data.AxisEnum.index_of(mirror_axis)
+
+        # populating primary, secondary, and tertiary vectors
+        self.__set_vectors()
+        
+        # create setup component
+        self.__create_setup_component(init_num_xforms=init_num_xforms, setup_color=setup_color, mirror_source=mirror_source, mirror_axis=mirror_axis)
+
+        # adding settings cntrl
+        if add_settings_cntrl:
+            self.__create_settings_cntrls(setup_color=setup_color, control_color=control_color)
+            
+        self.rename_nodes()
+    
+    def __connect_mirror_source(self, mirror_source:"Anim"):
+        """Connects all necessary attributes from mirror source
+
+        Args:
+            mirror_source (Anim): _description_
+        """
+        mirror_src_container = mirror_source.container_node
+        self_container = self.container_node
+
+        # add source and dest mirror attributes and connect it up
+        mirror_src_container.add_attr(self._MIRROR_SRC, type="message")
+        self_container.add_attr(self._MIRROR_DEST, type="message")
+
+        mirror_src_container[self._MIRROR_SRC] >> self_container[self._MIRROR_DEST]
+
+        # connect remap attrs
+        primary_axis_remap = component_enum_data.AxisEnum.create_remap("mirrorPrimaryAxisRemap")
+        secondary_axis_remap = component_enum_data.AxisEnum.create_remap("mirrorSecondaryAxisRemap")
+        char_side_remap = component_enum_data.CharacterSide.create_remap("mirrorHierSideRemap")
+
+        primary_axis_remap["inputValue"] << mirror_src_container[mirror_source._IN_PRM_AXIS]
+        primary_axis_remap["outValue"] >> self_container[self._IN_PRM_AXIS]
+
+        secondary_axis_remap["inputValue"] << mirror_src_container[mirror_source._IN_SEC_AXIS]
+        secondary_axis_remap["outValue"] >> self_container[self._IN_SEC_AXIS]
+        
+        char_side_remap["inputValue"] << mirror_src_container[mirror_source._HIER_SIDE]
+        char_side_remap["outValue"] >> self_container[self._HIER_SIDE]
+
+        self.container_node.add_nodes(primary_axis_remap, secondary_axis_remap, char_side_remap)
+
+        # connecting up other mirro source attributes
+        self_container[self._BLD_INST_NAME] << mirror_src_container[mirror_source._BLD_INST_NAME]
+        self_container[self._IN_SET_XFORM_FOLLOW_INDEX] << mirror_src_container[mirror_source._IN_SET_XFORM_FOLLOW_INDEX]
+        self_container[self._IN_SET_CNTRL_LOC_MAT] << mirror_src_container[mirror_source._OUT_SET_CNTRL_LOC_MAT]
+
+        self.rename_nodes()
+    def __set_vectors(self):
         """Creates nodes for primary, secondary, and tertiary vectors
 
         Args:
@@ -1293,8 +1426,6 @@ class Anim(Hierarchy):
         secondary_choice_node = axis_vec_choice_node(choice_node_name="primary_vec_choice", enum_attr=self.container_node[self._IN_SEC_AXIS])
         primary_axis_attr = primary_choice_node["output"]
         secondary_axis_attr = secondary_choice_node["output"]
-        if mirror_source:
-            raise NotImplementedError("mirror not implemented yet")
         tertiary_vec = nw.create_node("crossProduct", "tertiary_vec_prod")
         tertiary_vec["input1"] << primary_axis_attr
         tertiary_vec["input2"] << secondary_axis_attr
@@ -1304,7 +1435,7 @@ class Anim(Hierarchy):
         self.container_node[self._SEC_VEC] << secondary_axis_attr
 
         self.container_node.add_nodes(primary_choice_node, secondary_choice_node, tertiary_vec)
-    def __create_setup_component(self, init_num_xforms:Union[int, tuple]=0, setup_color=None, mirror_source:"Anim"=None):
+    def __create_setup_component(self, init_num_xforms:Union[int, tuple]=0, setup_color=None, mirror_source:"Anim"=None, mirror_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x):
         """Creates setup component and maps it to container
 
         Args:
@@ -1312,90 +1443,65 @@ class Anim(Hierarchy):
             setup_color (Any, optional): . Defaults to None.
             mirror_source (Anim, optional): . Defaults to None.
         """
+        import component.setup as setup
         if mirror_source is None:
-            build_setup = self.setup_component_type
+            setup_inst = self.setup_component_type.create(init_num_xforms=init_num_xforms, control_color=setup_color, parent=self, source_component=self)
         else:
-            build_setup = utils.string_to_class("component.setup.Mirror")
+            setup_inst = setup.Mirror.create(init_num_xforms=init_num_xforms, control_color=setup_color, parent=self, source_component=self, mirror_axis=mirror_axis)
 
-        setup_inst = build_setup.create(init_num_xforms=init_num_xforms, control_color=setup_color, parent=self, source_component=self)
         setup_inst.container_node[setup_inst._IN_SET_XFORM_FOLLOW_INDEX] << self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX]
         setup_inst.container_node[setup_inst._IN_SET_CNTRL_LOC_MAT] << self.container_node[self._IN_SET_CNTRL_LOC_MAT]
         setup_inst.container_node[setup_inst._OUT_SET_CNTRL_LOC_MAT] >> self.container_node[self._OUT_SET_CNTRL_LOC_MAT]
         utils.map_to_container(setup_inst.container_node, "setup_container")
-        self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX].set(len(self.get_xform_attrs(self.IO_ENUM.input)) - 1)
+        if self.mirror_src_component is None:
+            self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX] = len(self.get_xform_attrs(self.IO_ENUM.input)) - 1
     def __create_settings_cntrls(self, setup_color=None, control_color=None):
-        settings_init_choice = nw.create_node("choice", "settings_init_choice")
+        """Creates settings control. creates settings guide if not mirrored
+
+        Args:
+            setup_color (component_enum_data.Color, optional): Defaults to None.
+            control_color (component_enum_data.Color, optional): Defaults to None.
+        """
+        has_mirror_src  = self.mirror_src_component is not None
+
+        import component.control as control
+        #settings init
+        settings_init_choice = None
+        settings_init = None
+        if not has_mirror_src:
+            settings_init_choice = nw.create_node("choice", "settings_init_choice")
+            settings_init_choice["selector"] << self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX]
+            settings_init = control.Locator.create(instance_name="settings_guide", parent=self, color=setup_color)
+            settings_init.promote_attr_to_keyable(self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX])
+            settings_init.transform_node["translate"] = [1, 1, 1]
+            utils.map_to_container(settings_init.container_node, "settings_guide_container")
+
+            self.container_node.add_nodes(settings_init_choice)
+
         settings_choice = nw.create_node("choice", "settings_choice")
-        settings_init_choice["selector"] << self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX]
         settings_choice["selector"] << self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX]
         settings_mult = nw.create_node("multMatrix", "settings_ws_mult")
         
         # setting up controls
-        import component.control as control
-        settings_init = control.Locator.create(instance_name="settings_guide", parent=self, color=setup_color)
-        settings_init.promote_attr_to_keyable(self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX])
-        settings_init.transform_node["translate"] = [1, 1, 1]
         settings = control.Gear.create(instance_name="settings", parent=self, color=control_color)
-        utils.map_to_container(settings_init.container_node, "settings_guide_container")
         utils.map_to_container(settings.container_node, "settings_container")
         for attr in ["t", "r", "s"]:
             for axis in ["x", "y", "z"]:
                 settings.transform_node[f"{attr}{axis}"].set_locked(True)
                 settings.transform_node[f"{attr}{axis}"].set_keyable(False)
-        self.setup_component.container_node[self.setup_component._OUT_SET_CNTRL_LOC_MAT] << settings.container_node[settings._OUT_LOC_MAT]
-
-        # inserting offset matrix to control
-        settings_init.container_node[settings_init._IN_OFF_MAT] << settings_init_choice["output"]
-        settings.container_node[settings_init._IN_OFF_MAT] << settings_mult["matrixSum"]
-        settings_mult["matrixIn"][0] << settings_init.container_node[settings_init._OUT_LOC_MAT]
-        settings_mult["matrixIn"][1] << settings_choice["output"]
 
         anim_output_xforms = self.container_node[self.HIER_DATA.OUTPUT_XFORM]
         for index, output_xform in enumerate(anim_output_xforms):
-            settings_init_choice["input"][index] << output_xform[self.HIER_DATA.OUTPUT_INIT_MATRIX]
+            if not has_mirror_src:
+                settings_init_choice["input"][index] << output_xform[self.HIER_DATA.OUTPUT_INIT_MATRIX]
             settings_choice["input"][index] << output_xform[self.HIER_DATA.OUTPUT_WORLD_MATRIX]
 
-        self.container_node.add_nodes(settings_init_choice, settings_choice)
+        # inserting offset matrix to control
+        if not has_mirror_src:
+            settings_init.container_node[settings_init._IN_OFF_MAT] << settings_init_choice["output"]
+            settings_init.container_node[settings_init._OUT_LOC_MAT] >> self.container_node[self._IN_SET_CNTRL_LOC_MAT]
+        settings.container_node[settings._IN_OFF_MAT] << settings_mult["matrixSum"]
+        settings_mult["matrixIn"][0] << self.setup_component.container_node[self._OUT_SET_CNTRL_LOC_MAT]
+        settings_mult["matrixIn"][1] << settings_choice["output"]
 
-    def _pre_build(self, 
-                   instance_name:Union[str, nw.Attr]=None, 
-                   parent:Component=None, 
-                   init_num_xforms:Union[int, tuple]=0, 
-                   hier_side:component_enum_data.CharacterSide=component_enum_data.CharacterSide.none, 
-                   primary_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x,
-                   secondary_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.y,
-                   add_settings_cntrl:bool=True,
-                   mirror_source:"Anim"=None,
-                   setup_color=None,
-                   control_color=None,
-                   source_component:Component=None, 
-                   connect_hierarchy:bool=None, 
-                   connect_axis_vec:bool=True, 
-                   **pre_build_kwargs):
-        # calling super
-        super()._pre_build(
-            instance_name=instance_name, 
-            parent=parent, 
-            init_num_xforms=init_num_xforms, 
-            source_component=source_component, 
-            connect_hierarchy=connect_hierarchy, 
-            connect_axis_vec=connect_axis_vec, 
-            **pre_build_kwargs)
-        # setting values
-        self.container_node[self._HIER_SIDE]=hier_side.name
-        self.container_node[self._IN_PRM_AXIS]=primary_axis.name
-        self.container_node[self._IN_SEC_AXIS]=secondary_axis.name
-
-        # populating primary, secondary, and tertiary vectors
-        self.__set_vectors(mirror_source=mirror_source)
-
-        # create setup component
-        self.__create_setup_component(init_num_xforms=init_num_xforms, setup_color=setup_color, mirror_source=mirror_source)
-
-        # adding settings cntrl
-        if add_settings_cntrl:
-            self.__create_settings_cntrls(setup_color=setup_color, control_color=control_color)
-            
-        self.rename_nodes()
-    def _override_build(self, control_color=None, **build_kwargs):
-        return super()._override_build(control_color, **build_kwargs)
+        self.container_node.add_nodes(settings_choice)
