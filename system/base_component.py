@@ -1178,7 +1178,7 @@ class Hierarchy(Component):
             xform_type (component_enum_data.IO): selects input or output xform
             index (int, list):
         Returns:
-            dict: 
+            dict:
         """
         
         if index is None:

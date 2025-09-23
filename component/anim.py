@@ -22,10 +22,14 @@ class SimpleLimb(base_comp.Anim):
         merge_hier_inst = misc.MergeHier.create(source_components = [fk_inst, ik_inst], parent=self)
 
         for index in range(len(self.container_node[HIER_DATA.OUTPUT_XFORM])):
-            merge_output_xform = merge_hier_inst.container_node[HIER_DATA.OUTPUT_XFORM][index]
-            self_output_xform = self.container_node[HIER_DATA.OUTPUT_XFORM][index]
-            for attr_name in component_data.HierData.OUTPUT_DATA_NAMES:
-                merge_output_xform[attr_name] >> self_output_xform[attr_name]
+            self._set_xform_attrs(
+                index=index, 
+                xform_type=self.IO_ENUM.output,
+                xform=merge_hier_inst.get_xform_attrs(index=index, xform_type=self.IO_ENUM.output))
+            # merge_output_xform = merge_hier_inst.container_node[HIER_DATA.OUTPUT_XFORM][index]
+            # self_output_xform = self.container_node[HIER_DATA.OUTPUT_XFORM][index]
+            # for attr_name in component_data.HierData.OUTPUT_DATA_NAMES:
+            #     merge_output_xform[attr_name] >> self_output_xform[attr_name]
 
         # promoting to settings attr
         if self.settings_component is not None:
