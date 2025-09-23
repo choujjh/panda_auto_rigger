@@ -6,14 +6,12 @@ import component.control as control
 import system.component_data as component_data
 import system.component_enum_data as component_enum_data
 import utils.node_wrapper as nw
+import utils.utils as utils
 
 class SimpleLimb(base_comp.Anim):
     """Simple Limb Anim component (has a merged fk, ik, and a settings control). used in conjunction with simpleLimb setup"""
     _setup_component_type = setup.SimpleLimb
-
-    @classmethod
-    def create(cls, instance_name = None, parent = None, primary_axis = component_enum_data.AxisEnum.x, secondary_axis = component_enum_data.AxisEnum.y, add_settings_cntrl = True, mirror_source = None, mirror_axis = component_enum_data.AxisEnum.x, source_component = None, connect_hierarchy = True, connect_axis_vecs = True, control_color=None, setup_color=None, hier_side = component_enum_data.CharacterSide.none):
-        return super().create(instance_name, parent, 3, primary_axis, secondary_axis, add_settings_cntrl, mirror_source, mirror_axis, source_component, connect_hierarchy, connect_axis_vecs, control_color, setup_color, hier_side)
+    _max_num_xforms = (3, 3)
 
     def _override_build(self, control_color=None, **build_kwargs):
         HIER_DATA = self.HIER_DATA
@@ -30,35 +28,40 @@ class SimpleLimb(base_comp.Anim):
                 merge_output_xform[attr_name] >> self_output_xform[attr_name]
 
         # promoting to settings attr
-        settings_transform = self.settings_component.transform_node
+        if self.settings_component is not None:
+            settings_transform = self.settings_component.transform_node
 
-        settings_transform.add_attr("_", type="enum", enumName="FK_IK:")
-        settings_transform["_"].set_locked(True)
-        settings_transform["_"].set_keyable(True)
-        self.settings_component.promote_attr_to_keyable(attr=merge_hier_inst.container_node[merge_hier_inst._IN_HIER_BLEND], name="blend")
+            settings_transform.add_attr("_", type="enum", enumName="FK_IK:")
+            settings_transform["_"].set_locked(True)
+            settings_transform["_"].set_keyable(True)
+            self.settings_component.promote_attr_to_keyable(attr=merge_hier_inst.container_node[merge_hier_inst._IN_HIER_BLEND], name="blend")
 
-        settings_transform.add_attr("__", type="enum", enumName="IK:")
-        settings_transform["__"].set_locked(True)
-        settings_transform["__"].set_keyable(True)
-        self.settings_component.promote_attr_to_keyable(attr=ik_inst.container_node[ik_inst._IK_STRETCH_ENAB])
-        self.settings_component.promote_attr_to_keyable(attr=ik_inst.container_node[ik_inst._IK_SOFT_IK_ENAB])
-        self.settings_component.promote_attr_to_keyable(attr=ik_inst.container_node[ik_inst._IK_SOFT_BLEND_START])
-        self.settings_component.promote_attr_to_keyable(attr=ik_inst.container_node[ik_inst._IK_BLEND_TYP])
-        self.settings_component.promote_attr_to_keyable(attr=ik_inst.container_node[ik_inst._IK_BLEND_CRV])
+            settings_transform.add_attr("__", type="enum", enumName="IK:")
+            settings_transform["__"].set_locked(True)
+            settings_transform["__"].set_keyable(True)
+            self.settings_component.promote_attr_to_keyable(attr=ik_inst.container_node[ik_inst._IK_STRETCH_ENAB])
+            self.settings_component.promote_attr_to_keyable(attr=ik_inst.container_node[ik_inst._IK_SOFT_IK_ENAB])
+            self.settings_component.promote_attr_to_keyable(attr=ik_inst.container_node[ik_inst._IK_SOFT_BLEND_START])
+            self.settings_component.promote_attr_to_keyable(attr=ik_inst.container_node[ik_inst._IK_BLEND_TYP])
+            self.settings_component.promote_attr_to_keyable(attr=ik_inst.container_node[ik_inst._IK_BLEND_CRV])
+
+        # setting settings transform
+        if self.settings_guide_component is not None:
+            self.settings_guide_component.transform_node["t"] = -3 * self.container_node[self._SEC_VEC].value
+            ter_vec = self.container_node[self._TER_VEC].value
+            if ter_vec != utils.Vector(0, 1, 0) or ter_vec != utils.Vector(0, -1, 0):
+                self.settings_guide_component.transform_node["r"] = 90 * utils.Vector(0, 1, 0) ^ ter_vec
 
 class SingleXform(base_comp.Anim):
     """Single Joint Component"""
-
-    @classmethod
-    def create(cls, instance_name = None, parent = None, primary_axis = component_enum_data.AxisEnum.x, secondary_axis = component_enum_data.AxisEnum.y, add_settings_cntrl = True, mirror_source = None, mirror_axis = component_enum_data.AxisEnum.x, source_component = None, connect_hierarchy = True, connect_axis_vecs = True, control_color=None, setup_color=None, hier_side = component_enum_data.CharacterSide.none):
-        return super().create(instance_name, parent, 1, primary_axis, secondary_axis, add_settings_cntrl, mirror_source, mirror_axis, source_component, connect_hierarchy, connect_axis_vecs, control_color, setup_color, hier_side)
+    _max_num_xforms = (1, 1)
 
     def _override_build(self, control_color=None, **build_kwargs):
         setup_out_xform0 = self.setup_component.get_xform_attrs(xform_type=self.IO_ENUM.output, index=0)
-        self._set_xform_attrs(index=0, xform_type=self.IO_ENUM.input, xform_name=self.container_node[self._BLD_INST_NAME])
+        self._set_xform_attrs(index=0, xform_type=self.IO_ENUM.input, xform=self.XFORM(xform_name=self.container_node[self._BLD_INST_NAME]))
 
         cntrl_mult_matrix = nw.create_node("multMatrix", "cntrl_ws_offset_mat")
-        cntrl_mult_matrix["matrixIn"][0]  << setup_out_xform0[self.HIER_DATA.OUTPUT_WORLD_MATRIX]
+        cntrl_mult_matrix["matrixIn"][0]  << setup_out_xform0.world_matrix
         cntrl_mult_matrix["matrixIn"][1]  << self.transform_node["worldInverseMatrix"][0]
 
         cntrl_inst = control.Circle.create(instance_name=self.container_node[self._BLD_INST_NAME], parent=self, build_s=4, color=control_color)
@@ -69,10 +72,14 @@ class SingleXform(base_comp.Anim):
         self._set_xform_attrs(
             index=0,
             xform_type=self.IO_ENUM.output,
-            xform_name=self.container_node[self._BLD_INST_NAME],
-            init_matrix=setup_out_xform0[self.HIER_DATA.OUTPUT_INIT_MATRIX],
-            init_inv_matrix=setup_out_xform0[self.HIER_DATA.OUTPUT_WORLD_MATRIX],
-            world_matrix=cntrl_inst.container_node[cntrl_inst._OUT_WS_MAT],
-            world_inv_matrix=cntrl_inst.container_node[cntrl_inst._OUT_WS_INV_MAT],
+            xform=self.XFORM(
+                xform_name=self.container_node[self._BLD_INST_NAME],
+                init_matrix=setup_out_xform0.init_matrix,
+                init_inv_matrix=setup_out_xform0.world_matrix,
+                world_matrix=cntrl_inst.container_node[cntrl_inst._OUT_WS_MAT],
+                world_inv_matrix=cntrl_inst.container_node[cntrl_inst._OUT_WS_INV_MAT],
+            )
         )
-        self.rename_children()
+        self.settings_guide_component.transform_node["t"] = [0, 0, -6]
+
+        self._KWG_CNTRL_CLR

@@ -23,7 +23,8 @@ class FK(base_comp.Motion):
                 instance_name=input_xform[HIER_DATA.INPUT_XFORM_NAME], 
                 axis_vec=self.container_node[self._PRM_VEC].value, 
                 parent=self, 
-                color=control_color)
+                color=control_color,
+                xform_map_index=index)
             for attr in ["sx", "sy", "sz"]:
                 control_inst.transform_node[attr].set_locked(True)
                 control_inst.transform_node[attr].set_keyable(False)
@@ -43,7 +44,9 @@ class FK(base_comp.Motion):
             self._set_xform_attrs(
                 index=index,
                 xform_type=self.IO_ENUM.output,
-                world_matrix=control_inst.container_node[base_comp.Control._OUT_WS_MAT]
+                xform=self.XFORM(
+                    world_matrix=control_inst.container_node[base_comp.Control._OUT_WS_MAT]
+                )
             )
         self.container_node.add_nodes(*added_nodes)
 
@@ -51,6 +54,7 @@ class SimpleIK(base_comp.Motion):
     """Given the SimpleLimb creates a 2 chain IK chain"""
     class_namespace = "simple_IK"
     root_transform_name = "ik_grp"
+    _max_num_xforms = (3, 3)
 
     _IK = "IK"
     _IK_END_MAT = "IKEndMatrix"
@@ -89,13 +93,13 @@ class SimpleIK(base_comp.Motion):
             base_component.Control:
         """
         input_xform = self.get_xform_attrs(xform_type=self.IO_ENUM.input, index=input_xform_index)
-        control_inst = control.Box.create(instance_name=input_xform[self.HIER_DATA.INPUT_XFORM_NAME], parent=self, color=color)
+        control_inst = control.Box.create(instance_name=input_xform.xform_name, parent=self, color=color, xform_map_index=input_xform_index)
         for attr_name in ["sx", "sy", "sz"]:
             control_inst.transform_node[attr_name].set_locked(True)
             control_inst.transform_node[attr_name].set_keyable(False)
 
         mult_node = nw.create_node("multMatrix", f"{name}_cntrl_ws_mat")
-        mult_node["matrixIn"][0] << input_xform[self.HIER_DATA.INPUT_WORLD_MATRIX]
+        mult_node["matrixIn"][0] << input_xform.world_matrix
         mult_node["matrixIn"][1] << parent_init_inv_matrix
         mult_node["matrixIn"][2] << parent_world_matrix
         mult_node["matrixIn"][3] << self.transform_node["worldInverseMatrix"][0]
@@ -116,11 +120,11 @@ class SimpleIK(base_comp.Motion):
         input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
 
         len1_node = nw.create_node("distanceBetween", "len1_init_dist")
-        len1_node["inMatrix1"] << input_xforms[0][self.HIER_DATA.INPUT_WORLD_MATRIX]
-        len1_node["inMatrix2"] << input_xforms[1][self.HIER_DATA.INPUT_WORLD_MATRIX]
+        len1_node["inMatrix1"] << input_xforms[0].world_matrix
+        len1_node["inMatrix2"] << input_xforms[1].world_matrix
         len2_node = nw.create_node("distanceBetween", "len2_init_dist")
-        len2_node["inMatrix1"] << input_xforms[1][self.HIER_DATA.INPUT_WORLD_MATRIX]
-        len2_node["inMatrix2"] << input_xforms[2][self.HIER_DATA.INPUT_WORLD_MATRIX]
+        len2_node["inMatrix1"] << input_xforms[1].world_matrix
+        len2_node["inMatrix2"] << input_xforms[2].world_matrix
         curr_len_node = nw.create_node("distanceBetween", "curr_total_dist")
         curr_len_node["inMatrix1"] << root_control.container_node[base_comp.Control._OUT_WS_MAT]
         curr_len_node["inMatrix2"] << end_control.container_node[base_comp.Control._OUT_WS_MAT]
@@ -521,7 +525,7 @@ class SimpleIK(base_comp.Motion):
                 
             return "\n".join(expression_str)
         # control
-        pole_cntrl_inst = control.DiamondWire.create(instance_name="poleVec", parent=self, build_s=0.8, color=color)
+        pole_cntrl_inst = control.DiamondWire.create(instance_name="poleVec", parent=self, build_s=0.8, color=color, xform_map_index=1)
         for attr_name in ["sx", "sy", "sz"]:
             pole_cntrl_inst.transform_node[attr_name].set_locked(True)
             pole_cntrl_inst.transform_node[attr_name].set_keyable(False)
@@ -626,8 +630,10 @@ class SimpleIK(base_comp.Motion):
             self._set_xform_attrs(
                 index=index,
                 xform_type=self.IO_ENUM.output,
-                world_matrix=mult_matrix["matrixSum"],
-                loc_matrix=local_mat_attr
+                xform=self.XFORM(
+                    world_matrix=mult_matrix["matrixSum"],
+                    loc_matrix=local_mat_attr
+                )
             )
             xform_output_nodes.append(mult_matrix)
             if index == 1:
@@ -641,7 +647,7 @@ class SimpleIK(base_comp.Motion):
             ty_attr=xform2_rot_point["outputY"],
             tz_attr=xform2_rot_point["outputZ"]
         )
-        self._set_xform_attrs(index=2, xform_type=self.IO_ENUM.output, world_matrix=xform2_world_matrix["output"])
+        self._set_xform_attrs(index=2, xform_type=self.IO_ENUM.output, xform=self.XFORM(world_matrix=xform2_world_matrix["output"]))
 
         self.container_node.add_nodes(ik_base_mat_aim, *xform_output_nodes)
 

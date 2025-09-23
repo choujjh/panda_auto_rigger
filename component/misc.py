@@ -13,8 +13,6 @@ class VisualizeHier(base_comp.Hierarchy):
     class_namespace = "hier_vis"
 
     def _override_build(self, **kwargs):
-        HIER_DATA = self.HIER_DATA
-
         ws_grp = nw.create_node("transform", "worldSpace_grp")
         cmds.parent(str(ws_grp), str(self.transform_node))
         ws_grp["offsetParentMatrix"] << self.transform_node["worldInverseMatrix"][0]
@@ -27,8 +25,8 @@ class VisualizeHier(base_comp.Hierarchy):
         input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
         for index, input_xform in input_xforms.items():            
             # making controls
-            control_ws_inst = control.Axis.create(instance_name=f"{input_xform[HIER_DATA.INPUT_XFORM_NAME].value}_ws", parent=self)
-            control_loc_inst = control.Axis.create(instance_name=f"{input_xform[HIER_DATA.INPUT_XFORM_NAME].value}_loc", parent=self)
+            control_ws_inst = control.Axis.create(instance_name=f"{input_xform.xform_name.value}_ws", parent=self)
+            control_loc_inst = control.Axis.create(instance_name=f"{input_xform.xform_name.value}_loc", parent=self)
             # locking transforms
             for attr_name in ["t", "r", "s"]:
                 for axis in ["x", "y", "z"]:
@@ -37,20 +35,20 @@ class VisualizeHier(base_comp.Hierarchy):
             
             # setting up the rest of ws matrix
             cmds.parent(str(control_ws_inst.transform_node), str(ws_grp))
-            input_xform[HIER_DATA.INPUT_WORLD_MATRIX] >> control_ws_inst.container_node[base_comp.Control._IN_OFF_MAT]
+            input_xform.world_matrix >> control_ws_inst.container_node[base_comp.Control._IN_OFF_MAT]
 
             # setting up the rest of local matrix
             cmds.parent(str(control_loc_inst.transform_node), str(prev_loc_transform))
             if index != 0:
-                input_xform[HIER_DATA.INPUT_LOC_MATRIX] >> control_loc_inst.container_node[base_comp.Control._IN_OFF_MAT]
+                input_xform.loc_matrix >> control_loc_inst.container_node[base_comp.Control._IN_OFF_MAT]
             else:
-                input_xform[HIER_DATA.INPUT_WORLD_MATRIX] >> control_loc_inst.container_node[base_comp.Control._IN_OFF_MAT]
+                input_xform.world_matrix >> control_loc_inst.container_node[base_comp.Control._IN_OFF_MAT]
             prev_loc_transform = control_loc_inst.transform_node
 
             # connecting to component output
             output_xform = self.get_xform_attrs(xform_type=self.IO_ENUM.output, index=index)
-            for input_name, output_name in HIER_DATA.get_paired_names(self.IO_ENUM.input, self.IO_ENUM.output):
-                input_xform[input_name] >> output_xform[output_name]
+            for input_attr, output_attr in zip(input_xform, output_xform):
+                input_attr >> output_attr
 
         self.container_node.add_nodes(ws_grp)
 
@@ -62,6 +60,10 @@ class MergeHier(base_comp.Component):
     _IN_HIER_PAR_MAT = "hierParentMatricies"
     _IN_HIER_BLEND = "hierBlend"
     _KWG_SRC_COMPS = "source_components"
+
+    @property
+    def __hier_component(self):
+        return base_comp.Hierarchy(self.container_node)
 
     def _input_attr_build_data(self):
         node_data = super()._input_attr_build_data()
@@ -84,18 +86,21 @@ class MergeHier(base_comp.Component):
         return node_data
 
     @classmethod
-    def create(cls, source_components=[], instance_name = None, parent=None, **kwargs):
+    def create(cls, instance_name = None, parent=None, source_components=[], **kwargs):
         kwargs[cls._KWG_SRC_COMPS] = utils.make_iterable(source_components)
                 
-        pre_build_kwargs={
-            cls._KWG_INST_NAME:instance_name,
-            cls._KWG_PARENT:parent,
-            cls._KWG_SRC_COMPS:source_components
-        }
-        build_kwargs={}
-        post_build_kwargs={}
+        pre_build_kwargs, build_kwargs, post_build_kwargs = cls._process_kwargs(instance_name=instance_name, parent=parent, source_components=source_components)
+
         return cls._filtered_create(pre_build_kwargs=pre_build_kwargs, build_kwargs=build_kwargs, post_build_kwargs=post_build_kwargs)
     
+    @classmethod
+    def _process_kwargs(cls, instance_name = None, parent = None, source_components=[]):
+        pre_build_kwargs, build_kwargs, post_build_kwargs = super()._process_kwargs(instance_name, parent)
+        pre_build_kwargs.update({
+            cls._KWG_SRC_COMPS:source_components
+        })
+        return pre_build_kwargs, build_kwargs, post_build_kwargs
+
     def _pre_build(self, instance_name = None, parent=None, source_components=[], **pre_build_kwargs):
         super()._pre_build(instance_name, parent, **pre_build_kwargs)
         self._connect_source_hier_components(source_components=source_components)
@@ -106,7 +111,7 @@ class MergeHier(base_comp.Component):
         self.__blend_matricies(hier_parent_mat=hier_parent_mat, blend_weight_attrs=blend_weight_attrs)
         
     def __connect_hier(self):
-        """creates all nodes connected to hier"""
+        """Creates all nodes connected to hier"""
         # connecting hier
         hier_parent_mat = nw.create_node("blendMatrix", "hierParentMatrixBlend")
         for xform_index, hier_attr in enumerate(self.container_node[self._IN_HIER_PAR_MAT]):
@@ -117,7 +122,7 @@ class MergeHier(base_comp.Component):
         hier_parent_inv = nw.create_node("inverseMatrix", "hierParentInvMatrixBlend")
         hier_parent_inv["inputMatrix"] << hier_parent_mat["outputMatrix"]
         self.container_node[self.HIER_DATA.HIER_PARENT_MATRIX] << hier_parent_mat["outputMatrix"]
-        self.container_node[self.HIER_DATA.HIER_PARENT_INV_MATRIX] << hier_parent_inv["outputMatrix"] #TODO erroring out
+        self.container_node[self.HIER_DATA.HIER_PARENT_INV_MATRIX] << hier_parent_inv["outputMatrix"]
 
         self.container_node.add_nodes(hier_parent_mat, hier_parent_inv)
         return hier_parent_mat

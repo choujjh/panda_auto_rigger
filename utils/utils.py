@@ -208,6 +208,21 @@ def make_valid_maya_name(name:str):
         str: 
     """
     return name.replace("[", "_").replace("]", "").replace(" ", "_")
+def set_connect_attr_data(attr:nw.Attr, data, set_when_data_is_attr:bool=False):
+    """Connect to attribute if it can, but sets data otherwise
+
+    Args:
+        attr (nw.Attr):
+        data (Any):
+        set_when_attr (bool):
+    """
+    if isinstance(data, nw.Attr):
+        if set_when_data_is_attr:
+            attr.set(data.value)
+        else:
+            data >> attr
+    else:
+        attr.set(data)
 
 def is_iterable(obj):
     """Returns if something is iterable 
@@ -262,7 +277,7 @@ def make_len(curr_list:list, len_:int, default=0.0):
     if curr_list_len < len_:
         ending_list = [default for x in range(len_ - curr_list_len)]
         curr_list.extend(ending_list)
-        return ending_list
+        return curr_list
     elif curr_list_len > len_:
         return curr_list[:len_]
     return curr_list
@@ -404,6 +419,19 @@ def strip_characters(orig_str:str, strip_str:str, leading=True, trailing=True):
     if trailing:
         orig_str = orig_str.strip(strip_str)
     return orig_str
+def if_container_is_ancestor(child:nw.Container, ancestor:nw.Container):
+        """Sees if container is ancestor of child container
+
+        Args:
+            child (nw.Container):
+            ancestor (nw.Container):
+        """
+        curr_cntnr = child
+        while curr_cntnr is not None:
+            if curr_cntnr == ancestor:
+                return True
+            curr_cntnr = curr_cntnr.get_container_node()
+        return False
 
 class Namespace:
     """Class of static functions to handle namespaces"""
@@ -557,56 +585,6 @@ class Namespace:
             cls.add_namespace(new_name_parent)
         new_name = cls.strip_namespace(new_name)
         cmds.namespace(rename=[old_name, new_name], parent=new_name_parent)
-def identity_matrix():
-    """Returns identity matrix in an array
-
-    Returns:
-        list:
-    """
-    return [
-        1.0, 0.0, 0.0, 0.0,
-        0.0, 1.0, 0.0, 0.0,
-        0.0, 0.0, 1.0, 0.0,
-        0.0, 0.0, 0.0, 1.0
-    ]
-def zero_matrix():
-    """Returns zero matrix in an array
-
-    Returns:
-        list:
-    """
-    return [0.0 for x in range(16)]
-def translate_to_matrix(translation):
-    """Returns translation matrix in an array
-
-    Args:
-        translation (list): list of values for translation x, y, z
-
-    Returns:
-        list:
-    """
-    matrix = identity_matrix()
-    matrix[12] = translation[0]
-    matrix[13] = translation[1]
-    matrix[14] = translation[2]
-
-    return matrix
-def scale_matrix(scale):
-    """Returns translation matrix in an array
-
-    Args:
-        translation (list): list of values for translation x, y, z
-
-    Returns:
-        list:
-    """
-    matrix = identity_matrix()
-    matrix[0] = scale[0]
-    matrix[5] = scale[1]
-    matrix[10] = scale[2]
-
-    return matrix
-
 class Matrix(om2.MMatrix):
     """Class for matrix operations derived from MMatrix"""
     def __init__(self, *args):
@@ -619,15 +597,13 @@ class Matrix(om2.MMatrix):
         """
         if len(args) > 0 and isinstance(args[0], nw.Attr):
             if args[0].value is None:
-                
-                super(Matrix, self).__init__(zero_matrix())
-            else:
+                super(Matrix, self).__init__([x for x in range(16)])
+            elif args[0].type_ == "matrix":
                 super(Matrix, self).__init__(args[0].value)
         elif len(args) == 16:
             super(Matrix, self).__init__(args)
         else:
             super(Matrix, self).__init__(*args)
-
     def get(self, r, c):
         """Gets value in cell
 
@@ -639,7 +615,6 @@ class Matrix(om2.MMatrix):
             float:
         """
         return self[r * 4 + c]
-
     def setT(self, t):
         """Sets transform matrix
 
@@ -649,25 +624,22 @@ class Matrix(om2.MMatrix):
         self[12] = t[0]
         self[13] = t[1]
         self[14] = t[2]
-
     def __str__(self):
         """Returns string of translate, rotate, and scale values
 
         Returns:
             str:
         """
-        # values = [x for x in self.transpose()]
-        # return"[[{},{},{},{}],\n [{}, {}, {}, {}],\n [{}, {}, {}, {}],\n [{}, {}, {}, {}]]".format(*values)
-        return "Translate: {}, {}, {} | Rotate: {}, {}, {} | Scale: {}, {}, {}".format(*self.translate(), *self.rotate(), *self.scale())
-    
+        return f"Translate: {self.translate} | Rotate: {self.rotate} | Scale: {self.scale}"
+    @property
     def rotate(self):
         """Gets rotation values
 
         Returns:
             list:
         """
-        return self.as_degrees()
-
+        return self.as_degrees
+    @property
     def translate(self):
         """Gets translate values
 
@@ -675,16 +647,15 @@ class Matrix(om2.MMatrix):
             list:
         """
         return self[12], self[13], self[14]
-
+    @property
     def scale(self):
         """Gets Scale values
 
         Returns:
             list:
         """
-        return om2.MVector(self.axis(0)).length(), om2.MVector(self.axis(1)).length(), om2.MVector(self.axis(2)).length()
-
-    def axis(self, index):
+        return om2.MVector(self.column(0)).length(), om2.MVector(self.column(1)).length(), om2.MVector(self.column(2)).length()
+    def column(self, index):
         """returns a value column of the matrix
 
         Args:
@@ -695,7 +666,7 @@ class Matrix(om2.MMatrix):
         """
         i = index * 4
         return self[i], self[i + 1], self[i + 2]
-
+    @property
     def as_radians(self):
         """Gets rotation as radians
 
@@ -704,7 +675,7 @@ class Matrix(om2.MMatrix):
         """
         rx, ry, rz, ro = om2.MTransformationMatrix(self).rotationComponents(asQuaternion=False)
         return rx, ry, rz
-
+    @property
     def as_degrees(self):
         """Gets rotation as degrees
 
@@ -713,10 +684,7 @@ class Matrix(om2.MMatrix):
         """
         rx, ry, rz, ro = om2.MTransformationMatrix(self).rotationComponents(asQuaternion=False)
         return math.degrees(rx), math.degrees(ry), math.degrees(rz)
-
-    # def rotation(self):
-    #     return om2.Euler(om2.MTransformationMatrix(self).rotation())
-
+    @property
     def quaternion(self):
         """Gets quaternion values
 
@@ -724,5 +692,95 @@ class Matrix(om2.MMatrix):
             list:
         """
         return om2.QuaternionOrPoint().setValue(self)
+    def set_transform(self, transform:nw.Transform, world_space:bool=False):
+        """Sets tranform with it's contained matrix"""
+        cmds.xform(str(transform), worldSpace=world_space, matrix=list(self))
+
+    @classmethod
+    def identity_matrix(cls):
+        """Returns identity matrix in an array
+
+        Returns:
+            list:
+        """
+        return [
+            1.0, 0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0, 0.0,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 1.0
+        ]
+    @classmethod
+    def zero_matrix(cls):
+        """Returns zero matrix in an array
+
+        Returns:
+            list:
+        """
+        return cls([0.0 for x in range(16)])
+    @classmethod
+    def translate_matrix(cls, *translation):
+        """Returns translation matrix in an array
+
+        Args:
+            translation (list): list of values for translation x, y, z
+
+        Returns:
+            list:
+        """
+        matrix = cls.identity_matrix()
+        translation = make_len(list(translation), len_=3, default=0)
+        matrix[12] = translation[0]
+        matrix[13] = translation[1]
+        matrix[14] = translation[2]
+
+        return cls(matrix)
+    @classmethod
+    def scale_matrix(cls, *scale):
+        """Returns translation matrix in an array
+
+        Args:
+            translation (list): list of values for translation x, y, z
+
+        Returns:
+            list:
+        """
+        matrix = cls.identity_matrix()
+        scale = make_len(list(scale), len_=3, default=1)
+        matrix[0] = scale[0]
+        matrix[5] = scale[1]
+        matrix[10] = scale[2]
+
+        return matrix
+
 class Vector(om2.MVector):
-    pass
+    """Vector inherited from om2.Vector"""
+    def __add__(self, other):
+        return Vector(super().__add__(other))
+    def __iadd__(self, other):
+        return Vector(super().__iadd__(other))
+    def __imul__(self, other):
+        return Vector(super().__imul__(other))
+    def __isub__(self, other):
+        return Vector(super().__isub__(other))
+    def __itruediv__(self, other):
+        return Vector(super().__itruediv__(other))
+    def __mul__(self, other):
+        return Vector(super().__mul__(other))
+    def __neg__(self):
+        return Vector(super().__neg__())
+    def __radd__(self, other):
+        return Vector(super().__radd__(other))
+    def __rmul__(self, other):
+        return Vector(super().__rmul__(other))
+    def __rsub__(self, other):
+        return Vector(super().__rsub__(other))
+    def __rtruediv__(self, other):
+        return Vector(super().__rtruediv__(other))
+    def __rxor__(self, other):
+        return Vector(super().__rxor__(other))
+    def __sub__(self, other):
+        return Vector(super().__sub__(other))
+    def __truediv__(self, other):
+        return Vector(super().__truediv__(other))
+    def __xor__(self, other):
+        return Vector(super().__xor__(other))

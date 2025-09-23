@@ -714,8 +714,8 @@ class Transform(Node):
         for locked_attrs in transform_locked_attrs:
             locked_attrs.set_locked(True)
 
-        self["rotatePivot"] = [0.0, 0.0, 0.0]
-        self["scalePivot"] = [0.0, 0.0, 0.0]
+        # self["rotatePivot"] = [0.0, 0.0, 0.0]
+        # self["scalePivot"] = [0.0, 0.0, 0.0]
     def get_transform_locked_attrs(self):
         """Get's the transforms important attributes. Filtered by if the attribute 
         is locked
@@ -747,7 +747,7 @@ class Attr():
     """
     
 
-    __attr_data_map__ = {
+    __attr_data_map = {
         "kDoubleAngleAttribute":    {"get": lambda x: x.asMAngle().asDegrees(),     "set": lambda x, y: x.setDouble(om2.MAngle(y, 2).asRadians())},
         "kDoubleLinearAttribute":   {"get": lambda x: x.asDouble(),                 "set": lambda x, y: x.setDouble(y)},
         "kEnumAttribute":           {"get": lambda x: x.asInt(),                    "set": lambda x, y: x.setInt(y)},
@@ -1077,10 +1077,8 @@ class Attr():
                     value = index
             cmds.setAttr(str(self), value)
 
-        # elif self.type_ == "long":
-        #     self.__attr_data_map__[self._plug_attr_type("kEnumAttribute")]["set"](plug, value)
-        elif self._plug_attr_type(plug) in self.__attr_data_map__.keys():
-            self.__attr_data_map__[self._plug_attr_type(plug)]["set"](plug, value)
+        elif self._plug_attr_type(plug) in self.__attr_data_map.keys():
+            self.__attr_data_map[self._plug_attr_type(plug)]["set"](plug, value)
         else:
             cmds.setAttr(str(self), value)
 
@@ -1096,29 +1094,26 @@ class Attr():
 
         Returns:
         """
-        try:
-            if plug.isArray:
-                plug_list = [plug.elementByLogicalIndex(i) for i in range(plug.numElements())]
-                plug_list = [self._get_value(x) for x in plug_list]
-                return plug_list
-            elif plug.isCompound:
-                plug_list = [plug.child(i) for i in range(plug.numChildren())]
-                plug_list = [self._get_value(x) for x in plug_list]
-                return tuple(plug_list)
-            elif self._plug_attr_type(plug) in self.__attr_data_map__.keys():
-                return self.__attr_data_map__[self._plug_attr_type(plug)]["get"](plug)
-            # else:
-                # attr_type = cmds.getAttr(str(self), type=True)
+        from utils.utils import Vector, Matrix
+        # try:
+        return_value = None
+        if plug.isArray:
+            plug_list = [plug.elementByLogicalIndex(i) for i in range(plug.numElements())]
+            return_value = [self._get_value(x) for x in plug_list]
+        elif plug.isCompound:
+            plug_list = [plug.child(i) for i in range(plug.numChildren())]
+            return_value = tuple([self._get_value(x) for x in plug_list])
+        elif self._plug_attr_type(plug) in self.__attr_data_map.keys():
+            return_value = self.__attr_data_map[self._plug_attr_type(plug)]["get"](plug)
+        if return_value is None:
             return_value = cmds.getAttr(str(self))
-                # if attr_type == "matrix":
-                #     return_value = [return_value[i:i+4] for i in range(0, len(return_value), 4)]
-            return return_value
-        except RuntimeError as e:
-            print(f"ERROR {self} | {e}")
-            return None
-        except ValueError as e:
-            print(f"ERROR {self} | {e}")
-            return None
+        # casting it
+        if self.type_ == "double3" and isinstance(return_value, tuple):
+            return_value = Vector(return_value)
+        elif self.type_ == "matrix" and return_value is not None:
+            return_value = Matrix(return_value)
+
+        return return_value
     def __eq__(self, other):
         """Returns True if the other object is of type Attr and the 
         other's plug matches self's plug

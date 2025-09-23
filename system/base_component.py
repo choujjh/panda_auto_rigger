@@ -56,6 +56,7 @@ class Component():
     _OUT = "output"
     _CNTNR_PAR_COMP = "parentComponent"
     _CNTNR_CHLD_COMP = "childComponents"
+    _CNTNR_CNTRL_CHLDRN = "controlChildren"
     _KWG_INST_NAME = "instance_name"
     _KWG_PARENT  = "parent"
 
@@ -144,13 +145,13 @@ class Component():
             return self.input_node
     
     def child_components(self, component_type:component_enum_data.ComponentType=None)->list:
-        """_summary_
+        """gets child components
 
         Args:
             component_type (component_enum_data.ComponentType): defaults to None
 
         Returns:
-            list: _description_
+            list:
         """
         containers = [attr.get_dest_connections()[0].node for attr in self.container_node[self._CNTNR_CHLD_COMP]]
         if component_type is not None:
@@ -159,8 +160,15 @@ class Component():
             components = [get_component(container) for container in containers]
 
         return components
-    
-    def get_all_descendants(self)->list:
+    def get_all_descendants(self, component_type:component_enum_data.ComponentType=None)->list:
+        """Gets all descendent components
+
+        Args:
+            component_type (component_enum_data.ComponentType, optional): filters to component type. Defaults to None.
+
+        Returns:
+            list:
+        """
         descendants = self.child_components()
 
         index = 0
@@ -168,6 +176,8 @@ class Component():
             curr_children = descendants[index].child_components()
             descendants.extend(curr_children)
             index += 1
+        if component_type is not None:
+            descendants = [component for component in descendants if component.container_node.has_attr(self._BLD_COMP_TYPE) and component.container_node[self._BLD_COMP_TYPE].value ==  component_type.value]
         return descendants
     
     @classmethod
@@ -242,11 +252,12 @@ class Component():
         return component_data.NodeData(
             component_data.AttrData(name=self._CNTNR_PAR_COMP, type_="message"),
             component_data.AttrData(name=self._CNTNR_CHLD_COMP, type_="message", multi=True),
+            component_data.AttrData(name=self._CNTNR_CNTRL_CHLDRN, type_="message", multi=True)
         )
 
     @classmethod
-    def create(cls, instance_name:Union[str, nw.Attr]=None, parent=None):
-        """class method to create component
+    def create(cls, instance_name:Union[str, nw.Attr]=None, parent:Union["Component", nw.Container]=None):
+        """Class method to create component
 
         Args:
             instance_name (str, nw.Attr, optional): name of component. Defaults to None.
@@ -255,15 +266,31 @@ class Component():
         Returns:
             cls: returns created 
         """
-
-        pre_build_kwargs={cls._KWG_INST_NAME: instance_name, cls._KWG_PARENT:parent}
-        build_kwargs={}
-        post_build_kwargs={}
+        pre_build_kwargs, build_kwargs, post_build_kwargs = cls._process_kwargs(instance_name=instance_name, parent=parent)
 
         return cls._filtered_create(pre_build_kwargs=pre_build_kwargs, build_kwargs=build_kwargs, post_build_kwargs=post_build_kwargs)
     @classmethod
+    def _process_kwargs(cls, instance_name:Union[str, nw.Attr]=None, parent:Union["Component", nw.Container]=None):
+        """Process the different args to be sorted into pre, post, and override build. 
+
+        Args:
+            instance_name (Union[str, nw.Attr], optional): _description_. Defaults to None.
+            parent (Union[&quot;Component&quot;, nw.Container], optional): _description_. Defaults to None.
+
+        Returns:
+            list[dict]:
+        """
+        pre_build_kwargs={
+            cls._KWG_INST_NAME: instance_name,
+            cls._KWG_PARENT:parent
+        }
+        build_kwargs={}
+        post_build_kwargs={}
+
+        return pre_build_kwargs, build_kwargs, post_build_kwargs
+    @classmethod
     def _filtered_create(cls, pre_build_kwargs:dict, build_kwargs:dict, post_build_kwargs:dict):
-        """creates with kwarg arguments
+        """Creates with kwarg arguments
 
         Args:
             pre_build_kwargs (dict): 
@@ -271,7 +298,7 @@ class Component():
             post_build_kwargs (dict): 
 
         Returns:
-            self: 
+            self:
         """
         component_inst = cls()
         component_inst._pre_build(**pre_build_kwargs)
@@ -293,14 +320,7 @@ class Component():
         if self.container_node is None:
             self.__create_base_nodes(parent_container=parent)
             if instance_name is not None:
-                if isinstance(instance_name, nw.Attr):
-                    if instance_name.type_ != "string":
-                        input_node_name = self.input_node[self._BLD_INST_NAME]
-                        cmds.warning(f"{instance_name} is not a string attribute. Not connectiong to {input_node_name}")
-                    else:
-                        instance_name >> self.input_node[self._BLD_INST_NAME]
-                else:
-                    self.input_node[self._BLD_INST_NAME]=instance_name
+                utils.set_connect_attr_data(self.input_node[self._BLD_INST_NAME], instance_name)
             
             # connecting parent and child components
             if parent is not None:
@@ -326,7 +346,6 @@ class Component():
         """Build cleanup. sets build to true and renames nodes
         """
         self.rename_nodes()
-        self.rename_children()
     
     def __create_base_nodes(self, parent_container:nw.Container=None):
         """Creates the base node (input, output, container) in the initialization
@@ -414,9 +433,8 @@ class Component():
         if NAME_CLS.exists(prev_namespace) and NAME_CLS.empty(prev_namespace):
             NAME_CLS.delete(prev_namespace)
 
-    def rename_children(self):
-        for descendant in self.get_all_descendants():
-            descendant.rename_nodes()
+        for child_comp in self.child_components():
+            child_comp.rename_nodes()
 
     def get_parent_type_component(self, parent_type:component_enum_data.ComponentType, disable_warning=False):
         """given a type gets the closest parent component of that type
@@ -454,35 +472,46 @@ class Control(Component):
     _OUT_WS_MAT = "worldMatrix"
     _OUT_LOC_MAT = "localMatrix"
     _OUT_WS_INV_MAT = "worldInverseMatrix"
+    _CNTNR_CNTRL_MAP = "controlMap"
     _KWG_AXIS_VEC  = "axis_vec"
     _KWG_CLR = "color"
     _KWG_BUILD_T = "build_t"
     _KWG_BUILD_R = "build_r"
     _KWG_BUILD_S = "build_s"
+    _KWG_XFORM_MAP_INDEX = "xform_map_index"
 
     @classmethod
     def create(cls,
                instance_name:Union[str, nw.Attr]=None,
-               parent=None,
-               axis_vec=None,
+               parent:Union["Component", nw.Container]=None,
+               axis_vec:component_enum_data.AxisEnum=None,
                build_t=[0.0, 0.0, 0.0],
                build_r=[0.0, 0.0, 0.0],
                build_s=[1.0, 1.0, 1.0],
-               color=None):
-        pre_buid_kwargs = {
-            cls._KWG_INST_NAME:instance_name,
-            cls._KWG_PARENT:parent,
-        }
-        build_kwargs = {
+               color=None,
+               xform_map_index:int=None):
+        pre_buid_kwargs, build_kwargs, post_build_kwargs = cls._process_kwargs(instance_name=instance_name, parent=parent, axis_vec=axis_vec, build_t=build_t, build_r=build_r, build_s=build_s, color=color, xform_map_index=xform_map_index)
+        return cls._filtered_create(pre_build_kwargs=pre_buid_kwargs, build_kwargs=build_kwargs, post_build_kwargs=post_build_kwargs)
+    @classmethod
+    def _process_kwargs(cls, 
+                        instance_name:Union[str, nw.Attr]=None,
+                        parent:Union["Component", nw.Container]=None,
+                        axis_vec:component_enum_data.AxisEnum=None,
+                        build_t=[0.0, 0.0, 0.0],
+                        build_r=[0.0, 0.0, 0.0],
+                        build_s=[1.0, 1.0, 1.0],
+                        color=None,
+                        xform_map_index:int=None):
+        pre_build_kwargs, build_kwargs, post_build_kwargs = super()._process_kwargs(instance_name, parent)
+        build_kwargs.update({
             cls._KWG_AXIS_VEC:axis_vec,
             cls._KWG_CLR: color,
             cls._KWG_BUILD_T: build_t,
             cls._KWG_BUILD_R: build_r,
             cls._KWG_BUILD_S: build_s,
-        }
-        post_build_kwargs = {}
-
-        return cls._filtered_create(pre_build_kwargs=pre_buid_kwargs, build_kwargs=build_kwargs, post_build_kwargs=post_build_kwargs)
+            cls._KWG_XFORM_MAP_INDEX: xform_map_index
+        })
+        return pre_build_kwargs, build_kwargs, post_build_kwargs
 
     def _input_attr_build_data(self) -> component_data.NodeData:
         node_data = super()._input_attr_build_data()
@@ -498,12 +527,25 @@ class Control(Component):
             component_data.AttrData(name="overrideRGBColors", value=1),
         )
         return node_data
-    def _override_build(self, axis_vec=None, color=None, build_t=[0.0, 0.0, 0.0], build_r=[0.0, 0.0, 0.0], build_s=[1.0, 1.0, 1.0],  **build_kwargs):
+    def _container_attr_build_data(self):
+        node_data = super()._container_attr_build_data()
+        node_data.extend_attr_data(
+            component_data.AttrData(name=self._CNTNR_CNTRL_MAP, type_="message"),
+        )
+        return node_data
+    def _pre_build(self, instance_name = None, parent = None, **pre_build_kwargs):
+        super()._pre_build(instance_name, parent, **pre_build_kwargs)
+    
+    def _override_build(self, axis_vec:component_enum_data.AxisEnum=None, color=None, build_t=[0.0, 0.0, 0.0], build_r=[0.0, 0.0, 0.0], build_s=[1.0, 1.0, 1.0], xform_map_index:int=None, **build_kwargs):
         # set visibility to hidden in channel box
         self.transform_node["visibility"].set_keyable(False)
 
         # add shapes
         self._apply_shape_to_cntrl(axis_vec=axis_vec)
+
+        parent_container = self.container_node.get_container_node()
+        if parent_container is not None and xform_map_index is not None and xform_map_index >= 0:
+            parent_container[self._CNTNR_CNTRL_CHLDRN][xform_map_index] >> self.container_node[self._CNTNR_CNTRL_MAP]
 
         # add build transforms
         self.transform_node["translate"].set(utils.make_len(build_t, len_=3) if utils.is_iterable(build_t) else [build_t, build_t, build_t])
@@ -512,7 +554,7 @@ class Control(Component):
         self.transform_node.freeze_transforms()
         if color is not None:
             self.apply_color(color)
-    def _create_shapes(self, axis_vec) -> list:
+    def _create_shapes(self) -> list:
         """Creates shapes and returns a list of the shapes transforms. these 
         shapes will be parented to the transform node later
 
@@ -531,20 +573,13 @@ class Control(Component):
             component_container (nw.Container):
             axis_vec (vector, component_enum_data.AxisEnum, None): 
         """
-        
         if cntrl_transform is None:
             cntrl_transform = self.transform_node
         if component_container is None:
             component_container = self.container_node
 
-        # axis vec
-        if axis_vec is None:
-            axis_vec = component_enum_data.AxisEnum.y.value
-        elif component_enum_data.get_enum_item_class(axis_vec) == component_enum_data.AxisEnum:
-            axis_vec = axis_vec.value
-
         # parenting to transform
-        shape_transforms = self._create_shapes(axis_vec=axis_vec)
+        shape_transforms = self._create_shapes()
         for transform in shape_transforms:
             if not isinstance(transform, nw.Node):
                 transform = nw.wrap_node(transform)
@@ -556,8 +591,8 @@ class Control(Component):
             transform.freeze_transforms()
 
             # apply to transform
-            for x in cmds.listRelatives(str(transform), shapes=True, fullPath=True):
-                cmds.parent(x, str(cntrl_transform), relative=True, shape=True)
+            for shape in transform.get_shapes():
+                cmds.parent(str(shape), str(cntrl_transform), relative=True, shape=True)
         
         # deleting transforms
         if shape_transforms != []:
@@ -573,6 +608,18 @@ class Control(Component):
         # add shapes to container
         if component_container is not None:
             component_container.add_nodes(*shapes_list)
+
+        # axis vec
+        if axis_vec is not None and axis_vec and component_enum_data.get_enum_item_class(axis_vec) == component_enum_data.AxisEnum:
+            axis_vec = utils.Vector(axis_vec.value)
+        if axis_vec is not None and axis_vec != utils.Vector(component_enum_data.AxisEnum.y.value):
+            if axis_vec == utils.Vector(component_enum_data.AxisEnum.neg_y.value):
+                rot_vec = utils.Vector(1, 0, 0) * 180
+            else:
+                y_vec = utils.Vector(component_enum_data.AxisEnum.y.value)
+                rot_vec = (y_vec ^ axis_vec).normalize() * 90
+            self.transform_node["rotate"] = rot_vec
+            self.transform_node.freeze_transforms()
     
     def apply_color(self, color: Union[component_enum_data.Color, list, nw.Node]):
         """Applies color to control
@@ -688,24 +735,63 @@ class Control(Component):
     def post_swap_cleanup(self):
         """This code is ran after the control is swapped. meant to be overriden"""
 
-    def swap_control(self, replace_component:Union[type, "Control", nw.Transform]):
-        if not isinstance(replace_component, nw.Transform):
-            if isinstance(replace_component, type):
-                replace_component = replace_component()
+    def replace_control(self, replace_component:Union[type, "Control", nw.Transform], color=None):
+        
+        self.pre_swap_cleanup()
+        cmds.delete([str(x) for x in self.transform_node.get_shapes()])
+        replace_component_class = None
+        transform_node = None
+        if isinstance(replace_component, type):
+            replace_component = replace_component()
 
-            self.pre_swap_cleanup()
             self.container_node[self._BLD_COMP_CLASS] = replace_component.get_class_name()
 
-            cmds.delete([str(x) for x in self.transform_node.get_shapes()])
             replace_component._apply_shape_to_cntrl(
                 cntrl_transform=self.transform_node,
                 component_container=self.container_node
             )
+            replace_component_class = type(replace_component)
+
+        if isinstance(replace_component, nw.Transform):
+            transform_node = replace_component
+        elif replace_component_class is None:
+            transform_node = replace_component.transform_node
+            if transform_node is None:
+                raise RuntimeError(f"no replace transform found in {replace_component.container_node}")
+            replace_component_class = type(replace_component)
+        
+        if transform_node is not None:
+            mirror_transform = nw.wrap_node(cmds.duplicate(str(transform_node))[0])
+            for index, shape in enumerate(mirror_transform.get_shapes()):
+                cmds.parent(str(shape), str(self.transform_node), relative=True, shape=True)
+                shape.rename(f"{self.transform_node}Shape{index+1}")
+            cmds.delete(str(mirror_transform))
+
+        # renaming shapes
+        transform_shapes = self.transform_node.get_shapes()
+
+        # adding shapes to container
+        self.container_node.add_nodes(*transform_shapes)
+        self.rename_nodes()
+        
+        if replace_component_class is not None:
             new_component = type(replace_component)(self.container_node)
+            new_component.container_node[self._BLD_COMP_CLASS] = new_component.get_class_name()
             new_component.post_swap_cleanup()
-            return new_component
         else:
-            raise NotImplementedError("swap_control replace_component type \"Transform\" not implemented yet")
+            new_component = self
+
+        
+
+        # apply color
+        if color is not None:
+            self.apply_color(color=color)
+
+        return new_component
+        
+
+        # else:
+        #     raise NotImplementedError("swap_control replace_component type \"Transform\" not implemented yet")
 class SingletonComponent(Component):
     """Has instance method. only one of each singleton component exists in a character.
     usually used for enum conversion data (enum->vec)
@@ -739,9 +825,11 @@ class Hierarchy(Component):
     """
     class_namespace = "hier"
     component_type = component_enum_data.ComponentType.hier
+    _max_num_xforms = (-1, -1)
 
     HIER_DATA = component_data.HierData
     IO_ENUM = component_enum_data.IO
+    XFORM = component_data.Xform
     _PRM_VEC = "primaryVec"
     _PRM_VEC_X = "primaryVecX"
     _PRM_VEC_Y = "primaryVecY"
@@ -754,50 +842,65 @@ class Hierarchy(Component):
     _TER_VEC_X = "tertiaryVecX"
     _TER_VEC_Y = "tertiaryVecY"
     _TER_VEC_Z = "tertiaryVecZ"
-    _KWG_CNTRL_CLR = "control_color"
     _KWG_SRC_COMP = "source_component"
     _KWG_CONN_HIER = "connect_hierarchy"
     _KWG_CONN_AXS_VEC = "connect_axis_vec"
-    _KWG_INIT_NUM_XFORMS = "init_num_xforms"
+    _KWG_INPUT_XFORMS = "input_xforms"
     _KWG_CNTR_CLR = "control_color"
 
     @classmethod
     def create(cls, 
                instance_name:Union[str, nw.Attr]=None, 
                parent:Component=None, 
-               init_num_xforms:Union[int, tuple]=0, 
+               input_xforms:Union[list[component_data.Xform], int]=None, 
                source_component:Component=None, 
                connect_hierarchy:bool=True, 
                connect_axis_vecs:bool=True, 
                control_color=None):
-        pre_build_kwargs={
+        pre_build_kwargs, build_kwargs, post_build_kwargs=cls._process_kwargs(
+            instance_name=instance_name, 
+            parent=parent, 
+            input_xforms=input_xforms, 
+            source_component=source_component, 
+            connect_hierarchy=connect_hierarchy, 
+            connect_axis_vecs=connect_axis_vecs, 
+            control_color=control_color)
+        
+        return cls._filtered_create(pre_build_kwargs=pre_build_kwargs, build_kwargs=build_kwargs, post_build_kwargs=post_build_kwargs)
+    @classmethod
+    def _process_kwargs(cls, 
+                        instance_name:Union[str, nw.Attr]=None, 
+                        parent:Component=None, 
+                        input_xforms:Union[list[component_data.Xform], int]=[], 
+                        source_component:Component=None, 
+                        connect_hierarchy:bool=True, 
+                        connect_axis_vecs:bool=True, 
+                        control_color=None):
+        pre_build_kwargs, build_kwargs, post_build_kwargs = super()._process_kwargs(instance_name, parent)
+        pre_build_kwargs.update({
             cls._KWG_INST_NAME: instance_name, 
             cls._KWG_PARENT:parent,
             cls._KWG_SRC_COMP:source_component,
             cls._KWG_CONN_HIER:connect_hierarchy,
             cls._KWG_CONN_AXS_VEC:connect_axis_vecs,
-            cls._KWG_INIT_NUM_XFORMS:init_num_xforms}
-        build_kwargs={
+            cls._KWG_INPUT_XFORMS:input_xforms})
+        build_kwargs.update({
             cls._KWG_CNTR_CLR:control_color
-        }
-        post_build_kwargs={}
-        
-        return cls._filtered_create(pre_build_kwargs=pre_build_kwargs, build_kwargs=build_kwargs, post_build_kwargs=post_build_kwargs)
-    def _pre_build(self, instance_name:Union[str, nw.Attr]=None, parent:Component=None, init_num_xforms:Union[int, tuple]=0, source_component:Component=None, connect_hierarchy:bool=None, connect_axis_vec:bool=True, **pre_build_kwargs):
-        super()._pre_build(instance_name, parent)            
-        init_num_xforms = self._check_init_num_xforms(init_num_xforms=init_num_xforms, source_component=source_component)
+        })
+        return pre_build_kwargs, build_kwargs, post_build_kwargs
 
-        #initialize
-        for index, io in enumerate([self.IO_ENUM.input, self.IO_ENUM.output]):
-            xforms = self.get_xform_attrs(xform_type=io , index=utils.length_index_list(init_num_xforms[index]))
-            
-            xform_name = self.HIER_DATA.INPUT_XFORM_NAME if io == self.IO_ENUM.input else self.HIER_DATA.OUTPUT_XFORM_NAME
-            for xform_index, xform in xforms.items():
-                xform[xform_name].set(f"xform{xform_index}")
+    def _pre_build(self, instance_name:Union[str, nw.Attr]=None, parent:Component=None, input_xforms:Union[list[component_data.Xform], int]=None,  source_component:Component=None, connect_hierarchy:bool=None, connect_axis_vec:bool=True, **pre_build_kwargs):
+        super()._pre_build(instance_name, parent)            
+
+        source_xforms = None
+        if source_component is not None and hasattr(source_component, "get_as_source_xforms"):
+            source_xforms = source_component.get_as_source_xforms(is_parent_component=utils.if_container_is_ancestor(child=self.container_node, ancestor=source_component.container_node))
+        
+        self.__initialize_input_xform(input_xforms=input_xforms, source_xforms=source_xforms)
         
         #connect source component
-        if source_component is not None:
-            self._connect_source_hier_component(source_component=source_component, connect_hierarchy=connect_hierarchy, connect_axis_vec=connect_axis_vec)
+        if source_xforms is not None:
+            self._connect_source_component(source_component=source_component, source_xforms=source_xforms, connect_hierarchy=connect_hierarchy, connect_axis_vec=connect_axis_vec)
     def _override_build(self, control_color=None, **build_kwargs):
         return super()._override_build(**build_kwargs)
     def _post_build(self, **post_build_kwargs):
@@ -829,159 +932,215 @@ class Hierarchy(Component):
             component_data.AttrData(self._TER_VEC_Z, type_="double", parent=self._TER_VEC),
         )
         return node_data
+    
+    #pre build
+    def __initialize_input_xform(self, input_xforms:Union[list[component_data.Xform], int]=None, source_xforms:list=None):
+        """initializes input xform
+
+        Args:
+            input_xforms (Union[list[component_data.Xform], int], optional): Defaults to [].
+            source_xforms (list, optional): Defaults to None.
+
+        Raises:
+            RuntimeError: if list contains item that is not component_data
+        """
+        max_input_len, max_output_len = type(self)._max_num_xforms
+        input_xforms_len = 0
+        if max_input_len == -1 and source_xforms is not None:
+            max_input_len = len(source_xforms)
+        elif max_input_len == -1 and isinstance(input_xforms, int):
+            max_input_len = input_xforms
+        elif max_input_len == -1 and isinstance(input_xforms, list):
+            input_xforms_len = len(input_xforms)
+            max_input_len = input_xforms_len
+        elif max_input_len == -1:
+            max_input_len = -1
+            cmds.warning(f"{self.container_node} xforms not initialized")
+        elif isinstance(input_xforms, list):
+            input_xforms_len = len(input_xforms)
+        
+        if max_output_len < max_input_len:
+            max_output_len = max_input_len
+
+        for index in range(max_output_len):
+            # input
+            init_xform = self.XFORM(xform_name=f"xform{index}")
+            if index < max_input_len:
+                input_xform = init_xform
+                if index < input_xforms_len:
+                    input_xform=input_xforms[index]
+                self._set_xform_attrs(
+                    index=index,
+                    xform_type=self.IO_ENUM.input,
+                    xform=input_xform,
+                    set_when_data_is_attr=True
+                )
+            self._set_xform_attrs(
+                index=index,
+                xform_type=self.IO_ENUM.output,
+                xform=init_xform,
+                set_when_data_is_attr=True
+            )
     def __populate_output_xforms(self):
         """Goes through the output xform attributes and tries to connect name, local matrix, and init matricies"""
-        added_nodes = []
-        HIER_DATA = self.HIER_DATA
-        output_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.output)
-        for index, output_xform in output_xforms.items():
-            # init inverse matrix
-            added_nodes.extend(self.__populate_world_matrix(
-                index=index,
-                world_matrix_attr=output_xform[HIER_DATA.OUTPUT_INIT_MATRIX],
-                world_matrix_inv_attr=output_xform[HIER_DATA.OUTPUT_INIT_INV_MATRIX],
-                is_init_matrix=True))
-            self.__populate_name(index)
-            added_nodes.extend(self.__populate_world_matrix(
-                index=index,
-                world_matrix_attr=output_xform[HIER_DATA.OUTPUT_WORLD_MATRIX],
-                world_matrix_inv_attr=output_xform[HIER_DATA.OUTPUT_WORLD_INV_MATRIX]))
-            added_nodes.extend(self.__populate_loc_matrix(index=index))
+        def __populate_name(index:int):
+            """Given the index tries to connect or set the output name
 
-        # add nodes to container
-        self.container_node.add_nodes(*added_nodes)
-    def __populate_name(self, index:int):
-        """Given the index tries to connect or set the output name
+            Args:
+                index (int): xform index
+            """
+            # set variables
+            output_name = self.output_node[self.HIER_DATA.OUTPUT_XFORM][index][self.HIER_DATA.OUTPUT_XFORM_NAME]
+            if output_name.has_src_connection():
+                return
+            input_name = self.input_node[self.HIER_DATA.INPUT_XFORM][index][self.HIER_DATA.INPUT_XFORM_NAME]
+            output_ws_src = self.output_node[self.HIER_DATA.OUTPUT_XFORM][index][self.HIER_DATA.OUTPUT_WORLD_MATRIX].get_src_connection()
+            
+            # check if needs to be set
+            if output_name.value is not None and output_name.value != "":
+                pass
 
-        Args:
-            index (int): xform index
-        """
-        # set variables
-        output_name = self.output_node[self.HIER_DATA.OUTPUT_XFORM][index][self.HIER_DATA.OUTPUT_XFORM_NAME]
-        if output_name.has_src_connection():
-            return
-        input_name = self.input_node[self.HIER_DATA.INPUT_XFORM][index][self.HIER_DATA.INPUT_XFORM_NAME]
-        output_ws_src = self.output_node[self.HIER_DATA.OUTPUT_XFORM][index][self.HIER_DATA.OUTPUT_WORLD_MATRIX].get_src_connection()
-        
-        # check if needs to be set
-        if output_name.value is not None and output_name.value != "":
-            pass
+            # if input and output xform match
+            elif (len(self.input_node[self.HIER_DATA.INPUT_XFORM]) >=
+                len(self.output_node[self.HIER_DATA.OUTPUT_XFORM])):
+                input_name >> output_name
+            
+            elif output_ws_src is not None:
+                if output_ws_src.node.has_attr(self._BLD_INST_NAME):
+                    output_ws_src.node[self._BLD_INST_NAME] >> output_name
+        def __populate_world_matrix(index:int, world_matrix_attr:nw.Attr, world_matrix_inv_attr:nw.Attr, is_init_matrix:bool=False):
+            """Given the index tries to connect or set the output init matrix and output inverse init matrix
 
-        # if input and output xform match
-        elif (len(self.input_node[self.HIER_DATA.INPUT_XFORM]) ==
-            len(self.output_node[self.HIER_DATA.OUTPUT_XFORM])):
-            input_name >> output_name
-        
-        elif output_ws_src is not None:
-            if output_ws_src.node.has_attr(self._BLD_INST_NAME):
-                output_ws_src.node[self._BLD_INST_NAME] >> output_name
-    def __populate_world_matrix(self, index:int, world_matrix_attr:nw.Attr, world_matrix_inv_attr:nw.Attr, is_init_matrix:bool=False):
-        """Given the index tries to connect or set the output init matrix and output inverse init matrix
+            Args:
+                index (int): xform index
+            """
+            matrix_src = world_matrix_attr.get_src_connection()
+            inv_matrix_src = world_matrix_inv_attr.get_src_connection()
+            input_xform = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
+            output_xform = self.get_xform_attrs(xform_type=self.IO_ENUM.output)
 
-        Args:
-            index (int): xform index
-        """
-        matrix_src = world_matrix_attr.get_src_connection()
-        inv_matrix_src = world_matrix_inv_attr.get_src_connection()
+            inverse_name = f"xform{index}_inverse"
+            if is_init_matrix:
+                inverse_name = f"xform{index}_init_inverse"
 
-        inverse_name = f"xform{index}_inverse"
-        if is_init_matrix:
-            inverse_name = f"xform{index}_init_inverse"
-
-        input_xform = self.get_xform_attrs(xform_type=self.IO_ENUM.input, index=index)
-        output_xform = self.get_xform_attrs(xform_type=self.IO_ENUM.output, index=index)
-
-        added_nodes = []
-        # pre check to see if it needs to return anything
-        if inv_matrix_src is not None and matrix_src is not None:
-            return []
-        if inv_matrix_src is None and matrix_src is not None:
-            if isinstance(matrix_src.node, nw.Transform):
-                matrix_src.node["worldInverseMatrix"][0] >> world_matrix_inv_attr
-            else:
-                matrix_src_connections = [attr.node for attr in matrix_src.get_dest_connections() if attr.node.type_ == "inverseMatrix"]
-                if matrix_src_connections == []:
-                    inverse_node = nw.create_node("inverseMatrix", name=inverse_name)
-                    inverse_node["inputMatrix"] << matrix_src
-                    inverse_node["outputMatrix"] >> world_matrix_inv_attr
-                    added_nodes.append(inverse_node)
-                else:
-                    matrix_src_connections[0]["outputMatrix"] >> world_matrix_inv_attr
-        elif matrix_src is None and inv_matrix_src is not None:
-            if isinstance(inv_matrix_src.node, nw.Transform):
-                inv_matrix_src.node["worldMatrix"][0] >> world_matrix_attr
-            elif inv_matrix_src.node.type_ == "inverseMatrix":
-                new_matrix_src = inv_matrix_src.node["inputMatrix"].get_src_connection()
-                if new_matrix_src is not None:
-                    new_matrix_src >> world_matrix_attr
-
-        elif is_init_matrix and len(input_xform.keys()) == len(output_xform.keys()):
-            if matrix_src is None:
-                input_xform[self.HIER_DATA.INPUT_INIT_MATRIX] >> world_matrix_attr
-            if inv_matrix_src is None:
-                input_xform[self.HIER_DATA.INPUT_INIT_INV_MATRIX] >> world_matrix_inv_attr
-        return added_nodes
-    def __populate_loc_matrix(self, index:int):
-        """Given the index tries to connect or set the output local matrix
-
-        Args:
-            index (int): xform index
-        """
-        output_xform_attrs = self.get_xform_attrs(xform_type=self.IO_ENUM.output, index=index)
-        output_loc_matrix = output_xform_attrs[self.HIER_DATA.OUTPUT_LOC_MATRIX]
-        output_world_matrix_src = output_xform_attrs[self.HIER_DATA.OUTPUT_WORLD_MATRIX].get_src_connection()
-        added_nodes = []
-
-        if output_loc_matrix.has_src_connection():
-            return []
-        elif output_world_matrix_src is None:
-            return []
-        
-        # connect to parent
-        else:
-            if index == 0:
-                prev_world_inv_matrix_src = self.container_node[self.HIER_DATA.HIER_PARENT_INV_MATRIX]
-            else:
-                prev_world_inv_matrix_src = self.container_node[self.HIER_DATA.OUTPUT_XFORM][index-1][self.HIER_DATA.OUTPUT_WORLD_INV_MATRIX]
-                prev_world_inv_matrix_src = prev_world_inv_matrix_src.get_src_connection()
-            if prev_world_inv_matrix_src is None:
+            added_nodes = []
+            # pre check to see if it needs to return anything
+            if inv_matrix_src is not None and matrix_src is not None:
                 return []
+            if inv_matrix_src is None and matrix_src is not None:
+                if isinstance(matrix_src.node, nw.Transform):
+                    matrix_src.node["worldInverseMatrix"][0] >> world_matrix_inv_attr
+                else:
+                    matrix_src_connections = [attr.node for attr in matrix_src.get_dest_connections() if attr.node.type_ == "inverseMatrix"]
+                    if matrix_src_connections == []:
+                        inverse_node = nw.create_node("inverseMatrix", name=inverse_name)
+                        inverse_node["inputMatrix"] << matrix_src
+                        inverse_node["outputMatrix"] >> world_matrix_inv_attr
+                        added_nodes.append(inverse_node)
+                    else:
+                        matrix_src_connections[0]["outputMatrix"] >> world_matrix_inv_attr
+            elif matrix_src is None and inv_matrix_src is not None:
+                if isinstance(inv_matrix_src.node, nw.Transform):
+                    inv_matrix_src.node["worldMatrix"][0] >> world_matrix_attr
+                elif inv_matrix_src.node.type_ == "inverseMatrix":
+                    new_matrix_src = inv_matrix_src.node["inputMatrix"].get_src_connection()
+                    if new_matrix_src is not None:
+                        new_matrix_src >> world_matrix_attr
 
-            # adding matrix mult
-            mat_mult = nw.create_node("multMatrix", f"xform{index}_loc_output_mat_mult")
-            mat_mult["matrixIn"][0] << output_world_matrix_src
-            mat_mult["matrixIn"][1] << prev_world_inv_matrix_src
-            mat_mult["matrixSum"] >> output_loc_matrix
-
-            added_nodes.append(mat_mult)
+            elif world_matrix_attr.attr_name.find("Init") >= 0 and len(input_xform.keys()) == len(output_xform.keys()):
+                if matrix_src is None:
+                    input_xform[index].init_matrix >> world_matrix_attr
+                if inv_matrix_src is None:
+                    input_xform[index].init_inv_matrix >> world_matrix_inv_attr
 
             return added_nodes
+        def __populate_loc_matrix(index:int):
+            """Given the index tries to connect or set the output local matrix
 
-    def _check_init_num_xforms(self, init_num_xforms:Union[int, tuple]=0, source_component:Component=None):
-        """Checks  init_num_xforms before it builds the xforms. returns list of 2 for input and output num for initialization
+            Args:
+                index (int): xform index
+            """
+            output_xform = self.get_xform_attrs(xform_type=self.IO_ENUM.output, index=index)
+            output_loc_matrix = output_xform.loc_matrix
+            output_world_matrix_src = output_xform.world_matrix.get_src_connection()
+            added_nodes = []
+
+            if output_loc_matrix.has_src_connection():
+                return []
+            elif output_world_matrix_src is None:
+                return []
+            
+            # connect to parent
+            else:
+                if index == 0:
+                    prev_world_inv_matrix_src = self.container_node[self.HIER_DATA.HIER_PARENT_INV_MATRIX]
+                else:
+                    prev_world_inv_matrix_src = self.container_node[self.HIER_DATA.OUTPUT_XFORM][index-1][self.HIER_DATA.OUTPUT_WORLD_INV_MATRIX]
+                    prev_world_inv_matrix_src = prev_world_inv_matrix_src.get_src_connection()
+                if prev_world_inv_matrix_src is None:
+                    return []
+
+                # adding matrix mult
+                mat_mult = nw.create_node("multMatrix", f"xform{index}_loc_output_mat_mult")
+                mat_mult["matrixIn"][0] << output_world_matrix_src
+                mat_mult["matrixIn"][1] << prev_world_inv_matrix_src
+                mat_mult["matrixSum"] >> output_loc_matrix
+
+                added_nodes.append(mat_mult)
+
+                return added_nodes
+        
+        added_nodes = []
+        output_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.output)
+        for index, output_xform in output_xforms.items():
+            __populate_name(index)
+            added_nodes.extend(__populate_world_matrix(
+                index=index,
+                world_matrix_attr=output_xform.init_matrix,
+                world_matrix_inv_attr=output_xform.init_inv_matrix,
+                is_init_matrix=True))
+            added_nodes.extend(__populate_world_matrix(
+                index=index,
+                world_matrix_attr=output_xform.world_matrix,
+                world_matrix_inv_attr=output_xform.world_inv_matrix))
+            added_nodes.extend(__populate_loc_matrix(index=index))
+            
+        # add nodes to container
+        self.container_node.add_nodes(*added_nodes)
+    def _connect_source_component(self, source_component:Component, source_xforms:list[component_data.Xform], connect_hierarchy:bool=True, connect_axis_vec:bool=True):
+        """Given a source Hier component connects it's hier output to this component's hier input
+        
 
         Args:
-            init_num_xforms (Union[int, tuple], optional): Defaults to 0.
-            source_component (Component, optional):  Defaults to None.
-
-        Returns:
-            list:
+            source_component (Component):
+            connect_hierarchy (bool): connects hierarchy from source
+            connect_axis_vec (bool): connects axis vec from source
         """
-        # initialize xforms
-        if isinstance(init_num_xforms, tuple):
-            init_num_xforms=utils.make_len(list(init_num_xforms), len_=2, default=0)
-        else:
-            init_num_xforms=[init_num_xforms, init_num_xforms]
-        # limiting it to be as long as source component
-        if source_component is not None and self._has_xforms(source_component=source_component, xform_type=self.IO_ENUM.output):
-            src_output_len = len(source_component.container_node[self.HIER_DATA.OUTPUT_XFORM])
-            if src_output_len > init_num_xforms[0]:
-                init_num_xforms[0] = src_output_len
-        # limiting output to be as long as input initialization
-        if init_num_xforms[1] > init_num_xforms[0]:
-            init_num_xforms[1] = init_num_xforms[0]
+        HIER_DATA = self.HIER_DATA
 
-        return init_num_xforms
+        # getting both containers
+        self_container = self.container_node
+        source_container = source_component.container_node
+
+        for index, xform in enumerate(source_xforms):
+            self._set_xform_attrs(
+                index=index,
+                xform_type=self.IO_ENUM.input,
+                xform=xform,
+            )
+
+        # if connect_hierarchy
+        if connect_hierarchy:
+            for hier_attr_name in HIER_DATA.HIER_DATA_NAMES:
+                if source_container.has_attr(hier_attr_name):
+                    source_container[hier_attr_name] >> self_container[hier_attr_name]   
+
+        # connecting axis vectors
+        if connect_axis_vec:
+            for attr in [self._PRM_VEC, self._SEC_VEC, self._TER_VEC]:
+                if source_container.has_attr(attr) and self_container.has_attr(attr):
+                    source_container[attr] >> self_container[attr]
+    #post build
     def _check_output_xforms(self, check_len=True):
         """After component is built, checks to see if xforms were properly set"""
         if check_len:
@@ -1000,6 +1159,18 @@ class Hierarchy(Component):
                         cmds.warning(f"{xform_sub_attr} not set")
                 elif not xform_sub_attr.has_src_connection():
                     cmds.warning(f"{xform_sub_attr} does not have connection")
+    def get_as_source_xforms(self, is_parent_component=True):
+        """When it is the source component returns xforms to be plugged in
+
+        Args:
+            is_parent_component (bool, optional): _description_. Defaults to True.
+
+        Returns:
+            list(component_data.Xform):
+        """
+        xform_type = self.IO_ENUM.input if is_parent_component else self.IO_ENUM.output
+        return [x for x in self.get_xform_attrs(xform_type=xform_type).values()]
+    
     def get_xform_attrs(self, xform_type:component_enum_data.IO, index:Union[int, list]=None):
         """Gets a dict of xforms given indicies and type of xform. returns all if index is None
 
@@ -1018,118 +1189,26 @@ class Hierarchy(Component):
                 
         else:
             indicies = utils.make_iterable(index)
-        xform_names = self.HIER_DATA.get_xform_names(xform_type=xform_type)
         xform_parent_name = self.HIER_DATA.get_xform_parent_name(xform_type=xform_type)
-        xform_data = {index:{key: self.container_node[xform_parent_name][index][key] for key in xform_names} for index in indicies}
+        xform_data = {index: self.XFORM(self.container_node[xform_parent_name][index]) for index in indicies}
         if isinstance(index, int) and index is not None:
             return list(xform_data.values())[0]
         else:
             return xform_data
-    def _set_xform_attrs(
-            self, 
-            index:int, 
-            xform_type:component_enum_data.IO,
-            xform_name:Union[nw.Attr, str]=None, 
-            init_matrix:nw.Attr=None, 
-            init_inv_matrix:nw.Attr=None, 
-            world_matrix:nw.Attr=None,
-            world_inv_matrix:nw.Attr=None,
-            loc_matrix:nw.Attr=None,
-            disable_warning:bool=False,
-        ):
-        """Connects up attributes to output xform
+    def _set_xform_attrs(self, index:int, xform:component_data.Xform, xform_type:component_enum_data.IO, set_when_data_is_attr:bool=False, disable_warning:bool=False):
+        """Sets xform
 
         Args:
-            index (int):
-            input_name (Union[nw.Attr, str], optional): Defaults to None.
-            input_init_matrix (nw.Attr, optional): Defaults to None.
-            input_init_inv_matrix (nw.Attr, optional): Defaults to None.
-            input_world_matrix (nw.Attr, optional): Defaults to None.
-            input_world_inv_matrix (nw.Attr, optional): Defaults to None.
-            input_loc_matrix (nw.Attr, optional): Defaults to None.
-            disable_warning (bool):disables warnings
+            index (int): 
+            xform (component_data.Xform): 
+            xform_type (component_enum_data.IO): 
+            set_when_data_is_attr (bool, optional): only sets and not connects if it's an attribute. Defaults to False.
+            disable_warning (bool, optional): Defaults to False.
         """
-        xform_matricies = self.get_xform_attrs(xform_type=xform_type, index=index)
-        src_attr_list = [xform_name, init_matrix, init_inv_matrix, world_matrix, world_inv_matrix, loc_matrix]
-        xform_names = self.HIER_DATA.get_xform_names(xform_type=xform_type)
-        if len(src_attr_list) != len(xform_names):
-            raise RuntimeError("source_attr_list and xform_names mismatched lengths")
-        for src_attr, dest_attr in zip(src_attr_list, xform_names):
-            if not xform_matricies[dest_attr].has_src_connection():
-                if isinstance(src_attr, str):
-                    xform_matricies[dest_attr].set(src_attr)
-                elif src_attr is not None:
-                    src_attr >> xform_matricies[dest_attr]
-            elif not disable_warning:
-                cmds.warning(f"{xform_matricies[dest_attr]} has connection. unable to connect {src_attr} to it")
-    def _has_xforms(self, source_component:Component=None, xform_type:component_enum_data.IO=component_enum_data.IO.output):
-        """checks to see if component has xforms
-        
-        Args:
-            source_component (Component): component to check
-        Returns:
-            bool:
-        """
-        if source_component is None:
-            return False
-        if source_component.container_node.has_attr(self.HIER_DATA.get_xform_parent_name(xform_type=xform_type)):
-            if xform_type == self.IO_ENUM.output and self.HIER_DATA.is_output_xform_attr(source_component.container_node[self.HIER_DATA.OUTPUT_XFORM][0]):
-                return True
-            elif xform_type == self.IO_ENUM.input and self.HIER_DATA.is_input_xform_attr(source_component.container_node[self.HIER_DATA.INPUT_XFORM][0]):
-                return True
-        return False
-    def _initialize_xforms(self, xform_type:component_enum_data.IO, len_:int):
-        """initializes xform with xform{index} for names to len len_
-
-        Args:
-            xform_type (component_enum_data.IO):
-            len_ (int):
-        """
-        pass
-
-    def _connect_source_hier_component(self, source_component:Component, connect_hierarchy:bool=True, connect_axis_vec:bool=True):
-        """Given a source Hier component connects it's hier output to this component's hier input
-        
-
-        Args:
-            source_component (Component):
-            connect_hierarchy (bool): connects hierarchy from source
-            connect_axis_vec (bool): connects axis vec from source
-        """
-        if self._has_xforms(source_component=source_component, xform_type=self.IO_ENUM.output):
-            HIER_DATA = self.HIER_DATA
-
-            # getting both containers
-            self_container = self.container_node
-            source_container = source_component.container_node
-            parent_component_as_source = True if source_container == self_container.get_container_node() else False
-            if parent_component_as_source and not self._has_xforms(xform_type=self.IO_ENUM.input, source_component=source_component):
-                raise RuntimeError(f"source parent component ({source_component.container_node}) does not have input xforms")
-
-            src_type = self.IO_ENUM.input if parent_component_as_source else self.IO_ENUM.output
-            src_xforms =  source_component.get_xform_attrs(src_type)
-            self_input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input, index=utils.length_index_list(len(src_xforms.keys())))
-            for index, src_xform in src_xforms.items():
-
-                input_xform = self_input_xforms[index]
-                # for loop through attributes to connect
-                for src_name, self_input_name in HIER_DATA.get_paired_names(src=src_type, dest=self.IO_ENUM.input):
-                    src_xform[src_name] >> input_xform[self_input_name]
-
-            # if connect_hierarchy
-            if connect_hierarchy:
-                for hier_attr_name in HIER_DATA.HIER_DATA_NAMES:
-                    if source_container.has_attr(hier_attr_name):
-                        source_container[hier_attr_name] >> self_container[hier_attr_name]   
-
-            # connecting axis vectors
-            if connect_axis_vec:
-                for attr in [self._PRM_VEC, self._SEC_VEC, self._TER_VEC]:
-                    if source_container.has_attr(attr) and self_container.has_attr(attr):
-                        source_container[attr] >> self_container[attr]
-            
-        else:
-            raise RuntimeError(f"{source_component} does not have output xforms")
+        set_xform = self.get_xform_attrs(xform_type=xform_type, index=index)
+        for xform_attr, set_xform_attr in zip(xform, set_xform):
+            if xform_attr is not None:
+                utils.set_connect_attr_data(attr=set_xform_attr, data=xform_attr, set_when_data_is_attr=set_when_data_is_attr)
     def _create_orient_translate_blend(self, name:str, matrix_attr:nw.Attr, tx_attr:nw.Attr=None, ty_attr:nw.Attr=None, tz_attr:nw.Attr=None, tw_attr:nw.Attr=None):
         """Creates a blended matrix where the translate values are overriden
 
@@ -1165,7 +1244,6 @@ class Motion(Hierarchy):
     component_type = component_enum_data.ComponentType.motion
     root_transform_name = "grp"
     class_namespace = "motion"
-
 class Anim(Hierarchy):
     """Base class for anim autorigging components. Derived from Hierarchy"""
     component_type = component_enum_data.ComponentType.anim
@@ -1212,6 +1290,8 @@ class Anim(Hierarchy):
         Returns:
             Control:
         """
+        if not self.container_node.has_attr("settings_container"):
+            return
         return self._get_node_from_key("settings_container", as_component=True)
     @property
     def settings_guide_component(self)->Control:
@@ -1220,6 +1300,8 @@ class Anim(Hierarchy):
         Returns:
             Control:
         """
+        if not self.container_node.has_attr("settings_guide_container"):
+            return
         return self._get_node_from_key("settings_guide_container", as_component=True)
     @property
     def mirror_dest_component(self)->"Anim":
@@ -1240,7 +1322,7 @@ class Anim(Hierarchy):
             if self._MIRROR_DEST not in self._node_data_cache.keys():
                 if self.container_node.has_attr(self._MIRROR_DEST):
                     if self.container_node[self._MIRROR_DEST].has_src_connection():
-                        node = self.container_node[self._MIRROR_DEST].get_src_connection()
+                        node = self.container_node[self._MIRROR_DEST].get_src_connection().node
                         self._node_data_cache[self._MIRROR_DEST] = node
         if self._MIRROR_DEST in self._node_data_cache.keys():
             node = self._node_data_cache[self._MIRROR_DEST]
@@ -1278,7 +1360,7 @@ class Anim(Hierarchy):
     def create(cls, 
                instance_name:Union[str, nw.Attr]=None, 
                parent:Component=None, 
-               init_num_xforms:Union[int, tuple]=0, 
+               input_xforms:Union[int, tuple]=0, 
                primary_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x,
                secondary_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.y,
                add_settings_cntrl:bool=True,
@@ -1290,38 +1372,56 @@ class Anim(Hierarchy):
                control_color=None,
                setup_color=None,
                hier_side:component_enum_data.CharacterSide=component_enum_data.CharacterSide.none):
-        pre_build_kwargs={
-            cls._KWG_INST_NAME: instance_name, 
-            cls._KWG_PARENT:parent,
-            cls._KWG_SRC_COMP:source_component,
+        pre_build_kwargs, build_kwargs, post_build_kwargs = cls._process_kwargs(
+            instance_name=instance_name,
+            parent=parent, 
+            input_xforms=input_xforms,
+            primary_axis=primary_axis,
+            secondary_axis=secondary_axis,
+            add_settings_cntrl=add_settings_cntrl,
+            mirror_source=mirror_source,
+            mirror_axis=mirror_axis,
+            source_component=source_component,
+            connect_hierarchy=connect_hierarchy,
+            connect_axis_vecs=connect_axis_vecs,
+            control_color=control_color,
+            setup_color=setup_color,
+            hier_side=hier_side)
+        
+        return cls._filtered_create(pre_build_kwargs=pre_build_kwargs, build_kwargs=build_kwargs, post_build_kwargs=post_build_kwargs)
+    @classmethod
+    def _process_kwargs(cls, 
+               instance_name:Union[str, nw.Attr]=None, 
+               parent:Component=None, 
+               input_xforms:Union[int, tuple]=0, 
+               primary_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x,
+               secondary_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.y,
+               add_settings_cntrl:bool=True,
+               mirror_source:"Anim"=None,
+               mirror_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x,
+               source_component:Component=None, 
+               connect_hierarchy:bool=True, 
+               connect_axis_vecs:bool=True, 
+               control_color=None,
+               setup_color=None,
+               hier_side:component_enum_data.CharacterSide=component_enum_data.CharacterSide.none):
+        pre_build_kwargs, build_kwargs, post_build_kwargs = super()._process_kwargs(instance_name, parent, input_xforms, source_component, connect_hierarchy, connect_axis_vecs, control_color)
+        pre_build_kwargs.update({
             cls._KWG_HIER_SIDE: hier_side,
             cls._KWG_PRM_AXIS: primary_axis,
             cls._KWG_SEC_AXIS: secondary_axis,
-            cls._KWG_CONN_HIER:connect_hierarchy,
-            cls._KWG_CONN_AXS_VEC:connect_axis_vecs,
-            cls._KWG_INIT_NUM_XFORMS:init_num_xforms,
             cls._KWG_ADD_SETTINGS_CNTRL:add_settings_cntrl,
             cls._KWG_MIRROR_SRC:mirror_source,
             cls._KWG_SETUP_CLR:setup_color,
             cls._KWG_CNTR_CLR:control_color,
-            cls._KWG_MIRROR_AXIS:mirror_axis,}
-        build_kwargs={
-            cls._KWG_CNTR_CLR:control_color,
-        }
-        post_build_kwargs={}
-        
-        return cls._filtered_create(pre_build_kwargs=pre_build_kwargs, build_kwargs=build_kwargs, post_build_kwargs=post_build_kwargs)
-    
-    def mirror(self, control_color=None, setup_color=None, mirror_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x):
-        parent = None
-        mirror_component = type(self).create(parent=parent, source_component=self, mirror_source=self, mirror_axis=mirror_axis, control_color=control_color, setup_color=setup_color, connect_hierarchy=False, connect_axis_vecs=False)
-
-        return mirror_component
+            cls._KWG_MIRROR_AXIS:mirror_axis,
+        })
+        return pre_build_kwargs, build_kwargs, post_build_kwargs
 
     def _pre_build(self, 
                    instance_name:Union[str, nw.Attr]=None, 
                    parent:Component=None, 
-                   init_num_xforms:Union[int, tuple]=0, 
+                   input_xforms:Union[int, tuple]=0, 
                    hier_side:component_enum_data.CharacterSide=component_enum_data.CharacterSide.none, 
                    primary_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x,
                    secondary_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.y,
@@ -1338,7 +1438,7 @@ class Anim(Hierarchy):
         super()._pre_build(
             instance_name=instance_name, 
             parent=parent, 
-            init_num_xforms=init_num_xforms, 
+            input_xforms=input_xforms, 
             source_component=source_component, 
             connect_hierarchy=connect_hierarchy, 
             connect_axis_vec=connect_axis_vec, 
@@ -1359,14 +1459,42 @@ class Anim(Hierarchy):
         self.__set_vectors()
         
         # create setup component
-        self.__create_setup_component(init_num_xforms=init_num_xforms, setup_color=setup_color, mirror_source=mirror_source, mirror_axis=mirror_axis)
+        self.__create_setup_component(input_xforms=input_xforms, setup_color=setup_color, mirror_source=mirror_source, mirror_axis=mirror_axis)
 
         # adding settings cntrl
         if add_settings_cntrl:
             self.__create_settings_cntrls(setup_color=setup_color, control_color=control_color)
             
         self.rename_nodes()
-    
+    def _post_build(self, **post_build_kwargs):
+        super()._post_build(**post_build_kwargs)
+        if self.mirror_src_component is not None:
+            self.__mirror_controls_from_source()
+    def mirror(self, control_color:component_enum_data.Color=None, setup_color:component_enum_data.Color=None, mirror_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x):
+        """Mirrors component. returns new mirrored componenet
+
+        Args:
+            control_color (component_enum_data.Color, optional): Defaults to None.
+            setup_color (component_enum_data.Color, optional): Defaults to None.
+            mirror_axis (component_enum_data.AxisEnum, optional): Defaults to component_enum_data.AxisEnum.x.
+
+        Returns:
+            Hierarchy:
+        """
+        parent = None
+        add_settings_cntrl = self.settings_component is not None
+        mirror_component = type(self).create(
+            parent=parent, 
+            source_component=self, 
+            mirror_source=self, 
+            mirror_axis=mirror_axis, 
+            control_color=control_color, 
+            setup_color=setup_color, 
+            connect_hierarchy=False, 
+            connect_axis_vecs=False, 
+            add_settings_cntrl=add_settings_cntrl)
+
+        return mirror_component
     def __connect_mirror_source(self, mirror_source:"Anim"):
         """Connects all necessary attributes from mirror source
 
@@ -1404,6 +1532,55 @@ class Anim(Hierarchy):
         self_container[self._IN_SET_CNTRL_LOC_MAT] << mirror_src_container[mirror_source._OUT_SET_CNTRL_LOC_MAT]
 
         self.rename_nodes()
+    def __mirror_controls_from_source(self, color=None):
+        if self.mirror_src_component is None:
+            raise RuntimeError("__mirror_controls can only be called if component is mirror dest")
+        for control in self.get_all_descendants(component_enum_data.ComponentType.control):
+            mirror_control = self.__get_source_mirror_component(control)
+            if isinstance(control, Control):
+                replace_control = control.replace_control(mirror_control, color=color)
+                scale_attr = replace_control.transform_node["scale"]
+                
+                locked_attrs = [attr for attr in scale_attr if attr.is_locked()]
+                [attr.set_locked(False) for attr in locked_attrs]
+
+                scale_attr.set([-1, -1, -1])
+                replace_control.transform_node.freeze_transforms()
+
+                [attr.set_locked(True) for attr in locked_attrs]
+        
+    def __get_source_mirror_component(self, component:Component):
+        """Given a control component get it's mirror
+
+        Args:
+            control (Control): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        curr_comp = component
+        index_list = []
+        if self.mirror_src_component is None:
+            raise RuntimeError("get_mirror_control can only be called if component is mirror dest")
+        while curr_comp is not None and curr_comp.container_node != self.container_node:
+            connection = curr_comp.container_node[self._CNTNR_PAR_COMP].get_src_connection()
+            index_list.append(connection.index)
+
+            curr_comp = get_component(connection.node)
+        index_list = index_list[::-1]
+        mirrored_container = self.mirror_src_component.container_node
+        
+        for list_index, child_index in enumerate(index_list):
+            if list_index == 0:
+                set_guide = self.settings_guide_component
+                self_comp_type = component.container_node[self._BLD_COMP_TYPE].value
+                mirror_set_guide = self.mirror_src_component.settings_guide_component
+                if set_guide is None and mirror_set_guide is not None and self_comp_type != component_enum_data.ComponentType.setup.value:
+                    child_index += 1
+            mirrored_container = mirrored_container[self._CNTNR_CHLD_COMP][child_index].get_dest_connections()[0].node
+        return get_component(mirrored_container)
+    
+    
     def __set_vectors(self):
         """Creates nodes for primary, secondary, and tertiary vectors
 
@@ -1435,7 +1612,7 @@ class Anim(Hierarchy):
         self.container_node[self._SEC_VEC] << secondary_axis_attr
 
         self.container_node.add_nodes(primary_choice_node, secondary_choice_node, tertiary_vec)
-    def __create_setup_component(self, init_num_xforms:Union[int, tuple]=0, setup_color=None, mirror_source:"Anim"=None, mirror_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x):
+    def __create_setup_component(self, input_xforms:Union[int, tuple]=0, setup_color=None, mirror_source:"Anim"=None, mirror_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x):
         """Creates setup component and maps it to container
 
         Args:
@@ -1445,9 +1622,9 @@ class Anim(Hierarchy):
         """
         import component.setup as setup
         if mirror_source is None:
-            setup_inst = self.setup_component_type.create(init_num_xforms=init_num_xforms, control_color=setup_color, parent=self, source_component=self)
+            setup_inst = self.setup_component_type.create(input_xforms=input_xforms, control_color=setup_color, parent=self, source_component=self)
         else:
-            setup_inst = setup.Mirror.create(init_num_xforms=init_num_xforms, control_color=setup_color, parent=self, source_component=self, mirror_axis=mirror_axis)
+            setup_inst = setup.Mirror.create(input_xforms=input_xforms, control_color=setup_color, parent=self, source_component=self, mirror_axis=mirror_axis)
 
         setup_inst.container_node[setup_inst._IN_SET_XFORM_FOLLOW_INDEX] << self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX]
         setup_inst.container_node[setup_inst._IN_SET_CNTRL_LOC_MAT] << self.container_node[self._IN_SET_CNTRL_LOC_MAT]
@@ -1505,3 +1682,4 @@ class Anim(Hierarchy):
         settings_mult["matrixIn"][1] << settings_choice["output"]
 
         self.container_node.add_nodes(settings_choice)
+

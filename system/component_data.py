@@ -482,3 +482,10 @@ class Xform():
             not_none_list = [x for x in [self.xform_name, self.init_matrix, self.init_inv_matrix, self.world_matrix, self.world_inv_matrix, self.loc_matrix] if x is not None]
             if len(not_none_list) == 0:
                 raise RuntimeError(f"{self.__repr__()} fields cannot all be None")
+    @property
+    def attrs(self):
+        return [self.xform_name, self.init_matrix, self.init_inv_matrix, self.world_matrix, self.world_inv_matrix, self.loc_matrix]
+
+    def __iter__(self):
+        for attr in self.attrs:
+            yield attr

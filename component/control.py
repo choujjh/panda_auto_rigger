@@ -3,18 +3,17 @@ import maya.cmds as cmds
 import system.base_component as base_comp
 import utils.utils as utils
 import utils.node_wrapper as nw
-from typing import Union
 
 class Circle(base_comp.Control):
     """A circle nurbs curve control"""
     
-    def _create_shapes(self, axis_vec):
-        return [cmds.circle(normal=axis_vec)[0]]
+    def _create_shapes(self):
+        return [cmds.circle(normal=component_enum_data.AxisEnum.y.value)[0]]
 class Axis(base_comp.Control):
     """A axis nurbs curve control with a red, green, and blue axis pointers"""
     can_set_color = False
     
-    def _create_shapes(self, axis_vec):
+    def _create_shapes(self):
         x_axis = nw.wrap_node(cmds.curve(degree=1, point=[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]))
         y_axis = nw.wrap_node(cmds.curve(degree=1, point=[[0.0, 0.0, 0.0], [0.0, 1.0, 0.0]]))
         z_axis = nw.wrap_node(cmds.curve(degree=1, point=[[0.0, 0.0, 0.0], [0.0, 0.0, 1.0]]))
@@ -33,7 +32,7 @@ class Axis(base_comp.Control):
 class Box(base_comp.Control):
     """A box nurbs curve control"""
     
-    def _create_shapes(self, axis_vec):
+    def _create_shapes(self):
         x = 1.0
         y = 1.0
         z = 1.0
@@ -50,13 +49,13 @@ class Box(base_comp.Control):
 class Diamond(base_comp.Control):
     """A diamond nurbs surface control"""
     
-    def _create_shapes(self, axis_vec):
-        diamond = cmds.sphere(axis=axis_vec, sections=4, spans=2, degree=1)[0]
+    def _create_shapes(self):
+        diamond = cmds.sphere(sections=4, spans=2, degree=1)[0]
         return [diamond]
 class DiamondWire(base_comp.Control):
     """A diamond nurbs curve control"""
     
-    def _create_shapes(self, axis_vec):
+    def _create_shapes(self):
         diamond = cmds.curve(degree=1, point=[
             [0, 1, 0], [1, 0, 0], [0, -1, 0],
             [0, 0, 1], [0, 1, 0],
@@ -69,7 +68,7 @@ class DiamondWire(base_comp.Control):
 class Gear(base_comp.Control):
     """A gear nurbs curve control"""
     
-    def _create_shapes(self, axis_vec):
+    def _create_shapes(self):
         outer_shape = cmds.curve(degree=3, point=[
             [0.303359, 0, 0.940211], [0.662567, 0, 0.732822], [0.707107, 0, 0.720888], [0.751647, 0, 0.732822],
             [0.925336, 0, 0.833101], [0.973133, 0, 0.839394], [1.011381, 0, 0.810046], [1.20721, 0, 0.470859],
@@ -108,7 +107,7 @@ class Gear(base_comp.Control):
 class Gimbal(base_comp.Control):
     can_set_color = False
     
-    def _create_shapes(self, axis_vec):
+    def _create_shapes(self):
         circle1 = nw.wrap_node(cmds.circle(normal=[1.0, 0.0, 0.0])[0])
         circle2 = nw.wrap_node(cmds.circle(normal=[0.0, 1.0, 0.0])[0])
         circle3 = nw.wrap_node(cmds.circle(normal=[0.0, 0.0, 1.0])[0])
@@ -127,7 +126,7 @@ class Gimbal(base_comp.Control):
 class Pyramid4(base_comp.Control):
     """A pyramid nurbs curve control"""
     
-    def _create_shapes(self, axis_vec):
+    def _create_shapes(self):
         pyramid = cmds.curve(degree=1, point=[
             [1, 0, 1], [1, 0, -1], [0, 1.4, 0], [1, 0, 1],
             [-1, 0, 1], [0, 1.4, 0], [-1, 0, -1], [-1, 0, 1], 
@@ -137,8 +136,8 @@ class Pyramid4(base_comp.Control):
 class Sphere(base_comp.Control):
     """A sphere nurbs surface control"""
     
-    def _create_shapes(self, axis_vec):
-        sphere = cmds.sphere(axis=axis_vec)[0]
+    def _create_shapes(self):
+        sphere = cmds.sphere(axis=component_enum_data.AxisEnum.y.value)[0]
         return [sphere]
 class Locator(base_comp.Control):
     """A locator control"""
@@ -149,12 +148,10 @@ class Locator(base_comp.Control):
         super()._override_build(**kwargs)
         self.post_swap_cleanup()
 
-    def _create_shapes(self, axis_vec):
+    def _create_shapes(self):
         return [cmds.spaceLocator()[0]]
-    
     def pre_swap_cleanup(self):
         self.container_node.unpublish_attr(self.container_node[self._LOC_SCALE])
-        
     def post_swap_cleanup(self):
         loc_shape = self.transform_node.get_shapes()[0]
         loc_shape["localScaleX"] >> loc_shape["localScaleY"]
