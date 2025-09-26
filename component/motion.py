@@ -1,9 +1,11 @@
 import system.base_component as base_comp
 import component.control as control
+import component.setup as setup 
 import utils.node_wrapper as nw
 import system.component_data as component_data
 import system.component_enum_data as component_enum_data
 import maya.cmds as cmds
+
 
 class FK(base_comp.Motion):
     """Given a hierarchy creates an FK chain to accompany it"""
@@ -56,9 +58,15 @@ class SimpleIK(base_comp.Motion):
     root_transform_name = "ik_grp"
     _max_num_xforms = (3, 3)
 
+    _ROOT_WORLD_MAT = "rootWorldMatrix"
+    _ROOT_INIT_INV_MAT = "rootInitInvMatrix"
+    _END_WORLD_MAT = "endWorldMatrix"
+    _END_INIT_INV_MAT = "endInitInvMatrix"
+    _SPACE_SWITCH = "spaceSwitch"
+    _SPACE = "space"
+    _SPACE_MAT = "spaceMatrix"
+    _SPACE_INIT_INV_MAT = "spaceInitInvMat"
     _IK = "IK"
-    _IK_END_MAT = "IKEndMatrix"
-    _IK_END_INIT_INV_MAT = "IKEndInitInvMatrix"
     _IK_STRETCH_ENAB = "ikStretchEnabled"
     _IK_SOFT_BLEND_START = "softIKBlendStart"
     _IK_SOFT_IK_ENAB = "softIKEnabled"
@@ -68,9 +76,17 @@ class SimpleIK(base_comp.Motion):
     def _input_attr_build_data(self):
         node_data = super()._input_attr_build_data()
         node_data.extend_attr_data(
+            component_data.AttrData(self._ROOT_WORLD_MAT, type_="matrix", parent=self._IN),
+            component_data.AttrData(self._ROOT_INIT_INV_MAT, type_="matrix", parent=self._IN),
+            component_data.AttrData(self._END_WORLD_MAT, type_="matrix", parent=self._IN),
+            component_data.AttrData(self._END_INIT_INV_MAT, type_="matrix", parent=self._IN),
+
+            component_data.AttrData(self._SPACE, type_="enum", enumName="None", parent=self._IN),
+            component_data.AttrData(self._SPACE_SWITCH, type_="compound", parent=self._IN, multi=True),
+            component_data.AttrData(self._SPACE_MAT, type_="matrix", parent=self._SPACE_SWITCH),
+            component_data.AttrData(self._SPACE_INIT_INV_MAT, type_="matrix", parent=self._SPACE_SWITCH),
+            
             component_data.AttrData(self._IK, type_="compound", parent=self._IN),
-            component_data.AttrData(self._IK_END_MAT, type_="matrix", parent=self._IK),
-            component_data.AttrData(self._IK_END_INIT_INV_MAT, type_="matrix", parent=self._IK),
             component_data.AttrData(self._IK_STRETCH_ENAB, type_="bool", parent=self._IK, value=True),
             component_data.AttrData(self._IK_SOFT_BLEND_START, type_="double", parent=self._IK, value=0.9, min=0, max=1),
             component_data.AttrData(self._IK_SOFT_IK_ENAB, type_="bool", parent=self._IK),
@@ -78,42 +94,80 @@ class SimpleIK(base_comp.Motion):
             component_data.AttrData(self._IK_BLEND_CRV, type_=component_enum_data.SoftIKBlendCurve.quadratic, parent=self._IK),
         )
         return node_data
+    def __create_space_switch_nodes(self):
+        """Creates internal space switch nodes"""
+        space_switch_choice = nw.create_node("choice", "spaceMatrixChoice")
+        space_switch_init_inv_choice = nw.create_node("choice", "spaceInitInvMatrix_choice")
 
-    def __setup_ik_control(self, name:str, input_xform_index:int, parent_init_inv_matrix:nw.Attr, parent_world_matrix:nw.Attr, color=None):
-        """Creates the IK control
+        space_len = len(self._SPACE_SWITCH)
+        if space_len == 0:
+            space_len = 1
+        for index in range(space_len):
+            space_switch_choice["input"][index] << self.container_node[self._SPACE_SWITCH][index][self._SPACE_MAT]
+            space_switch_init_inv_choice["input"][index] << self.container_node[self._SPACE_SWITCH][index][self._SPACE_INIT_INV_MAT]
+
+        space_switch_choice["selector"] << self.container_node[self._SPACE]
+        space_switch_init_inv_choice["selector"] << self.container_node[self._SPACE]
+
+        self.container_node.add_nodes(space_switch_choice, space_switch_init_inv_choice)
+
+        return space_switch_choice, space_switch_init_inv_choice
+    def __ik_control(self, name:str, input_xform_index:int, control_matrix:nw.Attr, control_inv_matrix:nw.Attr, parent_init_inv_matrix:nw.Attr, parent_world_matrix:nw.Attr, color=None):
+        """Creates the IK control. returns world matrix
 
         Args:
             name (str):
             input_xform_index (int): input matrix index for it's parent
+            control_matrix (nw.Attr):
+            control_matrix (nw.Attr):
             parent_init_inv_matrix (nw.Attr):
             parent_world_matrix (nw.Attr):
-            color ():
+            color (Any):
 
         Returns
-            base_component.Control:
+            nw.Attr:
         """
-        input_xform = self.get_xform_attrs(xform_type=self.IO_ENUM.input, index=input_xform_index)
+        input_xform = self.get_xform_attrs(index=input_xform_index, xform_type=self.IO_ENUM.input)
         control_inst = control.Box.create(instance_name=input_xform.xform_name, parent=self, color=color, xform_map_index=input_xform_index)
         for attr_name in ["sx", "sy", "sz"]:
             control_inst.transform_node[attr_name].set_locked(True)
             control_inst.transform_node[attr_name].set_keyable(False)
 
+        # get orient of control
+        build_offset = True
+        if not control_matrix.has_src_connection():
+            control_matrix=input_xform.world_matrix
+            build_offset=False
+        if not control_inv_matrix.has_src_connection():
+            control_inv_matrix=input_xform.world_inv_matrix
+            build_offset=False
+
         mult_node = nw.create_node("multMatrix", f"{name}_cntrl_ws_mat")
-        mult_node["matrixIn"][0] << input_xform.world_matrix
+        mult_node["matrixIn"][0] << control_matrix
         mult_node["matrixIn"][1] << parent_init_inv_matrix
         mult_node["matrixIn"][2] << parent_world_matrix
         mult_node["matrixIn"][3] << self.transform_node["worldInverseMatrix"][0]
 
         control_inst.container_node[base_comp.Control._IN_OFF_MAT] << mult_node["matrixSum"]
+
+        end_orient_matrix = control_inst.container_node[control_inst._OUT_WS_MAT]
+        if build_offset:
+            loc_mat = nw.create_node("multMatrix", f"xform{input_xform_index}_offset_matrix")
+            loc_mat["matrixIn"][0] << input_xform.init_matrix
+            loc_mat["matrixIn"][1] << control_inv_matrix
+            loc_mat["matrixIn"][2] << control_inst.container_node[control_inst._OUT_WS_MAT]
+            end_orient_matrix = loc_mat["matrixSum"]
+            self.container_node.add_nodes(mult_node)
+
         self.container_node.add_nodes(mult_node)
 
-        return control_inst
-    def __create_dist_nodes(self, root_control:base_comp.Control, end_control:base_comp.Control):
+        return end_orient_matrix
+    def __create_dist_nodes(self, root_world_matrix:nw.Attr, end_world_matrix:nw.Attr):
         """Creates distance nodes for ik calculations. curr_len is the distance between root and end controls
 
         Args:
-            root_control (base_component.Control):
-            end_control (base_component.Control):
+            root_world_matrix (nw.Attr):
+            end_world_matrix (nw.Attr):
         Returns:
             len1_node:nw.Node, len2_node:nw.Node, curr_len_nodenw.Node:
         """
@@ -126,8 +180,8 @@ class SimpleIK(base_comp.Motion):
         len2_node["inMatrix1"] << input_xforms[1].world_matrix
         len2_node["inMatrix2"] << input_xforms[2].world_matrix
         curr_len_node = nw.create_node("distanceBetween", "curr_total_dist")
-        curr_len_node["inMatrix1"] << root_control.container_node[base_comp.Control._OUT_WS_MAT]
-        curr_len_node["inMatrix2"] << end_control.container_node[base_comp.Control._OUT_WS_MAT]
+        curr_len_node["inMatrix1"] << root_world_matrix
+        curr_len_node["inMatrix2"] << end_world_matrix
 
         self.container_node.add_nodes(len1_node, len2_node, curr_len_node)
         return len1_node["distance"], len2_node["distance"], curr_len_node["distance"]
@@ -197,7 +251,8 @@ class SimpleIK(base_comp.Motion):
         )
         cos_build_data_attrData.add_attrs_to_node(cos_build_data)
         cos_build_data_expression_str = __soft_ik_cos_expression_str(len1_attr=len1_attr, len2_attr=len2_attr, curr_len_attr=curr_len_attr, soft_ik_cos_build_data_node=cos_build_data)
-        len_expression = nw.wrap_node(cmds.expression(string=cos_build_data_expression_str, name="soft_ik_cos_expression"))
+        cos_expression = nw.wrap_node(cmds.expression(string=cos_build_data_expression_str, name="soft_ik_cos_expression"))
+        self.container_node.add_nodes(cos_expression)
 
         # creating blending for new height
         remap_cos = nw.create_node("remapValue", "soft_ik_cos_remap")
@@ -246,9 +301,7 @@ class SimpleIK(base_comp.Motion):
             soft_ik_output_data_node=soft_ik_output_data)
         len_expression = nw.wrap_node(cmds.expression(string=len_expression_str, name="soft_ik_len_expression"))
 
-        new_len_nodes = [soft_ik_output_data, len_expression]
-
-        self.container_node.add_nodes(cos_build_data, len_expression, *blending_nodes, *new_len_nodes)
+        self.container_node.add_nodes(cos_build_data, cos_expression, len_expression, *blending_nodes, soft_ik_output_data, blended_height)
         return soft_ik_output_data
     def __create_ik_build_data_nodes(self, len1_attr:nw.Attr, len2_attr:nw.Attr, curr_len_attr:nw.Attr):
         """Creates the trig hold value and distance nodes using law of cos. the holdValue will have the cos, sin, neg sin, and length of the ik
@@ -574,40 +627,57 @@ class SimpleIK(base_comp.Motion):
             string=pole_vec_expression_str, 
             name="ik_pole_vec_expression"))
 
-        self.container_node.add_nodes(aim_matrix, vec_mult, pole_vec_expression)
+        self.container_node.add_nodes(aim_matrix, vec_mult, pole_vec_expression, mult_matrix, pole_vec_ws_translate)
         return pole_cntrl_inst
 
+    def _pre_build(self, instance_name = None, parent = None, input_xforms = None, source_component = None, connect_hierarchy = None, connect_axis_vec = True, **pre_build_kwargs):
+        super()._pre_build(instance_name, parent, input_xforms, source_component, connect_hierarchy, connect_axis_vec, **pre_build_kwargs)
+        xforms = source_component.get_xform_attrs(xform_type=self.IO_ENUM.output, index=[0, 2])
+        if isinstance(source_component, setup.Mirror):
+            # get from input
+            self.container_node[self._ROOT_WORLD_MAT] << xforms[0].init_matrix
+            self.container_node[self._ROOT_INIT_INV_MAT] << xforms[0].init_inv_matrix
+            self.container_node[self._END_WORLD_MAT] << xforms[2].init_matrix
+            self.container_node[self._END_INIT_INV_MAT] << xforms[2].init_inv_matrix
+
     def _override_build(self, control_color=None, **kwargs):
+        # space switch to plug into controls
+        space_switch_choice, space_switch_init_inv_choice = self.__create_space_switch_nodes()
+        
         # controls
-        root_control = self.__setup_ik_control(
+        root_offset_matrix = self.__ik_control(
             name="root", 
             input_xform_index=0, 
+            control_matrix=self.input_node[self._ROOT_WORLD_MAT],
+            control_inv_matrix=self.input_node[self._ROOT_INIT_INV_MAT],
             parent_init_inv_matrix=self.input_node[self.HIER_DATA.HIER_PARENT_INIT_INV_MATRIX],
             parent_world_matrix=self.input_node[self.HIER_DATA.HIER_PARENT_MATRIX], 
             color=control_color)
-        end_control = self.__setup_ik_control(
+        end_offset_matrix = self.__ik_control(
             name="end",
             input_xform_index=2,
-            parent_init_inv_matrix=self.container_node[self._IK_END_INIT_INV_MAT],
-            parent_world_matrix=self.container_node[self._IK_END_MAT],
+            control_matrix=self.input_node[self._END_WORLD_MAT],
+            control_inv_matrix=self.input_node[self._END_INIT_INV_MAT],
+            parent_init_inv_matrix=space_switch_init_inv_choice["output"],
+            parent_world_matrix=space_switch_choice["output"],
             color=control_color)
-
+        
         # get all expression calculations
-        len1_attr, len2_attr, curr_len_attr = self.__create_dist_nodes(root_control=root_control, end_control=end_control)
+        len1_attr, len2_attr, curr_len_attr = self.__create_dist_nodes(root_world_matrix=root_offset_matrix, end_world_matrix=end_offset_matrix)
         soft_ik_new_len = self.__create_soft_ik_nodes(len1_attr=len1_attr, len2_attr=len2_attr, curr_len_attr=curr_len_attr)
         ik_build_data = self.__create_ik_build_data_nodes(len1_attr=soft_ik_new_len["len1"], len2_attr=soft_ik_new_len["len2"], curr_len_attr=curr_len_attr)
         
         loc_matricies, xform2_rot_point = self.__create_local_matrix_nodes(ik_build_data_node=ik_build_data)
         pole_cntrl_inst = self.__create_pole_vec_nodes(
             ik_build_data_node=ik_build_data,
-            root_cntrl_ws_mat=root_control.container_node[base_comp.Control._OUT_WS_MAT],
-            end_cntrl_ws_mat=end_control.container_node[base_comp.Control._OUT_WS_MAT],
+            root_cntrl_ws_mat=root_offset_matrix,
+            end_cntrl_ws_mat=end_offset_matrix,
             color=control_color)
         
         # create aim matrix
         ik_base_mat_aim = nw.create_node("aimMatrix", "ik_base_mat")
-        ik_base_mat_aim["inputMatrix"] << root_control.container_node[base_comp.Control._OUT_WS_MAT]
-        ik_base_mat_aim["primaryTargetMatrix"] << end_control.container_node[base_comp.Control._OUT_WS_MAT]
+        ik_base_mat_aim["inputMatrix"] << root_offset_matrix
+        ik_base_mat_aim["primaryTargetMatrix"] << end_offset_matrix
         ik_base_mat_aim["primaryInputAxis"] << self.container_node[self._PRM_VEC]
         ik_base_mat_aim["secondaryTargetMatrix"] << pole_cntrl_inst.container_node[base_comp.Control._OUT_WS_MAT]
         ik_base_mat_aim["secondaryInputAxis"] << self.container_node[self._SEC_VEC]
@@ -642,7 +712,7 @@ class SimpleIK(base_comp.Motion):
         
         xform2_world_matrix = self._create_orient_translate_blend(
             name="xform2_ws",
-            matrix_attr=end_control.container_node[base_comp.Control._OUT_WS_MAT],
+            matrix_attr=end_offset_matrix,
             tx_attr=xform2_rot_point["outputX"],
             ty_attr=xform2_rot_point["outputY"],
             tz_attr=xform2_rot_point["outputZ"]

@@ -17,19 +17,19 @@ class SimpleLimb(base_comp.Anim):
         HIER_DATA = self.HIER_DATA
 
         ik_inst = motion.SimpleIK.create(source_component=self.setup_component, control_color=control_color, parent=self)
-        fk_inst = motion.FK.create(source_component=self.setup_component, control_color=control_color, parent=self)
+        ik_output = ik_inst.get_xform_attrs(self.IO_ENUM.output)
+        for index in ik_output:
+            ik_xform = ik_output[index]
+            self._set_xform_attrs(index=index, xform_type=self.IO_ENUM.output, xform=ik_xform)
+        # fk_inst = motion.FK.create(source_component=self.setup_component, control_color=control_color, parent=self)
 
-        merge_hier_inst = misc.MergeHier.create(source_components = [fk_inst, ik_inst], parent=self)
+        # merge_hier_inst = misc.MergeHier.create(source_components = [fk_inst, ik_inst], parent=self)
 
-        for index in range(len(self.container_node[HIER_DATA.OUTPUT_XFORM])):
-            self._set_xform_attrs(
-                index=index, 
-                xform_type=self.IO_ENUM.output,
-                xform=merge_hier_inst.get_xform_attrs(index=index, xform_type=self.IO_ENUM.output))
-            # merge_output_xform = merge_hier_inst.container_node[HIER_DATA.OUTPUT_XFORM][index]
-            # self_output_xform = self.container_node[HIER_DATA.OUTPUT_XFORM][index]
-            # for attr_name in component_data.HierData.OUTPUT_DATA_NAMES:
-            #     merge_output_xform[attr_name] >> self_output_xform[attr_name]
+        # for index in range(len(self.container_node[HIER_DATA.OUTPUT_XFORM])):
+        #     self._set_xform_attrs(
+        #         index=index, 
+        #         xform_type=self.IO_ENUM.output,
+        #         xform=merge_hier_inst.get_xform_attrs(index=index, xform_type=self.IO_ENUM.output))
 
         # promoting to settings attr
         if self.settings_component is not None:
@@ -38,7 +38,7 @@ class SimpleLimb(base_comp.Anim):
             settings_transform.add_attr("_", type="enum", enumName="FK_IK:")
             settings_transform["_"].set_locked(True)
             settings_transform["_"].set_keyable(True)
-            self.settings_component.promote_attr_to_keyable(attr=merge_hier_inst.container_node[merge_hier_inst._IN_HIER_BLEND], name="blend")
+            # self.settings_component.promote_attr_to_keyable(attr=merge_hier_inst.container_node[merge_hier_inst._IN_HIER_BLEND], name="blend")
 
             settings_transform.add_attr("__", type="enum", enumName="IK:")
             settings_transform["__"].set_locked(True)

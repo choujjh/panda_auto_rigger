@@ -736,7 +736,20 @@ class Control(Component):
         """This code is ran after the control is swapped. meant to be overriden"""
 
     def replace_control(self, replace_component:Union[type, "Control", nw.Transform], color=None):
-        
+        """Replaces control with replace_component. could be component type, control, and transform
+
+        Args:
+            replace_component (Union[type, Control, nw.Transform]): _description_
+            color (any, optional): Defaults to None.
+
+        Raises:
+            RuntimeError: no replacement transform found
+
+        Returns:
+            Control:
+        """
+
+
         self.pre_swap_cleanup()
         cmds.delete([str(x) for x in self.transform_node.get_shapes()])
         replace_component_class = None
@@ -760,6 +773,7 @@ class Control(Component):
                 raise RuntimeError(f"no replace transform found in {replace_component.container_node}")
             replace_component_class = type(replace_component)
         
+        # renaming shapes
         if transform_node is not None:
             mirror_transform = nw.wrap_node(cmds.duplicate(str(transform_node))[0])
             for index, shape in enumerate(mirror_transform.get_shapes()):
@@ -767,11 +781,8 @@ class Control(Component):
                 shape.rename(f"{self.transform_node}Shape{index+1}")
             cmds.delete(str(mirror_transform))
 
-        # renaming shapes
-        transform_shapes = self.transform_node.get_shapes()
-
         # adding shapes to container
-        self.container_node.add_nodes(*transform_shapes)
+        self.container_node.add_nodes(*self.transform_node.get_shapes())
         self.rename_nodes()
         
         if replace_component_class is not None:
@@ -1681,5 +1692,5 @@ class Anim(Hierarchy):
         settings_mult["matrixIn"][0] << self.setup_component.container_node[self._OUT_SET_CNTRL_LOC_MAT]
         settings_mult["matrixIn"][1] << settings_choice["output"]
 
-        self.container_node.add_nodes(settings_choice)
+        self.container_node.add_nodes(settings_choice, settings_mult)
 
