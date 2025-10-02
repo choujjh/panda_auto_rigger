@@ -40,7 +40,7 @@ class Setup(base_comp.Hierarchy):
             control_inst = control.Locator.create(instance_name=input_xform.xform_name, parent=self, color=control_color, xform_map_index=index)
             control_container = control_inst.container_node
             control_container[control_inst._LOC_SCALE] << self.input_node[self._LOC_SCALE]
-            control_container[base_comp.Control._IN_OFF_MAT] = utils.Matrix.translate_matrix(0, index*1.5, 0)
+            utils.Matrix.translate_matrix(0, index*1.5, 0).set_transform(control_inst.transform_node, world_space=True)
             if input_xform.init_matrix.value is not None:
                 utils.Matrix(input_xform.init_matrix).set_transform(control_inst.transform_node, world_space=True)
                 
@@ -78,12 +78,12 @@ class SimpleLimb(Setup):
             color=control_color,
             xform_map_index=0,)
         control_inst0.transform_node["ty"] = 8
-        if input_xforms[0].init_matrix.value is not None:
-            utils.Matrix(input_xforms[0].init_matrix).set_transform(control_inst0.transform_node, world_space=True)
         control_inst0.container_node[control_inst0._LOC_SCALE] << self.container_node[self._LOC_SCALE]
         for attr in ["rz","sx","sy","sz"]:
             control_inst0.transform_node[attr].set_locked(True)
             control_inst0.transform_node[attr].set_keyable(False)
+        if input_xforms[0].init_matrix.value is not None:
+            input_xforms[0].init_matrix.value.set_transform(control_inst0.transform_node, world_space=True)
         # control 1
         control_inst1 = control.Locator.create(
             instance_name=self.input_node[self.HIER_DATA.INPUT_XFORM][1][self.HIER_DATA.INPUT_XFORM_NAME], 
@@ -95,6 +95,8 @@ class SimpleLimb(Setup):
         for attr in ["ty","rx","ry","rz","sx","sy","sz"]:
             control_inst1.transform_node[attr].set_locked(True)
             control_inst1.transform_node[attr].set_keyable(False)
+        if input_xforms[1].loc_matrix.value is not None:
+            input_xforms[1].loc_matrix.value.set_transform(control_inst1.transform_node)
         # control 2
         control_inst2_translate = control.Sphere.create(
             instance_name=self.input_node[self.HIER_DATA.INPUT_XFORM][2][self.HIER_DATA.INPUT_XFORM_NAME], 
@@ -110,12 +112,12 @@ class SimpleLimb(Setup):
             parent=self, 
             color=control_color,
             xform_map_index=2)
-        if input_xforms[2].init_matrix.value is not None:
-            init_matrix = utils.Matrix(input_xforms[2].init_matrix)
-            control_inst2_translate.transform_node["translate"] = utils.Matrix(init_matrix).translate
         for attr in ["tx","ty","tz","sx","sy","sz"]:
             control_inst2_orient.transform_node[attr].set_locked(True)
             control_inst2_orient.transform_node[attr].set_keyable(False)
+        if input_xforms[2].init_matrix.value is not None:
+            init_matrix = utils.Matrix(input_xforms[2].init_matrix)
+            control_inst2_translate.transform_node["translate"] = utils.Matrix(init_matrix).translate
         control_inst2_orient.container_node[control_inst2_orient._LOC_SCALE] << self.container_node[self._LOC_SCALE]
 
         # mid interp matrix
@@ -352,7 +354,8 @@ class SimpleLimb(Setup):
         self.container_node.add_nodes(xform_matrix2_ws, xform_matrix2_loc, xform2_pick_scale_mat, xform2_mult_mat)
 class Mirror(Setup):
     """Class that mirrors all xforms given"""
-    
+    root_transform_name = None
+
     _IN_MIRROR_AXIS = "mirrorAxis"
     _IN_AXIS_SCALAR = "AxisScalar"
     _IN_NEG_AXIS_SCALAR = "negAxisScalar"
@@ -380,6 +383,7 @@ class Mirror(Setup):
 
     def _override_build(self, control_color=None, **kwargs):
         self.__create_mirror_scale_matrix()
+        
 
         added_nodes = []
         input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)

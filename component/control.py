@@ -157,3 +157,8 @@ class Locator(base_comp.Control):
         loc_shape["localScaleX"] >> loc_shape["localScaleY"]
         loc_shape["localScaleX"] >> loc_shape["localScaleZ"]
         self.container_node.publish_attr(loc_shape["localScaleX"], attr_bind_name=self._LOC_SCALE)
+
+class DebugMirror(base_comp.Control):
+    def _create_shapes(self):
+        shape = cmds.curve(degree=1, point=[[0, 0 ,0], [1, 0, 0], [2, 1, 1], [0, 0, 1], [0, 0, 0]])
+        return [shape]

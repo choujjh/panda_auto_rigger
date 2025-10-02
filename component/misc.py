@@ -61,6 +61,8 @@ class MergeHier(base_comp.Component):
 
     _IN_HIER_PAR_MAT = "hierParentMatricies"
     _IN_HIER_BLEND = "hierBlend"
+    _IN_HIER_LEN = "hierLen"
+    _OUT_HIER_VIS = "hierVisibility"
     _KWG_SRC_COMPS = "source_components"
 
     def __init__(self, container_node=None):
@@ -70,13 +72,14 @@ class MergeHier(base_comp.Component):
     def _input_attr_build_data(self):
         node_data = super()._input_attr_build_data()
 
-        node_data.extend_attr_data(self.HIER_DATA.get_hier_data())
+        node_data.extend_attr_data(self.HIER_DATA.get_hier_parent_data())
 
         node_data.extend_attr_data(
             component_data.AttrData(self._IN_HIER_PAR_MAT, type_="matrix", multi=True, publish=True),
             component_data.AttrData(self.HIER_DATA.INPUT_XFORM, type_="compound", multi=True, publish=True),
             component_data.AttrData(self.HIER_DATA.INPUT_LOC_MATRIX, type_="matrix", parent=self.HIER_DATA.INPUT_XFORM, multi=True),
             component_data.AttrData(self._IN_HIER_BLEND, type_="double", parent=self._IN, min=0),
+            component_data.AttrData(self._IN_HIER_LEN, type_="long", min=0),
         )
         
         return node_data
@@ -84,6 +87,7 @@ class MergeHier(base_comp.Component):
     def _output_attr_build_data(self):
         node_data = super()._output_attr_build_data()
         node_data.extend_attr_data(self.HIER_DATA.get_output_xform_data())
+        node_data.extend_attr_data(component_data.AttrData(self._OUT_HIER_VIS, type_="double", multi=True, publish=True, min=0, max=1))
 
         return node_data
 
@@ -105,13 +109,58 @@ class MergeHier(base_comp.Component):
     def _pre_build(self, instance_name = None, parent=None, source_components=[], **pre_build_kwargs):
         super()._pre_build(instance_name, parent, **pre_build_kwargs)
         self._connect_source_hier_components(source_components=source_components)
-        
+
         self.__hier_comp = base_comp.Hierarchy(container_node=self.container_node)
 
     def _override_build(self, **kwargs):
         hier_parent_mat = self.__connect_hier()
         blend_weight_attrs = self.__blend_weights()
-        self.__blend_matricies(hier_parent_mat=hier_parent_mat, blend_weight_attrs=blend_weight_attrs)
+        self.__blend_matricies(hier_parent_mat=hier_parent_mat, blend_weight_attrs=blend_weight_attrs)\
+        
+        # create max selector
+        hier_blend_len = len(self.container_node[self.HIER_DATA.INPUT_XFORM])
+        cmds.addAttr(str(self.container_node[self._IN_HIER_BLEND]), edit=True, max=hier_blend_len-1)
+
+        # create visibility
+        vis_attrs = [attr for attr in self.container_node[self._OUT_HIER_VIS]]
+        self.input_node[self._IN_HIER_LEN] = len(vis_attrs) - 1
+        added_nodes = []
+        if len(vis_attrs) == 1:
+            self.container_node[self._IN_HIER_BLEND] >> vis_attrs[0]
+        elif len(vis_attrs) != 0:
+            len_factor = 1 / (len(vis_attrs) - 1)
+            for index, vis_attr in enumerate(vis_attrs):
+                # remap
+                remap = nw.create_node("remapValue", f"hierSource{index}Remap")
+                remap["inputMax"] << self.input_node[self._IN_HIER_LEN]
+                remap["inputValue"] << self.container_node[self._IN_HIER_BLEND]
+                remap["outValue"] >> vis_attr
+
+                index_vis_prev = (index - 1) * len_factor
+                index_vis = index * len_factor
+                index_vis_post = (1 + index) * len_factor
+
+                # setting remaps
+                curr_remap_index = 0
+                if index_vis_prev >= 0:
+                    remap["value"][curr_remap_index]["value_Position"] = index_vis_prev
+                    remap["value"][curr_remap_index]["value_FloatValue"] = 0
+                    curr_remap_index += 1
+                remap["value"][curr_remap_index]["value_Position"] = index_vis
+                remap["value"][curr_remap_index]["value_FloatValue"] = 1
+                curr_remap_index += 1
+                if index_vis_post <= 1:
+                    remap["value"][curr_remap_index]["value_Position"] = index_vis_post
+                    remap["value"][curr_remap_index]["value_FloatValue"] = 0
+
+                added_nodes.append(remap)
+
+        self.input_node[self._IN_HIER_LEN].set_locked(True)
+
+        self.container_node.add_nodes(*added_nodes)
+
+
+
         
     def __connect_hier(self):
         """Creates all nodes connected to hier"""
@@ -124,8 +173,9 @@ class MergeHier(base_comp.Component):
                 hier_parent_mat["target"][xform_index-1]["targetMatrix"] << hier_attr
         hier_parent_inv = nw.create_node("inverseMatrix", "hierParentInvMatrixBlend")
         hier_parent_inv["inputMatrix"] << hier_parent_mat["outputMatrix"]
-        self.container_node[self.HIER_DATA.HIER_PARENT_MATRIX] << hier_parent_mat["outputMatrix"]
-        self.container_node[self.HIER_DATA.HIER_PARENT_INV_MATRIX] << hier_parent_inv["outputMatrix"]
+        hier_parent = self.get_hier_parent_attrs()
+        hier_parent.matrix << hier_parent_mat["outputMatrix"]
+        hier_parent.inv_matrix << hier_parent_inv["outputMatrix"]
 
         self.container_node.add_nodes(hier_parent_mat, hier_parent_inv)
         return hier_parent_mat
@@ -137,7 +187,8 @@ class MergeHier(base_comp.Component):
         """
         blend_weight_attrs = []
         added_nodes = []
-        for index in range(len(self.container_node[self.HIER_DATA.INPUT_XFORM])):
+        hier_len = len(self.container_node[self.HIER_DATA.INPUT_XFORM])
+        for index in range(hier_len):
             if index != 0:
                 clamp = nw.create_node("clampRange", f"component{index}_clamp")
                 if index == 1:
@@ -196,7 +247,24 @@ class MergeHier(base_comp.Component):
             )
                         
         self.container_node.add_nodes(*added_nodes)
-    def _set_xform_attrs(self, index:int, xform:component_data.Xform, xform_type:component_enum_data.IO, set_when_data_is_attr:bool=False, disable_warning:bool=False):
+    # xform and hier parent functionality
+    def get_xform_attrs(self, xform_type:component_enum_data.IO, index:Union[int, list]=None):
+        """Gets an xform. returns all if index is None
+
+        Args:
+            xform_type (component_enum_data.IO): selects input or output xform
+            index (Union[int, list], optional): Defaults to None.
+
+        Raises:
+            RuntimeError: if xform_type is input
+
+        Returns:
+            component_data.Xform:
+        """
+        if self.HIER_DATA.is_input_enum(xform_type):
+            raise RuntimeError(f"{self.container_node} mergeHier could not get output xforms. none exist")
+        return self.__hier_comp.get_xform_attrs(xform_type=xform_type, index=index)
+    def _set_xform_attrs(self, index:int, xform:component_data.Xform, xform_type:component_enum_data.IO, set_when_data_is_attr:bool=False):
         """Sets xform based of index and xform type
 
         Args:
@@ -211,8 +279,26 @@ class MergeHier(base_comp.Component):
         """
         if self.HIER_DATA.is_input_enum(xform_type):
             raise RuntimeError(f"{self.container_node} mergeHier could not set output xforms. none exist")
-        return self.__hier_comp._set_xform_attrs(index=index, xform=xform, xform_type=xform_type, set_when_data_is_attr=set_when_data_is_attr, disable_warning=disable_warning)
+        return self.__hier_comp._set_xform_attrs(index=index, xform=xform, xform_type=xform_type, set_when_data_is_attr=set_when_data_is_attr)
+    def get_hier_parent_attrs(self):
+        """Gets hier parent attributes
+        
+        Returns:
+            component_data.HierParent:
+        """
+        return self.__hier_comp.get_hier_parent_attrs()
+    def _set_hier_parent_attrs(self, hier_parent:component_data.HierParent, set_when_data_is_attr:bool=False):
+        """sets hier parent attributes
+
+        Args:
+            hier_parent (component_data.HierParent): 
+            set_when_data_is_attr (bool, optional): Defaults to False.
+        """
+
+        self.__hier_comp._set_hier_parent_attrs(hier_parent=hier_parent, set_when_data_is_attr=set_when_data_is_attr)
     
+    def get_as_source_xforms(self, is_parent_component=True):
+        return self.__hier_comp.get_as_source_xforms(is_parent_component=is_parent_component)
     def _connect_source_hier_components(self, source_components):
         """given a list of source components, connects them to this component
 
@@ -220,10 +306,9 @@ class MergeHier(base_comp.Component):
             source_components (iter):
 
         Raises:
-            RuntimeError: _description_
-            RuntimeError: _description_
-            RuntimeError: _description_
-            RuntimeError: _description_
+            RuntimeError: lengths of source components don't match
+            RuntimeError: source container cannot be parent container
+            RuntimeError: source_component is not of Hierarchy
         """
         if utils.is_iterable(source_components) and len(source_components) > 0:
             #connect up local matricies
@@ -256,6 +341,10 @@ class MergeHier(base_comp.Component):
                     out_xform[HIER_DATA.OUTPUT_XFORM_NAME] << src_out_xform[HIER_DATA.OUTPUT_XFORM_NAME]
                     out_xform[HIER_DATA.OUTPUT_INIT_MATRIX] << src_out_xform[HIER_DATA.OUTPUT_INIT_MATRIX]
                     out_xform[HIER_DATA.OUTPUT_INIT_INV_MATRIX] << src_out_xform[HIER_DATA.OUTPUT_INIT_INV_MATRIX]
+
+                # set visibility
+                if source_component.transform_node is not None:
+                    self.container_node[self._OUT_HIER_VIS][hier_index] >> source_component.transform_node["visibility"]
             
             # setting hiers
             source_container = source_components[0].container_node
@@ -264,19 +353,3 @@ class MergeHier(base_comp.Component):
         else:
             raise RuntimeError("source component needs to be iterable")
     
-    def get_xform_attrs(self, xform_type:component_enum_data.IO, index:Union[int, list]=None):
-        """Gets an xform. returns all if index is None
-
-        Args:
-            xform_type (component_enum_data.IO): selects input or output xform
-            index (Union[int, list], optional): Defaults to None.
-
-        Raises:
-            RuntimeError: if xform_type is input
-
-        Returns:
-            component_data.Xform:
-        """
-        if self.HIER_DATA.is_input_enum(xform_type):
-            raise RuntimeError(f"{self.container_node} mergeHier could not get output xforms. none exist")
-        return self.__hier_comp.get_xform_attrs(xform_type=xform_type, index=index)

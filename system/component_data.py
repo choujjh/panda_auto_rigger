@@ -247,7 +247,7 @@ class HierData:
         OUTPUT_DATA_NAMES (list(str)):
         """
 
-    HIERARCHY = "hierarchy"
+    HIER_PARENT = "hierParent"
     HIER_PARENT_MATRIX = "hierParentMatrix" 
     HIER_PARENT_INV_MATRIX = "hierParentInvMatrix" 
     HIER_PARENT_INIT_INV_MATRIX = "hierParentInitInvMatrix"
@@ -268,7 +268,7 @@ class HierData:
     OUTPUT_WORLD_INV_MATRIX = "outputWorldInvMatrix"
     OUTPUT_LOC_MATRIX = "outputLocMatrix"
 
-    HIER_DATA_NAMES = [
+    HIER_PARENT_DATA_NAMES = [
         HIER_PARENT_MATRIX,
         HIER_PARENT_INV_MATRIX,
         HIER_PARENT_INIT_INV_MATRIX
@@ -336,7 +336,7 @@ class HierData:
             return cls.OUTPUT_XFORM
 
     @classmethod
-    def is_hier_attr(cls, attr:nw.Attr):
+    def is_hier_parent_attr(cls, attr:nw.Attr):
         """Checks if attribute is a hier attribute
 
         Args:
@@ -345,15 +345,10 @@ class HierData:
         Returns:
             bool:
         """
-        hier_names = cls.HIER_DATA_NAMES
+        hier_names = cls.HIER_PARENT_DATA_NAMES
         for attr_name in hier_names:
             if not attr.has_attr(attr_name):
                 return False
-
-        attr = attr[cls.INPUT_XFORM][0]
-
-        if not cls.is_input_xform_attr(attr[cls.INPUT_XFORM][0]):
-            return False
         return True
     @classmethod
     def is_input_xform_attr(cls, attr:nw.Attr):
@@ -409,13 +404,13 @@ class HierData:
 
         return NodeData(*attr_data)
     @classmethod
-    def get_hier_data(cls):
+    def get_hier_parent_data(cls):
         """Returns NodeData for hier
 
         Returns:
             NodeData:
         """
-        return cls.__gen_hier_node_data(cls.HIERARCHY, cls.HIER_DATA_NAMES, multi=False)
+        return cls.__gen_hier_node_data(cls.HIER_PARENT, cls.HIER_PARENT_DATA_NAMES, multi=False)
     @classmethod
     def get_input_xform_data(cls):
         """Returns NodeData for an input xform
@@ -436,8 +431,62 @@ class HierData:
         """
         return cls.__gen_hier_node_data(cls.OUTPUT_XFORM, cls.OUTPUT_DATA_NAMES, multi=True)
 
+def xform_to_hier_parent(xform:"Xform"):
+        """converts xform to hier_parent
 
+        Args:
+            xform (component_data.Xform): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        return HierParent(matrix=xform.world_matrix, inv_matrix=xform.world_inv_matrix, init_inv_matrix=xform.init_inv_matrix)
+
+class HierParent():
+    """Encapsulates HierParent attribute"""
+    def __init__(self, 
+                 hier_parent_attr:nw.Attr=None, 
+                 matrix:Union[utils.Matrix, nw.Attr]=None, 
+                 inv_matrix:Union[utils.Matrix, nw.Attr]=None, 
+                 init_inv_matrix:Union[utils.Matrix, nw.Attr]=None):
+        """initializes hier parent. uses hier_parent first. otherwise uses given attributes
+
+        Args:
+            hier_parent_attr (nw.Attr, optional): _description_. Defaults to None.
+            parent_matrix (Union[utils.Matrix, nw.Attr], optional): _description_. Defaults to None.
+            parent_inv_matrix (Union[utils.Matrix, nw.Attr], optional): _description_. Defaults to None.
+            parent_init_inv_matrix (Union[utils.Matrix, nw.Attr], optional): _description_. Defaults to None.
+        """
+        if hier_parent_attr is not None:
+            if not HierData.is_hier_parent_attr(hier_parent_attr):
+                raise RuntimeError(f"{hier_parent_attr} is not hier parent attribute")
+            self.matrix = hier_parent_attr[HierData.HIER_PARENT_MATRIX]
+            self.inv_matrix = hier_parent_attr[HierData.HIER_PARENT_INV_MATRIX]
+            self.init_inv_matrix = hier_parent_attr[HierData.HIER_PARENT_INIT_INV_MATRIX]
+        else:
+            self.matrix = matrix
+            self.inv_matrix = inv_matrix
+            self.init_inv_matrix = init_inv_matrix
+
+            not_none_list = [x for x in self.attrs if x is not None]
+            if len(not_none_list) == 0:
+                raise RuntimeError(f"{self.__repr__()} not all fields can be None")
+
+
+    @property
+    def attrs(self):
+        """list of all attributes
+
+        Returns:
+            list:
+        """
+        return [self.matrix, self.inv_matrix, self.init_inv_matrix]
+
+    def __iter__(self):
+        for attr in self.attrs:
+            yield attr
 class Xform():
+    """Encapsulates Xform attribute"""
     def __init__(self, 
                     xform_attr:nw.Attr=None, 
                     xform_type:component_enum_data.IO=component_enum_data.IO.input,
@@ -447,6 +496,22 @@ class Xform():
                     world_matrix:Union[utils.Matrix, nw.Attr]=None, 
                     world_inv_matrix:Union[utils.Matrix, nw.Attr]=None, 
                     loc_matrix:Union[utils.Matrix, nw.Attr]=None):
+        """Initializes Xform. tries to populate from xform_attr first, otherwise uses given attributes
+
+        Args:
+            xform_attr (nw.Attr, optional): _description_. Defaults to None.
+            xform_type (component_enum_data.IO, optional): _description_. Defaults to component_enum_data.IO.input.
+            xform_name (Union[str, nw.Attr], optional): _description_. Defaults to None.
+            init_matrix (Union[utils.Matrix, nw.Attr], optional): _description_. Defaults to None.
+            init_inv_matrix (Union[utils.Matrix, nw.Attr], optional): _description_. Defaults to None.
+            world_matrix (Union[utils.Matrix, nw.Attr], optional): _description_. Defaults to None.
+            world_inv_matrix (Union[utils.Matrix, nw.Attr], optional): _description_. Defaults to None.
+            loc_matrix (Union[utils.Matrix, nw.Attr], optional): _description_. Defaults to None.
+
+        Raises:
+            RuntimeError: xform_attr is not an xform attribute
+            RuntimeError: if all fields are none
+        """
         if xform_attr is not None:
             if HierData.is_input_xform_attr(xform_attr):
                 self.xform_type = component_enum_data.IO.input
@@ -479,11 +544,16 @@ class Xform():
             self.world_inv_matrix = world_inv_matrix
             self.loc_matrix = loc_matrix
 
-            not_none_list = [x for x in [self.xform_name, self.init_matrix, self.init_inv_matrix, self.world_matrix, self.world_inv_matrix, self.loc_matrix] if x is not None]
+            not_none_list = [x for x in self.attrs if x is not None]
             if len(not_none_list) == 0:
-                raise RuntimeError(f"{self.__repr__()} fields cannot all be None")
+                raise RuntimeError(f"{self.__repr__()} not all fields can be None")
     @property
     def attrs(self):
+        """list of all attributes
+
+        Returns:
+            list:
+        """
         return [self.xform_name, self.init_matrix, self.init_inv_matrix, self.world_matrix, self.world_inv_matrix, self.loc_matrix]
 
     def __iter__(self):

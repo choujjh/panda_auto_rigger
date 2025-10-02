@@ -14,22 +14,16 @@ class SimpleLimb(base_comp.Anim):
     _max_num_xforms = (3, 3)
 
     def _override_build(self, control_color=None, **build_kwargs):
-        HIER_DATA = self.HIER_DATA
-
         ik_inst = motion.SimpleIK.create(source_component=self.setup_component, control_color=control_color, parent=self)
-        ik_output = ik_inst.get_xform_attrs(self.IO_ENUM.output)
-        for index in ik_output:
-            ik_xform = ik_output[index]
-            self._set_xform_attrs(index=index, xform_type=self.IO_ENUM.output, xform=ik_xform)
-        # fk_inst = motion.FK.create(source_component=self.setup_component, control_color=control_color, parent=self)
+        fk_inst = motion.FK.create(source_component=self.setup_component, control_color=control_color, parent=self)
 
-        # merge_hier_inst = misc.MergeHier.create(source_components = [fk_inst, ik_inst], parent=self)
+        merge_hier_inst = misc.MergeHier.create(source_components = [fk_inst, ik_inst], parent=self)
 
-        # for index in range(len(self.container_node[HIER_DATA.OUTPUT_XFORM])):
+        # for index, output_xform in merge_hier_inst.get_xform_attrs(xform_type=self.IO_ENUM.output).items():
         #     self._set_xform_attrs(
         #         index=index, 
         #         xform_type=self.IO_ENUM.output,
-        #         xform=merge_hier_inst.get_xform_attrs(index=index, xform_type=self.IO_ENUM.output))
+        #         xform=output_xform)
 
         # promoting to settings attr
         if self.settings_component is not None:
@@ -38,7 +32,7 @@ class SimpleLimb(base_comp.Anim):
             settings_transform.add_attr("_", type="enum", enumName="FK_IK:")
             settings_transform["_"].set_locked(True)
             settings_transform["_"].set_keyable(True)
-            # self.settings_component.promote_attr_to_keyable(attr=merge_hier_inst.container_node[merge_hier_inst._IN_HIER_BLEND], name="blend")
+            self.settings_component.promote_attr_to_keyable(attr=merge_hier_inst.container_node[merge_hier_inst._IN_HIER_BLEND], name="blend")
 
             settings_transform.add_attr("__", type="enum", enumName="IK:")
             settings_transform["__"].set_locked(True)
@@ -56,19 +50,25 @@ class SimpleLimb(base_comp.Anim):
             if ter_vec != utils.Vector(0, 1, 0) or ter_vec != utils.Vector(0, -1, 0):
                 self.settings_guide_component.transform_node["r"] = 90 * utils.Vector(0, 1, 0) ^ ter_vec
 
+        # print("54-------------------------------------------------------")
+        corrective_inst = motion.ResampleHier.create(source_component=merge_hier_inst)
+        for index, output_xform in corrective_inst.get_xform_attrs(xform_type=self.IO_ENUM.output).items():
+            self._set_xform_attrs(
+                index=index, 
+                xform_type=self.IO_ENUM.output,
+                xform=output_xform)
+
 class SingleXform(base_comp.Anim):
     """Single Joint Component"""
     _max_num_xforms = (1, 1)
 
     def _override_build(self, control_color=None, **build_kwargs):
         setup_out_xform0 = self.setup_component.get_xform_attrs(xform_type=self.IO_ENUM.output, index=0)
-        self._set_xform_attrs(index=0, xform_type=self.IO_ENUM.input, xform=self.XFORM(xform_name=self.container_node[self._BLD_INST_NAME]))
-
         cntrl_mult_matrix = nw.create_node("multMatrix", "cntrl_ws_offset_mat")
         cntrl_mult_matrix["matrixIn"][0]  << setup_out_xform0.world_matrix
         cntrl_mult_matrix["matrixIn"][1]  << self.transform_node["worldInverseMatrix"][0]
 
-        cntrl_inst = control.Circle.create(instance_name=self.container_node[self._BLD_INST_NAME], parent=self, build_s=4, color=control_color)
+        cntrl_inst = control.Circle.create(parent=self, color=control_color)
         cntrl_inst.container_node[cntrl_inst._IN_OFF_MAT] << cntrl_mult_matrix["matrixSum"]
 
         self.container_node.add_nodes(cntrl_mult_matrix)
@@ -77,13 +77,11 @@ class SingleXform(base_comp.Anim):
             index=0,
             xform_type=self.IO_ENUM.output,
             xform=self.XFORM(
-                xform_name=self.container_node[self._BLD_INST_NAME],
                 init_matrix=setup_out_xform0.init_matrix,
                 init_inv_matrix=setup_out_xform0.world_matrix,
                 world_matrix=cntrl_inst.container_node[cntrl_inst._OUT_WS_MAT],
                 world_inv_matrix=cntrl_inst.container_node[cntrl_inst._OUT_WS_INV_MAT],
             )
         )
-        self.settings_guide_component.transform_node["t"] = [0, 0, -6]
-
-        self._KWG_CNTRL_CLR
+        if self.settings_guide_component is not None:
+            self.settings_guide_component.transform_node["t"] = [0, 0, -6]

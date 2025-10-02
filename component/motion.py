@@ -18,11 +18,13 @@ class FK(base_comp.Motion):
         added_nodes = []
         HIER_DATA =self.HIER_DATA
 
-        prev_ws_attr = self.container_node[HIER_DATA.HIER_PARENT_MATRIX]
-        prev_inv_attr = self.container_node[HIER_DATA.HIER_PARENT_INIT_INV_MATRIX]
-        for index, input_xform in enumerate(self.input_node[self.HIER_DATA.INPUT_XFORM]):
+        hier_parent = self.get_hier_parent_attrs()
+        prev_ws_attr = hier_parent.matrix
+        prev_inv_attr = hier_parent.init_inv_matrix
+        input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
+        for index, input_xform in input_xforms.items():
             control_inst = control.Circle.create(
-                instance_name=input_xform[HIER_DATA.INPUT_XFORM_NAME], 
+                instance_name=input_xform.xform_name, 
                 axis_vec=self.container_node[self._PRM_VEC].value, 
                 parent=self, 
                 color=control_color,
@@ -34,14 +36,14 @@ class FK(base_comp.Motion):
             ws_mult_matrix = nw.create_node("multMatrix", f"xform{index}_ws_mat_mult")
             added_nodes.append(ws_mult_matrix)
 
-            ws_mult_matrix["matrixIn"][0] << input_xform[HIER_DATA.INPUT_WORLD_MATRIX]
+            ws_mult_matrix["matrixIn"][0] << input_xform.world_matrix
             ws_mult_matrix["matrixIn"][1] << prev_inv_attr
             ws_mult_matrix["matrixIn"][2] << prev_ws_attr
             ws_mult_matrix["matrixIn"][3] << self.transform_node["worldInverseMatrix"][0]
             ws_mult_matrix["matrixSum"] >> control_inst.container_node[base_comp.Control._IN_OFF_MAT]
             
             prev_ws_attr = control_inst.container_node[base_comp.Control._OUT_WS_MAT]
-            prev_inv_attr = self.input_node[HIER_DATA.INPUT_XFORM][index][HIER_DATA.INPUT_WORLD_INV_MATRIX]
+            prev_inv_attr = input_xform.world_inv_matrix
 
             self._set_xform_attrs(
                 index=index,
@@ -645,13 +647,14 @@ class SimpleIK(base_comp.Motion):
         space_switch_choice, space_switch_init_inv_choice = self.__create_space_switch_nodes()
         
         # controls
+        hier_parent = self.get_hier_parent_attrs()
         root_offset_matrix = self.__ik_control(
             name="root", 
             input_xform_index=0, 
             control_matrix=self.input_node[self._ROOT_WORLD_MAT],
             control_inv_matrix=self.input_node[self._ROOT_INIT_INV_MAT],
-            parent_init_inv_matrix=self.input_node[self.HIER_DATA.HIER_PARENT_INIT_INV_MATRIX],
-            parent_world_matrix=self.input_node[self.HIER_DATA.HIER_PARENT_MATRIX], 
+            parent_init_inv_matrix=hier_parent.init_inv_matrix,
+            parent_world_matrix=hier_parent.matrix, 
             color=control_color)
         end_offset_matrix = self.__ik_control(
             name="end",
@@ -721,6 +724,39 @@ class SimpleIK(base_comp.Motion):
 
         self.container_node.add_nodes(ik_base_mat_aim, *xform_output_nodes)
 
+class ResampleHier(base_comp.Motion):
+    def _override_build(self, control_color=None, **build_kwargs):
+        input_xforms = list(self.get_xform_attrs(xform_type=self.IO_ENUM.input).items())
         
+        added_nodes = []
+        factor = 3
+        for index, input_xform in input_xforms:
+            offset_index = index * (factor + 1)
+            self._set_xform_attrs(
+                index = offset_index,
+                xform_type=self.IO_ENUM.output,
+                xform=input_xform,
+            )
+            if index == input_xforms[-1][0]:
+                break
+            hold_mat = nw.create_node("holdMatrix")
+            input_xform.world_matrix >> hold_mat["inMatrix"]
+            added_nodes.append(hold_mat)
+            for inner_index in range(factor):
+                self._set_xform_attrs(
+                    index = offset_index + inner_index + 1,
+                    xform_type=self.IO_ENUM.output,
+                    xform=self.XFORM(
+                        xform_name=f"{input_xform.xform_name.value}_sub{inner_index}",
+                        world_matrix=hold_mat["outMatrix"],
+                        init_matrix=hold_mat["outMatrix"],
+                    )
+                )
+                
+        self.container_node.add_nodes(*added_nodes)
+
+    def _post_build(self, **post_build_kwargs):
+        self.rename_nodes()
+
 
             

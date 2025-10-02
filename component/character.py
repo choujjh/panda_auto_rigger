@@ -82,14 +82,15 @@ class CustomCharacter(base_comp.Component):
 
         return shader
 
+    @property
+    def root_component(self):
+        return self.child_components()[0]
     @classmethod
     def create(cls, instance_name = None, parent=None):
         return super().create(instance_name, parent)
     
     def _pre_build(self, instance_name = None, parent=None):
         super()._pre_build(instance_name, parent)
-
-        import component.anim as anim
 
         m_color = component_enum_data.Color.yellow
         m_char_side = component_enum_data.CharacterSide.mid
@@ -128,21 +129,56 @@ class CustomCharacter(base_comp.Component):
 
         return choice_node
 
-class SimpleCharacter(CustomCharacter):
+class SimpleBiped(CustomCharacter):
     """Class for character component of a simple character
 
     Args:
         CustomCharacter (_type_): _description_
     """
     def _override_build(self, **kwargs):
+        # color
+        setup_color = self.get_color_shader(char_side=self._SETUP_CLR, set_color=component_enum_data.Color.green)
 
-        l_color = component_enum_data.Color.blue
-        l_char_side = component_enum_data.CharacterSide.left
-        l_char_shader = self.get_color_shader(l_char_side, set_color=l_color)
+        l_char_shader = self.get_color_shader(char_side=component_enum_data.CharacterSide.left, set_color=component_enum_data.Color.blue)
+        r_char_shader = self.get_color_shader(char_side=component_enum_data.CharacterSide.right, set_color=component_enum_data.Color.red)
+                
+        # leg
+        l_leg = anim.SimpleLimb.create(
+        instance_name="leg", 
+        parent=self,
+        hier_side=component_enum_data.CharacterSide.left, 
+        control_color=l_char_shader, 
+        setup_color=setup_color,
+        input_xforms=[
+            component_data.Xform(xform_name="upleg", init_matrix=utils.Matrix.translate_matrix(3, 8, 0)),
+            component_data.Xform(xform_name="loleg"),
+            component_data.Xform(xform_name="foot", init_matrix=utils.Matrix.translate_matrix(4, 0, 0)),
+        ],
+        add_settings_cntrl=True)
+        r_leg = l_leg.mirror(control_color=r_char_shader, setup_color=setup_color)
+
+        # arm
+        l_arm = anim.SimpleLimb.create(
+        instance_name="arm", 
+        parent=self,
+        hier_side=component_enum_data.CharacterSide.left, 
+        control_color=l_char_shader, 
+        setup_color=setup_color,
+        input_xforms=[
+            component_data.Xform(xform_name="uparm", init_matrix=utils.Matrix.translate_matrix(3, 15, 0)),
+            component_data.Xform(xform_name="loarm", loc_matrix=utils.Matrix.translate_matrix(0, 0, -1)),
+            component_data.Xform(xform_name="hand", init_matrix=utils.Matrix.translate_matrix(8, 12, 0)),
+        ],
+        add_settings_cntrl=True)
+        r_arm = l_arm.mirror(control_color=r_char_shader, setup_color=setup_color)
         
-        l_leg_anim_inst = anim.SimpleLimb.create(
-            instance_name="Leg", 
-            parent=self, 
-            control_color=l_char_shader,
-            setup_color=self.get_color_shader(self._SETUP_CLR),
-            hier_side=l_char_side)
+        root_xform = self.root_component.get_xform_attrs(index=0, xform_type=component_enum_data.IO.output)
+        l_leg.hook(self.root_component)
+        r_leg.hook(self.root_component)
+        l_arm.hook(self.root_component)
+        r_arm.hook(self.root_component)
+        # l_leg._set_hier_parent_attrs(hier_parent=component_data.xform_to_hier_parent(root_xform))
+        # r_leg._set_hier_parent_attrs(hier_parent=component_data.xform_to_hier_parent(root_xform))
+        # l_arm._set_hier_parent_attrs(hier_parent=component_data.xform_to_hier_parent(root_xform))
+        # r_arm._set_hier_parent_attrs(hier_parent=component_data.xform_to_hier_parent(root_xform))
+
