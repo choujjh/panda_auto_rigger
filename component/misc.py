@@ -1,11 +1,8 @@
 import system.base_component as base_comp
 import system.component_data as component_data
-import system.component_enum_data as component_enum_data
 import component.control as control
 import utils.node_wrapper as nw
-import utils.utils as utils
 import maya.cmds as cmds
-from typing import Union
 
 class VisualizeHier(base_comp.Hierarchy):
     """Helps visualize and debug hierarchies by creating chains for world space and local visualization"""
@@ -52,304 +49,223 @@ class VisualizeHier(base_comp.Hierarchy):
 
         self.container_node.add_nodes(ws_grp)
 
-class MergeHier(base_comp.Component):
+class MergeHier(base_comp.Hierarchy):
     """Merges multiple components together and outputs it"""
     class_namespace="merge_hier"
-    HIER_DATA = component_data.HierData
-    IO_ENUM = component_enum_data.IO
-    XFORM = component_data.Xform
 
     _IN_HIER_PAR_MAT = "hierParentMatricies"
+    _IN_HIER = "hierarchy"
+    _IN_HIER_LOC_MAT = "hierarchyLocMatrix"
     _IN_HIER_BLEND = "hierBlend"
-    _IN_HIER_LEN = "hierLen"
     _OUT_HIER_VIS = "hierVisibility"
+
     _KWG_SRC_COMPS = "source_components"
 
     def __init__(self, container_node=None):
         super().__init__(container_node)
         self.__hier_comp = base_comp.Hierarchy(container_node=container_node)
-
     def _input_attr_build_data(self):
         node_data = super()._input_attr_build_data()
-
-        node_data.extend_attr_data(self.HIER_DATA.get_hier_parent_data())
-
         node_data.extend_attr_data(
             component_data.AttrData(self._IN_HIER_PAR_MAT, type_="matrix", multi=True, publish=True),
-            component_data.AttrData(self.HIER_DATA.INPUT_XFORM, type_="compound", multi=True, publish=True),
-            component_data.AttrData(self.HIER_DATA.INPUT_LOC_MATRIX, type_="matrix", parent=self.HIER_DATA.INPUT_XFORM, multi=True),
+            component_data.AttrData(self._IN_HIER, type_="compound", multi=True, publish=True),
+            component_data.AttrData(self._IN_HIER_LOC_MAT, type_="matrix", multi=True, parent=self._IN_HIER),
             component_data.AttrData(self._IN_HIER_BLEND, type_="double", parent=self._IN, min=0),
-            component_data.AttrData(self._IN_HIER_LEN, type_="long", min=0),
         )
         
         return node_data
-    
     def _output_attr_build_data(self):
         node_data = super()._output_attr_build_data()
         node_data.extend_attr_data(self.HIER_DATA.get_output_xform_data())
-        node_data.extend_attr_data(component_data.AttrData(self._OUT_HIER_VIS, type_="double", multi=True, publish=True, min=0, max=1))
+        node_data.extend_attr_data(component_data.AttrData(self._OUT_HIER_VIS, type_="double", multi=True, parent=self._OUT, min=0, max=1))
 
         return node_data
 
     @classmethod
-    def create(cls, instance_name = None, parent=None, source_components=[], **kwargs):
-        kwargs[cls._KWG_SRC_COMPS] = utils.make_iterable(source_components)
-                
+    def create(cls, instance_name = None, parent = None, source_components=[]):
+        
         pre_build_kwargs, build_kwargs, post_build_kwargs = cls._process_kwargs(instance_name=instance_name, parent=parent, source_components=source_components)
-        return cls._filtered_create(pre_build_kwargs=pre_build_kwargs, build_kwargs=build_kwargs, post_build_kwargs=post_build_kwargs)
+
+        return cls._filtered_create(pre_build_kwargs, build_kwargs, post_build_kwargs)
     
     @classmethod
-    def _process_kwargs(cls, instance_name = None, parent = None, source_components=[]):
-        pre_build_kwargs, build_kwargs, post_build_kwargs = super()._process_kwargs(instance_name, parent)
-        pre_build_kwargs.update({
-            cls._KWG_SRC_COMPS:source_components
-        })
+    def _process_kwargs(cls, instance_name=None, parent=None, source_components=[]):
+        pre_build_kwargs, build_kwargs, post_build_kwargs = super()._process_kwargs(
+            instance_name=instance_name,
+            parent=parent)
+        pre_build_kwargs[cls._KWG_SRC_COMPS] = source_components
+
         return pre_build_kwargs, build_kwargs, post_build_kwargs
 
-    def _pre_build(self, instance_name = None, parent=None, source_components=[], **pre_build_kwargs):
-        super()._pre_build(instance_name, parent, **pre_build_kwargs)
-        self._connect_source_hier_components(source_components=source_components)
-
-        self.__hier_comp = base_comp.Hierarchy(container_node=self.container_node)
-
-    def _override_build(self, **kwargs):
-        hier_parent_mat = self.__connect_hier()
-        blend_weight_attrs = self.__blend_weights()
-        self.__blend_matricies(hier_parent_mat=hier_parent_mat, blend_weight_attrs=blend_weight_attrs)\
+    def _pre_build(self, instance_name=None, parent=None, source_components=[], **pre_build_kwargs):
+        # get initial source_component
+        source_component = None if len(source_components) < 1 else source_components[0]
+        super()._pre_build(instance_name=instance_name, parent=parent, source_component=source_component, connect_hierarchy=True, connect_axis_vec=True)
         
-        # create max selector
-        hier_blend_len = len(self.container_node[self.HIER_DATA.INPUT_XFORM])
-        cmds.addAttr(str(self.container_node[self._IN_HIER_BLEND]), edit=True, max=hier_blend_len-1)
+        # checking components
+        self.__check_source_components(source_components=source_components)
 
-        # create visibility
-        vis_attrs = [attr for attr in self.container_node[self._OUT_HIER_VIS]]
-        self.input_node[self._IN_HIER_LEN] = len(vis_attrs) - 1
-        added_nodes = []
-        if len(vis_attrs) == 1:
-            self.container_node[self._IN_HIER_BLEND] >> vis_attrs[0]
-        elif len(vis_attrs) != 0:
-            len_factor = 1 / (len(vis_attrs) - 1)
-            for index, vis_attr in enumerate(vis_attrs):
-                # remap
-                remap = nw.create_node("remapValue", f"hierSource{index}Remap")
-                remap["inputMax"] << self.input_node[self._IN_HIER_LEN]
-                remap["inputValue"] << self.container_node[self._IN_HIER_BLEND]
-                remap["outValue"] >> vis_attr
+        # connecting the rest of the components
+        source_components = [] if source_component is None else source_components[1:]
+        self.__connect_components(source_component=source_component, source_components=source_components)
 
-                index_vis_prev = (index - 1) * len_factor
-                index_vis = index * len_factor
-                index_vis_post = (1 + index) * len_factor
-
-                # setting remaps
-                curr_remap_index = 0
-                if index_vis_prev >= 0:
-                    remap["value"][curr_remap_index]["value_Position"] = index_vis_prev
-                    remap["value"][curr_remap_index]["value_FloatValue"] = 0
-                    curr_remap_index += 1
-                remap["value"][curr_remap_index]["value_Position"] = index_vis
-                remap["value"][curr_remap_index]["value_FloatValue"] = 1
-                curr_remap_index += 1
-                if index_vis_post <= 1:
-                    remap["value"][curr_remap_index]["value_Position"] = index_vis_post
-                    remap["value"][curr_remap_index]["value_FloatValue"] = 0
-
-                added_nodes.append(remap)
-
-        self.input_node[self._IN_HIER_LEN].set_locked(True)
-
-        self.container_node.add_nodes(*added_nodes)
-
-
-
-        
-    def __connect_hier(self):
-        """Creates all nodes connected to hier"""
-        # connecting hier
-        hier_parent_mat = nw.create_node("blendMatrix", "hierParentMatrixBlend")
-        for xform_index, hier_attr in enumerate(self.container_node[self._IN_HIER_PAR_MAT]):
-            if xform_index == 0:
-                hier_parent_mat["inputMatrix"] << hier_attr
-            else:
-                hier_parent_mat["target"][xform_index-1]["targetMatrix"] << hier_attr
-        hier_parent_inv = nw.create_node("inverseMatrix", "hierParentInvMatrixBlend")
-        hier_parent_inv["inputMatrix"] << hier_parent_mat["outputMatrix"]
-        hier_parent = self.get_hier_parent_attrs()
-        hier_parent.matrix << hier_parent_mat["outputMatrix"]
-        hier_parent.inv_matrix << hier_parent_inv["outputMatrix"]
-
-        self.container_node.add_nodes(hier_parent_mat, hier_parent_inv)
-        return hier_parent_mat
-    def __blend_weights(self):
-        """creates all nodes for blending
-
-        Returns:
-            list(nw.Attr): list of attribute that has the blended weights for each index
-        """
-        blend_weight_attrs = []
-        added_nodes = []
-        hier_len = len(self.container_node[self.HIER_DATA.INPUT_XFORM])
-        for index in range(hier_len):
-            if index != 0:
-                clamp = nw.create_node("clampRange", f"component{index}_clamp")
-                if index == 1:
-                    clamp["input"] << self.container_node[self._IN_HIER_BLEND]
-                else:
-                    component_weight = nw.create_node("subtract", name=f"component{index}_envelope")
-                    component_weight["input1"] << self.container_node[self._IN_HIER_BLEND]
-                    component_weight["input2"].set(index-1)
-                    clamp["input"] << component_weight["output"]
-                    added_nodes.append(component_weight)
-                added_nodes.append(clamp)
-                blend_weight_attrs.append(clamp["output"])
-        self.container_node.add_nodes(*added_nodes)
-
-        return blend_weight_attrs
-    def __blend_matricies(self, hier_parent_mat:nw.Node, blend_weight_attrs:list):
-        """creates local, world, and inverse matricies
+    #pre build helper functions
+    def __check_source_components(self, source_components=[]):
+        """Checks that all components given are valid
 
         Args:
-            hier_parent_mat (nw.Node): 
-            blend_weight_attrs (list): 
+            source_components (list, optional): Defaults to [].
+
+        Raises:
+            RuntimeError: hier len is different than first
+            RuntimeError: source component is the parent of this merge component
+            RuntimeError: is not a hierarchy component
         """
-        added_nodes = []
-        prev_ws_attr = hier_parent_mat["outputMatrix"]
-        hier_len = len(self.container_node[self.HIER_DATA.INPUT_XFORM][0][self.HIER_DATA.INPUT_LOC_MATRIX])
-        for xform_index in range(hier_len):
-            blend_mat = nw.create_node("blendMatrix", name=f"xform{xform_index}_loc_blend")
+        if len(source_components) < 1:
+            return
+        xform_len = len(source_components[0].container_node[self.HIER_DATA.OUTPUT_XFORM])
+        container_parents = []
+        curr_par_cntnr = self.container_node.get_container_node()
+        while curr_par_cntnr is not None:
+            container_parents.append(curr_par_cntnr)
+            curr_par_cntnr = curr_par_cntnr.get_container_node()
+        for source_component in source_components:
+            component_len = len(source_component.container_node[self.HIER_DATA.OUTPUT_XFORM])
+            if xform_len != component_len:
+                raise RuntimeError(f"{source_component.container_node} has mismatched len. expecting {xform_len} got {component_len}")
+            if source_component.container_node in container_parents:
+                raise RuntimeError("source container cannot be parent of merge container")
+            if not issubclass(type(source_component), base_comp.Hierarchy):
+                raise RuntimeError(f"{source_component.container_node} is not hierarchy component")
+    def __connect_components(self, source_component, source_components=[]):
+        """Connects source components up to local hierarchy attribute
 
-            #adding world space
-            mult_mat = nw.create_node("multMatrix", name=f"xform{xform_index}_ws_mat")
-            mult_mat["matrixIn"][0] << blend_mat["outputMatrix"]
-            mult_mat["matrixIn"][1] << prev_ws_attr
-            inverse_mat = nw.create_node("inverseMatrix", name=f"xform{xform_index}_inv_mat")
-            inverse_mat["inputMatrix"] << mult_mat["matrixSum"]
-            
-            prev_ws_attr = mult_mat["matrixSum"]
-            #local space blend
-            for component_index, input_xform in enumerate(self.container_node[self.HIER_DATA.INPUT_XFORM]):
-                loc_mat_attr = input_xform[self.HIER_DATA.INPUT_LOC_MATRIX][xform_index]
-                if component_index == 0:
-                    blend_mat["inputMatrix"] << loc_mat_attr
-                else:
-                    blend_mat["target"][component_index-1]["targetMatrix"] << loc_mat_attr
-                    blend_mat["target"][component_index-1]["weight"] << blend_weight_attrs[component_index-1]
-                added_nodes.extend([blend_mat, mult_mat, inverse_mat])
+        Args:
+            source_components (list, optional): Defaults to [].
+        """
+        set_component_vis = lambda index, component: (
+            None if component.transform_node is None else 
+            self.container_node[self._OUT_HIER_VIS][index] >> component.transform_node["visibility"])
+        connect_hier_parent = lambda index, component: (
+            component.container_node[self.HIER_DATA.HIER_PARENT_MATRIX] >> self.container_node[self._IN_HIER_PAR_MAT][index]
+        )
 
+        set_component_vis(index=0, component=source_component)
+        connect_hier_parent(index=0, component=source_component)
+        for component_index, curr_component in enumerate(source_components):
+            # hier parent
+            hier_attr = self.container_node[self._IN_HIER][component_index][self._IN_HIER_LOC_MAT]
 
+            for xform_index, xform in enumerate(curr_component.container_node[self.HIER_DATA.OUTPUT_XFORM]):
+                hier_attr[xform_index] << xform[self.HIER_DATA.OUTPUT_LOC_MATRIX]
+
+            # connecting to visibility
+            set_component_vis(index=component_index+1, component=curr_component)
+            connect_hier_parent(index=component_index+1, component=curr_component)
+
+    def _override_build(self, **kwargs):
+        num_hiers = len(self.container_node[self._IN_HIER_PAR_MAT])
+        if num_hiers < 1:
+            cmds.warning(f"{self.container_node} does not have any source hier components connected")
+            return
+        num_hiers_seg = 1 / (num_hiers - 1)
+        hier_parent_blend = nw.create_node("blendMatrix", "hierParent_matBlend")
+        vis_remaps = []
+        for hier_index, hier_parent_attr in enumerate(self.container_node[self._IN_HIER_PAR_MAT]):
+            # visibility
+            vis_remaps.append(self.__create_vis_remap(hier_index=hier_index, num_hiers=num_hiers, num_hiers_seg=num_hiers_seg))
+
+            # hier parent
+            if hier_index == 0:
+                hier_parent_blend["inputMatrix"] << hier_parent_attr
+            else:
+                hier_parent_blend["target"][hier_index-1]["targetMatrix"] << hier_parent_attr
+
+        # xform operations
+        input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
+        blend_mats = []
+        world_mats = []
+        world_mat_attr = hier_parent_blend["outputMatrix"]
+        for xform_index, in_xform in input_xforms.items():
+            # blend loc matrix
+            blend_mat = nw.create_node("blendMatrix", f"xform{xform_index}_locMatBlend")
+            blend_mats.append(blend_mat)
+            blend_mat["inputMatrix"] << in_xform.loc_matrix
+
+            # world matrix
+            world_mat = nw.create_node("multMatrix", f"xform{xform_index}_WorldMult")
+            world_mats.append(world_mat)
+
+            # setting world_matrix
+            world_mat["matrixIn"][0] << blend_mat["outputMatrix"]
+            world_mat["matrixIn"][1] << world_mat_attr
+            world_mat_attr = world_mat["matrixSum"]
+
+            # set output xform
             self._set_xform_attrs(
                 index=xform_index,
                 xform_type=self.IO_ENUM.output,
                 xform=self.XFORM(
-                    world_matrix=mult_mat["matrixSum"],
-                    world_inv_matrix=inverse_mat["outputMatrix"],
                     loc_matrix=blend_mat["outputMatrix"],
+                    world_matrix=world_mat["matrixSum"]
                 )
             )
-                        
-        self.container_node.add_nodes(*added_nodes)
-    # xform and hier parent functionality
-    def get_xform_attrs(self, xform_type:component_enum_data.IO, index:Union[int, list]=None):
-        """Gets an xform. returns all if index is None
+
+        # hierarcy loop
+        blend_weights = []
+        for hier_index, hier_attr in enumerate(self.container_node[self._IN_HIER]):
+            # remaps for weights
+            blend_weight = nw.create_node("remapValue", f"hier{hier_index+1}_blendWeightRemap")
+            blend_weight["inputMin"] = hier_index
+            blend_weight["inputMax"] = hier_index + 1
+            blend_weight["inputValue"] << self.container_node[self._IN_HIER_BLEND]
+            blend_weights.append(blend_weight)
+
+            # connect to hier_parent_blend
+            hier_parent_blend["target"][hier_index]["weight"] << blend_weight["outValue"]
+
+            for loc_index, loc_attr in enumerate(hier_attr[self._IN_HIER_LOC_MAT]):
+                blend_mats[loc_index]["target"][hier_index]["targetMatrix"] << loc_attr
+                blend_mats[loc_index]["target"][hier_index]["weight"] << blend_weight["outValue"]
+
+        # set hierBlend max
+        cmds.addAttr(str(self.container_node[self._IN_HIER_BLEND]), edit=True, max=num_hiers-1)
+
+        # adding nodes
+        self.container_node.add_nodes(hier_parent_blend, *blend_mats, *world_mats, *blend_weights, *vis_remaps)
+    
+    # override helper functions
+    def __create_vis_remap(self, hier_index:int, num_hiers:int, num_hiers_seg:float):
+        """creates hier visualize remap
 
         Args:
-            xform_type (component_enum_data.IO): selects input or output xform
-            index (Union[int, list], optional): Defaults to None.
-
-        Raises:
-            RuntimeError: if xform_type is input
+            hier_index (int): 
+            num_hiers (int): 
+            num_hiers_seg (float): 
 
         Returns:
-            component_data.Xform:
+            nw.Node: 
         """
-        if self.HIER_DATA.is_input_enum(xform_type):
-            raise RuntimeError(f"{self.container_node} mergeHier could not get output xforms. none exist")
-        return self.__hier_comp.get_xform_attrs(xform_type=xform_type, index=index)
-    def _set_xform_attrs(self, index:int, xform:component_data.Xform, xform_type:component_enum_data.IO, set_when_data_is_attr:bool=False):
-        """Sets xform based of index and xform type
+        hier_vis_remap = nw.create_node("remapValue", f"hier{hier_index}_visRemap")
+        hier_vis_remap["inputMax"] = num_hiers - 1
+        hier_vis_remap["inputValue"] << self.container_node[self._IN_HIER_BLEND]
 
-        Args:
-            index (int):
-            xform (component_data.Xform):
-            xform_type (component_enum_data.IO):
-            set_when_data_is_attr (bool, optional): only sets value not connects them. Defaults to False.
-            disable_warning (bool, optional): Defaults to False.
+        value_index=0
+        pre_seg_val = num_hiers_seg * (hier_index - 1)
+        seg_val = num_hiers_seg * hier_index
+        post_seg_val = num_hiers_seg * (hier_index + 1)
+        if pre_seg_val >= 0.0:
+            hier_vis_remap["value"][value_index]["value_Position"] = pre_seg_val
+            hier_vis_remap["value"][value_index]["value_FloatValue"] = 0.49
+            value_index += 1
+        hier_vis_remap["value"][value_index]["value_Position"] = seg_val
+        hier_vis_remap["value"][value_index]["value_FloatValue"] = 1
+        value_index += 1
+        if (pre_seg_val - 1.0) < 0.0005:
+            hier_vis_remap["value"][value_index]["value_Position"] = post_seg_val
+            hier_vis_remap["value"][value_index]["value_FloatValue"] = 0.49
+            value_index += 1
 
-        Raises:
-            RuntimeError: if xform_type is input
-        """
-        if self.HIER_DATA.is_input_enum(xform_type):
-            raise RuntimeError(f"{self.container_node} mergeHier could not set output xforms. none exist")
-        return self.__hier_comp._set_xform_attrs(index=index, xform=xform, xform_type=xform_type, set_when_data_is_attr=set_when_data_is_attr)
-    def get_hier_parent_attrs(self):
-        """Gets hier parent attributes
-        
-        Returns:
-            component_data.HierParent:
-        """
-        return self.__hier_comp.get_hier_parent_attrs()
-    def _set_hier_parent_attrs(self, hier_parent:component_data.HierParent, set_when_data_is_attr:bool=False):
-        """sets hier parent attributes
+        hier_vis_remap["outValue"] >> self.container_node[self._OUT_HIER_VIS][hier_index]
 
-        Args:
-            hier_parent (component_data.HierParent): 
-            set_when_data_is_attr (bool, optional): Defaults to False.
-        """
-
-        self.__hier_comp._set_hier_parent_attrs(hier_parent=hier_parent, set_when_data_is_attr=set_when_data_is_attr)
-    
-    def get_as_source_xforms(self, is_parent_component=True):
-        return self.__hier_comp.get_as_source_xforms(is_parent_component=is_parent_component)
-    def _connect_source_hier_components(self, source_components):
-        """given a list of source components, connects them to this component
-
-        Args:
-            source_components (iter):
-
-        Raises:
-            RuntimeError: lengths of source components don't match
-            RuntimeError: source container cannot be parent container
-            RuntimeError: source_component is not of Hierarchy
-        """
-        if utils.is_iterable(source_components) and len(source_components) > 0:
-            #connect up local matricies
-            HIER_DATA = self.HIER_DATA
-            # checks first
-            xform_len = len(source_components[0].container_node[HIER_DATA.OUTPUT_XFORM])
-            for source_component in source_components:
-                component_len = len(source_component.container_node[HIER_DATA.OUTPUT_XFORM])
-                if xform_len != component_len:
-                    raise RuntimeError(f"{source_component.container_node} has mismatched len. expecting {xform_len} got {component_len}")
-                if source_component.container_node == self.container_node.get_container_node():
-                    raise RuntimeError("source container cannot be parent container")
-                if not issubclass(type(source_component), base_comp.Hierarchy):
-                    raise RuntimeError(f"{source_component.container_node} is not hierarchy component")
-                
-            for hier_index, source_component in enumerate(source_components):
-                # input xform local attrs
-                src_container = source_component.container_node
-                src_xforms = src_container[HIER_DATA.OUTPUT_XFORM]
-                for xform_index, src_out_xform  in enumerate(src_xforms):
-                    self_loc_matrix = self.container_node[HIER_DATA.INPUT_XFORM][hier_index][HIER_DATA.INPUT_LOC_MATRIX][xform_index]
-                    src_out_xform[HIER_DATA.OUTPUT_LOC_MATRIX] >> self_loc_matrix
-
-                    src_container[HIER_DATA.HIER_PARENT_MATRIX] >> self.container_node[self._IN_HIER_PAR_MAT][hier_index]
-                # connect up output name, world matrix and init matricies 
-                curr_src_container = source_components[0].container_node
-                for index, src_out_xform in enumerate(curr_src_container[HIER_DATA.OUTPUT_XFORM]):
-                    out_xform = self.container_node[HIER_DATA.OUTPUT_XFORM][index]
-
-                    out_xform[HIER_DATA.OUTPUT_XFORM_NAME] << src_out_xform[HIER_DATA.OUTPUT_XFORM_NAME]
-                    out_xform[HIER_DATA.OUTPUT_INIT_MATRIX] << src_out_xform[HIER_DATA.OUTPUT_INIT_MATRIX]
-                    out_xform[HIER_DATA.OUTPUT_INIT_INV_MATRIX] << src_out_xform[HIER_DATA.OUTPUT_INIT_INV_MATRIX]
-
-                # set visibility
-                if source_component.transform_node is not None:
-                    self.container_node[self._OUT_HIER_VIS][hier_index] >> source_component.transform_node["visibility"]
-            
-            # setting hiers
-            source_container = source_components[0].container_node
-            source_container[HIER_DATA.HIER_PARENT_INIT_INV_MATRIX] >> self.container_node[HIER_DATA.HIER_PARENT_INIT_INV_MATRIX]
-
-        else:
-            raise RuntimeError("source component needs to be iterable")
-    
+        return hier_vis_remap

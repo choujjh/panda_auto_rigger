@@ -351,7 +351,7 @@ class SimpleLimb(Setup):
                 loc_matrix=xform_matrix2_loc["matrixSum"]
             )
         )
-        self.container_node.add_nodes(xform_matrix2_ws, xform_matrix2_loc, xform2_pick_scale_mat, xform2_mult_mat)
+        self.container_node.add_nodes(xform_matrix2_ws, xform_matrix2_loc, xform2_pick_scale_mat, xform2_mult_mat, xform_pick_mat)
 class Mirror(Setup):
     """Class that mirrors all xforms given"""
     root_transform_name = None
@@ -441,6 +441,7 @@ class Mirror(Setup):
         self.container_node.add_nodes(*added_nodes, settings_mult_mat)
 
     def __create_mirror_scale_matrix(self):
+        """Creates mirror scale matrix from axis"""
         x_choice = nw.create_node("choice", "xScalar")
         y_choice = nw.create_node("choice", "YScalar")
         z_choice = nw.create_node("choice", "ZScalar")

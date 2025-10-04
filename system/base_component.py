@@ -1242,6 +1242,11 @@ class Hierarchy(Component):
                 utils.set_connect_attr_data(attr=set_hier_parent, data=hier_parent, set_when_data_is_attr=set_when_data_is_attr)
     # hooking
     def hook(self, hook_src_data):
+        """Hooks xform to hier parent
+
+        Args:
+            hook_src_data (_type_): _description_
+        """
         # get parent hier that can be hooked first
         hier_parent = self.get_hook_hier_parent()
 
@@ -1289,6 +1294,14 @@ class Hierarchy(Component):
                 return curr_hier_parent
             curr_hier_parent = next_hier_parent
     def get_hook_source_data(self, hook_src_data):
+        """converts hook_src_data to component_data.hierParent
+
+        Args:
+            hook_src_data (any):
+
+        Returns:
+            component_data.hierParent:
+        """
         control_inst=None
         if isinstance(hook_src_data, nw.Transform) and hook_src_data.get_container_node() is not None:
             control_inst = get_component(hook_src_data.get_container_node())
@@ -1322,7 +1335,6 @@ class Hierarchy(Component):
                     matrix=control_inst.transform_node["worldMatrix"][0],
                     inv_matrix=control_inst.transform_node["worldInverseMatrix"][0],
                     init_inv_matrix=control_inst.transform_node["worldInverseMatrix"][0].value)
-
     def get_hook_xform(self, xform:nw.Attr):
         """Gets hook xform at the end of chain that can be used to set hook data
 
@@ -1666,7 +1678,7 @@ class Anim(Hierarchy):
 
             # setting correct input xform
             setup_xforms = mirror_source.setup_component.get_xform_attrs(self.IO_ENUM.input)
-            setup_xforms = {index: self.get_hook_xform(xform.init_matrix.parent) for index, xform in setup_xforms.items()}
+            setup_xforms = {index: mirror_source.get_hook_xform(xform.init_matrix.parent) for index, xform in setup_xforms.items()}
             
             input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
             for input_xform in input_xforms.values():
@@ -1693,8 +1705,7 @@ class Anim(Hierarchy):
             self.__mirror_controls_from_source()
         self._attach_output_xforms_to_settings_controls()
     def _attach_output_xforms_to_settings_controls(self):
-        """Takes finished output xforms and applies it to settings init choice
-        """
+        """Takes finished output xforms and applies it to settings init choice"""
         output_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.output)
         settings_guide = self.settings_guide_component
         if settings_guide is not None:

@@ -1,14 +1,15 @@
 import system.base_component as base_comp
 import component.anim as anim
-import component.setup as setup
 import system.component_enum_data as component_enum_data
 import utils.node_wrapper as nw
 import system.component_data as component_data
 import utils.utils as utils
 from typing import Union
 
+base_comp.Anim
+
 class CustomCharacter(base_comp.Component):
-    """Base class for character. takes care of a lot of the nice stuff like root transform and color and axis enum storing"""
+    """Base class for character"""
     component_type = component_enum_data.ComponentType.character
     class_namespace = "char"
     root_transform_name = "grp"
@@ -39,6 +40,14 @@ class CustomCharacter(base_comp.Component):
 
         return node_data
     def _get_char_color_side_name(self, char_side:component_enum_data.CharacterSide):
+        """Gets character side color name
+
+        Args:
+            char_side (component_enum_data.CharacterSide):
+
+        Returns:
+            str:
+        """
         return f"{char_side.name}Color"
     def get_color_shader(self, char_side:Union[component_enum_data.CharacterSide, str], set_color:component_enum_data.Color=None):
         """Gets shader for character side. creates if not created yet
@@ -84,6 +93,11 @@ class CustomCharacter(base_comp.Component):
 
     @property
     def root_component(self):
+        """Root component
+
+        Returns:
+            base_comp.Anim:
+        """
         return self.child_components()[0]
     @classmethod
     def create(cls, instance_name = None, parent=None):
@@ -156,7 +170,7 @@ class SimpleBiped(CustomCharacter):
         ],
         add_settings_cntrl=True)
         r_leg = l_leg.mirror(control_color=r_char_shader, setup_color=setup_color)
-
+        
         # arm
         l_arm = anim.SimpleLimb.create(
         instance_name="arm", 
@@ -172,13 +186,7 @@ class SimpleBiped(CustomCharacter):
         add_settings_cntrl=True)
         r_arm = l_arm.mirror(control_color=r_char_shader, setup_color=setup_color)
         
-        root_xform = self.root_component.get_xform_attrs(index=0, xform_type=component_enum_data.IO.output)
         l_leg.hook(self.root_component)
         r_leg.hook(self.root_component)
         l_arm.hook(self.root_component)
         r_arm.hook(self.root_component)
-        # l_leg._set_hier_parent_attrs(hier_parent=component_data.xform_to_hier_parent(root_xform))
-        # r_leg._set_hier_parent_attrs(hier_parent=component_data.xform_to_hier_parent(root_xform))
-        # l_arm._set_hier_parent_attrs(hier_parent=component_data.xform_to_hier_parent(root_xform))
-        # r_arm._set_hier_parent_attrs(hier_parent=component_data.xform_to_hier_parent(root_xform))
-

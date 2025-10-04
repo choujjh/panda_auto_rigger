@@ -324,12 +324,28 @@ class HierData:
         return False
     @classmethod
     def get_xform_names(cls, xform_type:component_enum_data.IO):
+        """Gets xform name given the type (input or output)
+
+        Args:
+            xform_type (component_enum_data.IO):
+
+        Returns:
+            list(str):
+        """
         if cls.is_input_enum(xform_type):
             return cls.INPUT_DATA_NAMES
         else:
             return cls.OUTPUT_DATA_NAMES
     @classmethod
     def get_xform_parent_name(cls, xform_type:component_enum_data.IO):
+        """Gets xform parent name given the type (input or output)
+
+        Args:
+            xform_type (component_enum_data.IO):
+
+        Returns:
+            str:
+        """
         if cls.is_input_enum(xform_type):
             return cls.INPUT_XFORM
         else:
@@ -432,7 +448,7 @@ class HierData:
         return cls.__gen_hier_node_data(cls.OUTPUT_XFORM, cls.OUTPUT_DATA_NAMES, multi=True)
 
 def xform_to_hier_parent(xform:"Xform"):
-        """converts xform to hier_parent
+        """Converts xform to hier_parent
 
         Args:
             xform (component_data.Xform): _description_

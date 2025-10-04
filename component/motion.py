@@ -159,7 +159,7 @@ class SimpleIK(base_comp.Motion):
             loc_mat["matrixIn"][1] << control_inv_matrix
             loc_mat["matrixIn"][2] << control_inst.container_node[control_inst._OUT_WS_MAT]
             end_orient_matrix = loc_mat["matrixSum"]
-            self.container_node.add_nodes(mult_node)
+            self.container_node.add_nodes(mult_node, loc_mat)
 
         self.container_node.add_nodes(mult_node)
 
@@ -188,8 +188,26 @@ class SimpleIK(base_comp.Motion):
         self.container_node.add_nodes(len1_node, len2_node, curr_len_node)
         return len1_node["distance"], len2_node["distance"], curr_len_node["distance"]
     def __create_soft_ik_nodes(self, len1_attr:nw.Attr, len2_attr:nw.Attr, curr_len_attr:nw.Attr):
+        """creates soft ik nodes
+
+        Args:
+            len1_attr (nw.Attr):
+            len2_attr (nw.Attr):
+            curr_len_attr (nw.Attr):
+        """
 
         def __soft_ik_cos_expression_str(len1_attr:nw.Attr, len2_attr:nw.Attr, curr_len_attr:nw.Attr, soft_ik_cos_build_data_node:nw.Node):
+            """Expression str for soft cos ik
+
+            Args:
+                len1_attr (nw.Attr):
+                len2_attr (nw.Attr):
+                curr_len_attr (nw.Attr):
+                soft_ik_cos_build_data_node (nw.Node):
+
+            Returns:
+                str:
+            """
             expression_str = [
                 f"float $len1 = {len1_attr};",
                 f"float $len2 = {len2_attr};",
@@ -223,6 +241,19 @@ class SimpleIK(base_comp.Motion):
             return "\n".join(expression_str)
         
         def __soft_ik_len_expression_str(len1_attr:nw.Attr, len2_attr:nw.Attr, cos0_squared_attr:nw.Attr, init_height_attr:nw.Attr, solved_height_attr:nw.Attr, soft_ik_output_data_node:nw.Node):
+            """Expression str for soft len ik
+
+            Args:
+                len1_attr (nw.Attr):
+                len2_attr (nw.Attr):
+                cos0_squared_attr (nw.Attr):
+                init_height_attr (nw.Attr):
+                solved_height_attr (nw.Attr):
+                soft_ik_output_data_node (nw.Node):
+
+            Returns:
+                str:
+            """
             expression_str = [
                 f"float $len1 = {len1_attr};",
                 f"float $len2 = {len2_attr};",

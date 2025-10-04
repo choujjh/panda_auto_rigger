@@ -6,7 +6,7 @@ import utils.utils as utils
 
 
 def axis_vec_choice_node(choice_node_name, enum_attr:nw.Attr=None):
-    """creates a choice node for axis vectors. allows enum to generate a vector
+    """Creates a choice node for axis vectors. allows enum to generate a vector
 
     Args:
         choice_node_name (str):
