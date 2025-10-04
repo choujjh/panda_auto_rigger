@@ -177,10 +177,12 @@ class SimpleBiped(CustomCharacter):
                 component_data.Xform(xform_name="foot", init_matrix=utils.Matrix.translate_matrix(4, 0, 0)),
             ],
             add_settings_cntrl=True)
-    
-        r_leg = l_leg.mirror(control_color=r_char_shader, setup_color=setup_color)
         
-        # arm
+        import component.misc as misc
+        misc.VisualizeHier.create(source_component=l_leg)
+        r_leg = l_leg.mirror(control_color=r_char_shader, setup_color=setup_color)
+        misc.VisualizeHier.create(source_component=r_leg)
+        # # arm
         l_arm = anim.SimpleLimb.create(
             instance_name="arm", 
             parent=self,

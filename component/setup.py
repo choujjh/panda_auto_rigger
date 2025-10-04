@@ -280,30 +280,24 @@ class SimpleLimb(Setup):
         aim_node["secondaryTargetVector"] = [0, 0, 1]
         aim_node["secondaryMode"] = 2
 
-        # pick out scale matrix
-        pick_mat = nw.create_node("pickMatrix", "xform0_pick_mat")
-        pick_mat["inputMatrix"] << aim_node["outputMatrix"]
-        pick_mat["useScale"] = False
-        pick_mat["useShear"] = False
-
         # xform0 inverse
         mat_inv = nw.create_node("inverseMatrix", "xform0_inv_mat")
-        mat_inv["inputMatrix"] << pick_mat["outputMatrix"]
+        mat_inv["inputMatrix"] << aim_node["outputMatrix"]
 
         # connect to output xform
         self._set_xform_attrs(
             index = 0,
             xform_type=self.IO_ENUM.output,
             xform=self.XFORM(
-                init_matrix=pick_mat["outputMatrix"],
+                init_matrix=aim_node["outputMatrix"],
                 init_inv_matrix=mat_inv["outputMatrix"],
-                world_matrix=pick_mat["outputMatrix"],
-                loc_matrix=pick_mat["outputMatrix"]
+                world_matrix=aim_node["outputMatrix"],
+                loc_matrix=aim_node["outputMatrix"]
             )
         )
 
-        self.container_node.add_nodes(aim_node, pick_mat, mat_inv)
-        return pick_mat["outputMatrix"], mat_inv["outputMatrix"]
+        self.container_node.add_nodes(aim_node, mat_inv)
+        return aim_node["outputMatrix"], mat_inv["outputMatrix"]
     def __create_xform1(self, guide_transform1_ws_mat:nw.Attr, guide_transform2_ws_mat:nw.Attr, xform0_ws_mat:nw.Attr,  xform0_inv_mat:nw.Attr):
         """Creates all xform1 nodes
 
@@ -330,19 +324,13 @@ class SimpleLimb(Setup):
         aim_node["secondaryTargetVector"] << self.container_node[self._TER_VEC]
         aim_node["secondaryMode"] = 2
 
-        # pick out scale matrix
-        pick_mat = nw.create_node("pickMatrix", "xform1_pick_mat")
-        pick_mat["inputMatrix"] << aim_node["outputMatrix"]
-        pick_mat["useScale"] = False
-        pick_mat["useShear"] = False
-
         # xform1 inverse
         mat_inv = nw.create_node("inverseMatrix", "xform1_inv_mat")
-        mat_inv["inputMatrix"] << pick_mat["outputMatrix"]
+        mat_inv["inputMatrix"] << aim_node["outputMatrix"]
 
         # xform1 loc
         mat_loc = nw.create_node("multMatrix", "xform1_loc_mat")
-        mat_loc["matrixIn"][0] << pick_mat["outputMatrix"]
+        mat_loc["matrixIn"][0] <<aim_node["outputMatrix"]
         mat_loc["matrixIn"][1] << xform0_inv_mat
 
         # connect to output xform
@@ -350,15 +338,15 @@ class SimpleLimb(Setup):
             index = 1,
             xform_type=self.IO_ENUM.output,
             xform = self.XFORM(
-                init_matrix=pick_mat["outputMatrix"],
+                init_matrix=aim_node["outputMatrix"],
                 init_inv_matrix=mat_inv["outputMatrix"],
-                world_matrix=pick_mat["outputMatrix"],
+                world_matrix=aim_node["outputMatrix"],
                 loc_matrix=mat_loc["matrixSum"]
             )
         )
 
-        self.container_node.add_nodes(aim_node, mat_inv, pick_mat, mat_loc)
-        return pick_mat["outputMatrix"], mat_inv["outputMatrix"]
+        self.container_node.add_nodes(aim_node, mat_inv, mat_loc)
+        return aim_node["outputMatrix"], mat_inv["outputMatrix"]
     def __create_xform2(self, xform1_ws_mat:nw.Attr, xform2_translate:nw.Node, xform2_orient:nw.Node, xform1_inv_mat:nw.Attr):
         """Creates all xform2 nodes
 
@@ -377,26 +365,16 @@ class SimpleLimb(Setup):
             tw_attr=xform2_translate["outputW"], 
         )
 
-        xform2_pick_scale_mat = nw.create_node("pickMatrix", "xform2_scale_mat")
-        xform2_pick_scale_mat["inputMatrix"] << self.transform_node["worldMatrix"][0]
-        xform2_pick_scale_mat["useTranslate"] = 0
-        xform2_pick_scale_mat["useRotate"] = 0
-        xform2_pick_scale_mat["useShear"] = 0
         xform2_mult_mat = nw.create_node("multMatrix", "xform2_orient_ws")
-        xform2_mult_mat["matrixIn"][0] << xform2_pick_scale_mat["outputMatrix"]
+        xform2_mult_mat["matrixIn"][0] << self.transform_node["worldMatrix"][0]
         xform2_mult_mat["matrixIn"][1] << xform_matrix2_ws["output"]
 
         # connect to xform2 orient parent offset matrix
         xform2_mult_mat["matrixSum"] >> xform2_orient["offsetParentMatrix"]
 
-        
-        xform_pick_mat = nw.create_node("pickMatrix", "xform2_pick_no_scale")
-        xform_pick_mat["inputMatrix"] << xform2_orient["worldMatrix"][0]
-        xform_pick_mat["useScale"] = 0
-
         # xform2 loc
         xform_matrix2_loc = nw.create_node("multMatrix", "xform2_loc_mat")
-        xform_matrix2_loc["matrixIn"][0] << xform_pick_mat["outputMatrix"]
+        xform_matrix2_loc["matrixIn"][0] << xform2_orient["worldMatrix"][0]
         xform_matrix2_loc["matrixIn"][1] << xform1_inv_mat
 
         # xform2 connect to output xform
@@ -404,12 +382,12 @@ class SimpleLimb(Setup):
             index=2,
             xform_type=self.IO_ENUM.output,
             xform=self.XFORM(
-                init_matrix=xform_pick_mat["outputMatrix"],
-                world_matrix=xform_pick_mat["outputMatrix"],
+                init_matrix=xform2_orient["worldMatrix"][0],
+                world_matrix=xform2_orient["worldMatrix"][0],
                 loc_matrix=xform_matrix2_loc["matrixSum"]
             )
         )
-        self.container_node.add_nodes(xform_matrix2_ws, xform_matrix2_loc, xform2_pick_scale_mat, xform2_mult_mat, xform_pick_mat)
+        self.container_node.add_nodes(xform_matrix2_ws, xform_matrix2_loc, xform2_mult_mat)
 class Mirror(Setup):
     """Class that mirrors all xforms given"""
     _IN_MIRROR_AXIS = "mirrorAxis"
@@ -444,52 +422,32 @@ class Mirror(Setup):
         added_nodes = []
         input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
         for index, input_xform in input_xforms.items():
-            mult_mat = nw.create_node("multMatrix", f"xform{index}_ws")
-            mult_mat["matrixIn"][0] << input_xform.init_matrix
-            mult_mat["matrixIn"][1] << self.container_node[self._IN_MIRROR_MAT]
+            mult_mat_neg_scale = nw.create_node("multMatrix", f"xform{index}_mirror_neg_scale_mult")
 
-            pick_mat = nw.create_node("pickMatrix", f"xform{index}_noScale")
-            pick_mat["inputMatrix"] << mult_mat["matrixSum"]
-            pick_mat["useScale"] = False
-            pick_mat["useShear"] = False
+            # mult_mat_neg_scale["matrixIn"][0] = utils.Matrix.scale_matrix(-1, -1, -1)
+            mult_mat_neg_scale["matrixIn"][0] << input_xform.init_matrix
+            mult_mat_neg_scale["matrixIn"][1] << self.container_node[self._IN_MIRROR_MAT]
 
-            aim_mat = nw.create_node("aimMatrix", f"xform{index}_realign")
-            for attr in ["inputMatrix", "primaryTargetMatrix", "secondaryTargetMatrix"]:
-                aim_mat[attr] << pick_mat["outputMatrix"]
-            aim_mat["primaryTargetVector"] = [-1, 0, 0]
-            aim_mat["secondaryTargetVector"] = [0, -1, 0]
-            for attr in ["primaryMode", "secondaryMode"]:
-                aim_mat[attr] = 1
-
+            mult_mat = nw.create_node("multMatrix", f"xform{index}_mirror_ws_mult")
+            mult_mat["matrixIn"][0] = utils.Matrix.scale_matrix(-1, -1, -1)
+            mult_mat["matrixIn"][1] << mult_mat_neg_scale["matrixSum"]
+            
             self._set_xform_attrs(
                 index=index,
                 xform_type=self.IO_ENUM.output,
                 xform = self.XFORM(
                     xform_name=input_xform.xform_name,
-                    init_matrix=mult_mat["matrixSum"],
-                    world_matrix=aim_mat["outputMatrix"]
+                    init_matrix=mult_mat_neg_scale["matrixSum"],
+                    world_matrix=mult_mat["matrixSum"]
                 )
             )
-            added_nodes.extend([mult_mat, pick_mat, aim_mat])
+            added_nodes.extend([mult_mat_neg_scale, mult_mat])
 
         # mirroring settings
         settings_mult_mat = nw.create_node("multMatrix", "settings_guide_mirror")
         settings_mult_mat["matrixIn"][0].set(utils.Matrix.scale_matrix(-1, -1, -1))
         settings_mult_mat["matrixIn"][1] << self.container_node[self._IN_SET_CNTRL_LOC_MAT]
         settings_mult_mat["matrixIn"][2].set(utils.Matrix.scale_matrix(-1, -1, -1))
-
-        # settings_pick_mat = nw.create_node("pickMatrix", "settings_guide_mirror_noScale")
-        # settings_pick_mat["inputMatrix"] << settings_mult_mat["matrixSum"]
-        # settings_pick_mat["useScale"] = False
-        # settings_pick_mat["useShear"] = False
-
-        # settings_aim_mat = nw.create_node("aimMatrix", f"settings_xform{index}_realign")
-        # for attr in ["inputMatrix", "primaryTargetMatrix", "secondaryTargetMatrix"]:
-        #     settings_aim_mat[attr] << settings_mult_mat["matrixSum"]
-        # settings_aim_mat["primaryTargetVector"] = [-1, 0, 0]
-        # settings_aim_mat["secondaryTargetVector"] = [0, -1, 0]
-        # for attr in ["primaryMode", "secondaryMode"]:
-        #     settings_aim_mat[attr] = 1
         
         # settings_aim_mat["outputMatrix"] >> self.container_node[self._OUT_SET_CNTRL_LOC_MAT]
         settings_mult_mat["matrixSum"] >> self.container_node[self._OUT_SET_CNTRL_LOC_MAT]

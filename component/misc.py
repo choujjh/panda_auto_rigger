@@ -44,7 +44,7 @@ class VisualizeHier(base_comp.Hierarchy):
             for input_attr, output_attr in zip(input_xform, output_xform):
                 input_attr >> output_attr
 
-        self.container_node.add_nodes(ws_grp)
+        self.container_node.add_nodes(ws_grp, loc_grp)
 
 class MergeHier(base_comp.Hierarchy):
     """Merges multiple components together and outputs it"""
