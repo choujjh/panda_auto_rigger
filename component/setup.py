@@ -67,13 +67,21 @@ class Setup(base_comp.Hierarchy):
             self.container_node[self._IN_SET_CNTRL_LOC_MAT] >> self.container_node[self._OUT_SET_CNTRL_LOC_MAT]
         super()._post_build(**post_build_kwargs)
         self.__setup_wire(control_color)
+    def get_as_source_xforms(self, is_parent_component=True):
+        xforms = super().get_as_source_xforms(is_parent_component)
+        for xform in xforms:
+            xform.init_matrix = xform.world_matrix
+            xform.init_inv_matrix = xform.world_inv_matrix
+        return xforms
+    
+    # post build
     def __setup_wire(self, control_color):
         """Creates wire visualize the xforms and hier parent"""
         output_xforms = self.get_xform_attrs(self.IO_ENUM.output)
         if len(output_xforms.keys()) <= 1:
             return
         # creating wires
-        hier_wire = nw.wrap_node(cmds.curve(name="hierWire", degree=1, point=[[0, x, 0] for x in output_xforms.keys()]))
+        hier_wire = nw.wrap_node(cmds.curve(name="xformWire", degree=1, point=[[0, x, 0] for x in output_xforms.keys()]))
         for transform in ["t", "r", "s", "v"]:
             hier_wire[transform].set_locked(True)
             hier_wire[transform].set_keyable(False)
@@ -108,13 +116,16 @@ class Setup(base_comp.Hierarchy):
         cmds.parent(str(hier_wire), str(hier_parent_wire), str(self.transform_node))
         self.container_node.add_nodes(hier_wire, hier_wire_shape, hier_parent_wire, hier_parent_wire_shape, *wire_points)
 
-
-    def get_as_source_xforms(self, is_parent_component=True):
-        xforms = super().get_as_source_xforms(is_parent_component)
-        for xform in xforms:
-            xform.init_matrix = xform.world_matrix
-            xform.init_inv_matrix = xform.world_inv_matrix
-        return xforms
+    # hooking
+    def hook(self, hook_src_data):
+        super().hook(hook_src_data)
+        if not self.container_node[self._IN_HAS_PARENT_HIER].has_src_connection():
+            self.container_node[self._IN_HAS_PARENT_HIER] = True
+    def unhook(self):
+        hier_parent = super().unhook()
+        if not self.container_node[self._IN_HAS_PARENT_HIER].has_src_connection():
+            self.container_node[self._IN_HAS_PARENT_HIER] = False
+        return hier_parent
 
 class SimpleLimb(Setup):
     """3 xform that aim and align to each other. middle xform stays inbetween and orients correctly to whatever the angle the other 2 xform make"""        
@@ -242,14 +253,9 @@ class SimpleLimb(Setup):
             tz_attr=average_nodes[2]["output"],
         )
 
-        # scale compensate
-        scale_comp = nw.create_node("multMatrix", "mid_mat_scale_compensate_ws")
-        scale_comp["matrixIn"][0] << mid_matrix_inbetween_4x4["output"]
-        scale_comp["matrixIn"][1] << self.transform_node["worldInverseMatrix"][0]
-
         # adding nodes to container
-        self.container_node.add_nodes(aim_matrix, *translate_row_nodes, mid_matrix_inbetween_4x4, *average_nodes, scale_comp)
-        return scale_comp["matrixSum"], translate_row_nodes[1]
+        self.container_node.add_nodes(aim_matrix, *translate_row_nodes, mid_matrix_inbetween_4x4, *average_nodes)
+        return mid_matrix_inbetween_4x4["output"], translate_row_nodes[1]
     def __create_xform0(self, guide_transform0_ws_mat:nw.Attr, guide_transform1_ws_mat:nw.Attr):
         """ Creates all xform0 nodes
 
@@ -379,7 +385,6 @@ class SimpleLimb(Setup):
         xform2_mult_mat = nw.create_node("multMatrix", "xform2_orient_ws")
         xform2_mult_mat["matrixIn"][0] << xform2_pick_scale_mat["outputMatrix"]
         xform2_mult_mat["matrixIn"][1] << xform_matrix2_ws["output"]
-        xform2_mult_mat["matrixIn"][2] << self.transform_node["worldInverseMatrix"][0]
 
         # connect to xform2 orient parent offset matrix
         xform2_mult_mat["matrixSum"] >> xform2_orient["offsetParentMatrix"]

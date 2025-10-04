@@ -47,6 +47,7 @@ class Component():
     component_type = component_enum_data.ComponentType.component
     root_transform_name = None
     class_namespace = "component"
+    lock_transform = True
 
     _IN = "input"
     _BLD_DATA = "buildData"
@@ -180,6 +181,7 @@ class Component():
             descendants = [component for component in descendants if component.container_node.has_attr(self._BLD_COMP_TYPE) and component.container_node[self._BLD_COMP_TYPE].value ==  component_type.value]
         return descendants
     
+    # namespaces
     @classmethod
     def get_class_name(cls)->str:
         """Gets class name
@@ -216,6 +218,7 @@ class Component():
 
         return f"{parent_namespace}:{instance_name}{postfix}"
 
+    # build attributes
     def _input_attr_build_data(self) -> component_data.NodeData:
         """Defines all the added, published, or modified attributes for the 
         input node. Can be added onto by inherited classes
@@ -354,6 +357,13 @@ class Component():
         # input node
         if type(self).root_transform_name is not None:
             input_node = nw.create_node("transform", type(self).root_transform_name)
+            
+            # see if transform trs is locked
+            if type(self).lock_transform:
+                for attr in ["t", "r", "s"]:
+                    input_node[attr].set_locked(True)
+                    for axis in ["x", "y", "z"]:
+                        input_node[f"{attr}{axis}"].set_keyable(False)
         else:
             input_node = nw.create_node("network", "input")
         input_node_attr_data = self._input_attr_build_data()
@@ -465,6 +475,7 @@ class Control(Component):
     root_transform_name = "control"
     class_namespace = "cntrl"
     can_set_color = True
+    lock_transform = False
 
     _IN_OFF_MAT = "offsetMatrix"
     _IN_HAS_CLR = "hasColor"
@@ -1245,21 +1256,29 @@ class Hierarchy(Component):
         """Hooks xform to hier parent
 
         Args:
-            hook_src_data (_type_): _description_
+            hook_src_data (any): _description_
         """
         # get parent hier that can be hooked first
-        hier_parent = self.get_hook_hier_parent()
-
-        # disconnect things from hier parent
-        for attr in hier_parent:
-            if attr.has_src_connection():
-                ~attr
+        hier_parent = self.unhook()
 
         # convert hook data (go from highest level hier)
         hier_src_data = self.get_hook_source_data(hook_src_data=hook_src_data)
 
         for hook_src, hook_hier_parent in zip(hier_src_data, hier_parent):
             hook_src >> hook_hier_parent
+    def unhook(self):
+        """Unhooks Hierarchy
+
+        Returns:
+            component_data.HierParent:
+        """
+        hier_parent = self.get_hook_hier_parent()
+        
+        for attr in hier_parent:
+            if attr.has_src_connection():
+                ~attr
+        return hier_parent
+
     def __get_hier_parent_source(self, hier_parent:component_data.HierParent):
         """Gets hier parent source and casts it to hier parent. returns none if source is not hier parent
 
@@ -1459,7 +1478,6 @@ class Hierarchy(Component):
         
         self.container_node.add_nodes(matrix_4x4, *row_nodes)
         return matrix_4x4
-
 class Motion(Hierarchy):
     """Base class for motion autorigging components. Derived from Hierarchy"""
     component_type = component_enum_data.ComponentType.motion
@@ -1706,6 +1724,82 @@ class Anim(Hierarchy):
         if self.mirror_src_component is not None:
             self.__mirror_controls_from_source()
         self._attach_output_xforms_to_settings_controls()
+    def __get_source_mirror_component(self, component:Component):
+        """Given a control component get it's mirror
+
+        Args:
+            control (Control): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        curr_comp = component
+        index_list = []
+        if self.mirror_src_component is None:
+            raise RuntimeError("get_mirror_control can only be called if component is mirror dest")
+        while curr_comp is not None and curr_comp.container_node != self.container_node:
+            connection = curr_comp.container_node[self._CNTNR_PAR_COMP].get_src_connection()
+            index_list.append(connection.index)
+
+            curr_comp = get_component(connection.node)
+        index_list = index_list[::-1]
+        mirrored_container = self.mirror_src_component.container_node
+        
+        for list_index, child_index in enumerate(index_list):
+            if list_index == 0:
+                set_guide = self.settings_guide_component
+                self_comp_type = component.container_node[self._BLD_COMP_TYPE].value
+                mirror_set_guide = self.mirror_src_component.settings_guide_component
+                if set_guide is None and mirror_set_guide is not None and self_comp_type != component_enum_data.ComponentType.setup.value:
+                    child_index += 1
+            mirrored_container = mirrored_container[self._CNTNR_CHLD_COMP][child_index].get_dest_connections()[0].node
+        return get_component(mirrored_container)
+     
+    # settings controls
+    def __create_settings_cntrls(self, setup_color=None, control_color=None):
+        """Creates settings control. creates settings guide if not mirrored
+
+        Args:
+            setup_color (component_enum_data.Color, optional): Defaults to None.
+            control_color (component_enum_data.Color, optional): Defaults to None.
+        """
+        has_mirror_src  = self.mirror_src_component is not None
+
+        import component.control as control
+        #settings init
+        settings_init_choice = None
+        settings_init = None
+        if not has_mirror_src:
+            settings_init_choice = nw.create_node("choice", "settings_init_choice")
+            settings_init_choice["selector"] << self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX]
+            settings_init = control.Locator.create(instance_name="settings_guide", parent=self, color=setup_color)
+            settings_init.promote_attr_to_keyable(self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX])
+            settings_init.transform_node["translate"] = [1, 1, 1]
+            utils.map_to_container(settings_init.container_node, "settings_guide_container")
+
+            self.container_node.add_nodes(settings_init_choice)
+
+        settings_choice = nw.create_node("choice", "settings_choice")
+        settings_choice["selector"] << self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX]
+        settings_mult = nw.create_node("multMatrix", "settings_ws_mult")
+        
+        # setting up controls
+        settings = control.Gear.create(instance_name="settings", parent=self, color=control_color)
+        utils.map_to_container(settings.container_node, "settings_container")
+        for attr in ["t", "r", "s"]:
+            for axis in ["x", "y", "z"]:
+                settings.transform_node[f"{attr}{axis}"].set_locked(True)
+                settings.transform_node[f"{attr}{axis}"].set_keyable(False)
+
+        # inserting offset matrix to control
+        if not has_mirror_src:
+            settings_init.container_node[settings_init._IN_OFF_MAT] << settings_init_choice["output"]
+            settings_init.container_node[settings_init._OUT_LOC_MAT] >> self.container_node[self._IN_SET_CNTRL_LOC_MAT]
+        settings.container_node[settings._IN_OFF_MAT] << settings_mult["matrixSum"]
+        settings_mult["matrixIn"][0] << self.setup_component.container_node[self._OUT_SET_CNTRL_LOC_MAT]
+        settings_mult["matrixIn"][1] << settings_choice["output"]
+
+        self.container_node.add_nodes(settings_choice, settings_mult)
     def _attach_output_xforms_to_settings_controls(self):
         """Takes finished output xforms and applies it to settings init choice"""
         output_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.output)
@@ -1738,6 +1832,7 @@ class Anim(Hierarchy):
 
         # do it for settings
 
+    # mirroring
     def mirror(self, control_color:component_enum_data.Color=None, setup_color:component_enum_data.Color=None, mirror_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x):
         """Mirrors component. returns new mirrored componenet
 
@@ -1827,38 +1922,19 @@ class Anim(Hierarchy):
                     replace_control.transform_node.freeze_transforms()
 
                     [attr.set_locked(True) for attr in locked_attrs]
-        
-    def __get_source_mirror_component(self, component:Component):
-        """Given a control component get it's mirror
 
-        Args:
-            control (Control): _description_
-
-        Returns:
-            _type_: _description_
-        """
-        curr_comp = component
-        index_list = []
-        if self.mirror_src_component is None:
-            raise RuntimeError("get_mirror_control can only be called if component is mirror dest")
-        while curr_comp is not None and curr_comp.container_node != self.container_node:
-            connection = curr_comp.container_node[self._CNTNR_PAR_COMP].get_src_connection()
-            index_list.append(connection.index)
-
-            curr_comp = get_component(connection.node)
-        index_list = index_list[::-1]
-        mirrored_container = self.mirror_src_component.container_node
-        
-        for list_index, child_index in enumerate(index_list):
-            if list_index == 0:
-                set_guide = self.settings_guide_component
-                self_comp_type = component.container_node[self._BLD_COMP_TYPE].value
-                mirror_set_guide = self.mirror_src_component.settings_guide_component
-                if set_guide is None and mirror_set_guide is not None and self_comp_type != component_enum_data.ComponentType.setup.value:
-                    child_index += 1
-            mirrored_container = mirrored_container[self._CNTNR_CHLD_COMP][child_index].get_dest_connections()[0].node
-        return get_component(mirrored_container)
-        
+    # hooking
+    def hook(self, hook_src_data):
+        super().hook(hook_src_data)
+        if not self.container_node[self._IN_HAS_PARENT_HIER].has_src_connection():
+            self.container_node[self._IN_HAS_PARENT_HIER] = True
+    def unhook(self):
+        hier_parent = super().unhook()
+        if not self.container_node[self._IN_HAS_PARENT_HIER].has_src_connection():
+            self.container_node[self._IN_HAS_PARENT_HIER] = False
+        return hier_parent
+                
+   # other
     def __set_vectors(self):
         """Creates nodes for primary, secondary, and tertiary vectors
 
@@ -1911,50 +1987,3 @@ class Anim(Hierarchy):
         utils.map_to_container(setup_inst.container_node, "setup_container")
         if self.mirror_src_component is None:
             self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX] = len(self.get_xform_attrs(self.IO_ENUM.input)) - 1
-    def __create_settings_cntrls(self, setup_color=None, control_color=None):
-        """Creates settings control. creates settings guide if not mirrored
-
-        Args:
-            setup_color (component_enum_data.Color, optional): Defaults to None.
-            control_color (component_enum_data.Color, optional): Defaults to None.
-        """
-        has_mirror_src  = self.mirror_src_component is not None
-
-        import component.control as control
-        #settings init
-        settings_init_choice = None
-        settings_init = None
-        if not has_mirror_src:
-            settings_init_choice = nw.create_node("choice", "settings_init_choice")
-            settings_init_choice["selector"] << self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX]
-            settings_init = control.Locator.create(instance_name="settings_guide", parent=self, color=setup_color)
-            settings_init.promote_attr_to_keyable(self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX])
-            settings_init.transform_node["translate"] = [1, 1, 1]
-            utils.map_to_container(settings_init.container_node, "settings_guide_container")
-
-            self.container_node.add_nodes(settings_init_choice)
-
-        settings_choice = nw.create_node("choice", "settings_choice")
-        settings_choice["selector"] << self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX]
-        settings_mult = nw.create_node("multMatrix", "settings_ws_mult")
-        
-        # setting up controls
-        settings = control.Gear.create(instance_name="settings", parent=self, color=control_color)
-        utils.map_to_container(settings.container_node, "settings_container")
-        for attr in ["t", "r", "s"]:
-            for axis in ["x", "y", "z"]:
-                settings.transform_node[f"{attr}{axis}"].set_locked(True)
-                settings.transform_node[f"{attr}{axis}"].set_keyable(False)
-
-        # inserting offset matrix to control
-        if not has_mirror_src:
-            settings_init.container_node[settings_init._IN_OFF_MAT] << settings_init_choice["output"]
-            settings_init.container_node[settings_init._OUT_LOC_MAT] >> self.container_node[self._IN_SET_CNTRL_LOC_MAT]
-        settings.container_node[settings._IN_OFF_MAT] << settings_mult["matrixSum"]
-        settings_mult["matrixIn"][0] << self.setup_component.container_node[self._OUT_SET_CNTRL_LOC_MAT]
-        settings_mult["matrixIn"][1] << settings_choice["output"]
-
-        self.container_node.add_nodes(settings_choice, settings_mult)
-    def hook(self, hook_src_data):
-        super().hook(hook_src_data)
-        self.container_node[self._IN_HAS_PARENT_HIER] = True

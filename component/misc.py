@@ -11,11 +11,8 @@ class VisualizeHier(base_comp.Hierarchy):
 
     def _override_build(self, **kwargs):
         ws_grp = nw.create_node("transform", "worldSpace_grp")
-        cmds.parent(str(ws_grp), str(self.transform_node))
-        ws_grp["offsetParentMatrix"] << self.transform_node["worldInverseMatrix"][0]
         loc_grp = nw.create_node("transform", "localSpace_grp")
-        cmds.parent(str(loc_grp), str(self.transform_node))
-        loc_grp["offsetParentMatrix"] << self.transform_node["worldInverseMatrix"][0]
+        cmds.parent(str(loc_grp), str(ws_grp), str(self.transform_node))
 
         prev_loc_transform = loc_grp
 

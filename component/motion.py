@@ -39,7 +39,6 @@ class FK(base_comp.Motion):
             ws_mult_matrix["matrixIn"][0] << input_xform.world_matrix
             ws_mult_matrix["matrixIn"][1] << prev_inv_attr
             ws_mult_matrix["matrixIn"][2] << prev_ws_attr
-            ws_mult_matrix["matrixIn"][3] << self.transform_node["worldInverseMatrix"][0]
             ws_mult_matrix["matrixSum"] >> control_inst.container_node[base_comp.Control._IN_OFF_MAT]
             
             prev_ws_attr = control_inst.container_node[base_comp.Control._OUT_WS_MAT]
@@ -148,7 +147,6 @@ class SimpleIK(base_comp.Motion):
         mult_node["matrixIn"][0] << control_matrix
         mult_node["matrixIn"][1] << parent_init_inv_matrix
         mult_node["matrixIn"][2] << parent_world_matrix
-        mult_node["matrixIn"][3] << self.transform_node["worldInverseMatrix"][0]
 
         control_inst.container_node[base_comp.Control._IN_OFF_MAT] << mult_node["matrixSum"]
 
@@ -629,10 +627,6 @@ class SimpleIK(base_comp.Motion):
         aim_matrix["secondaryInputAxis"] << self.container_node[self._SEC_VEC]
         aim_matrix["secondaryTargetVector"] << self.container_node[self._SEC_VEC]
 
-        mult_matrix = nw.create_node("multMatrix", name="pole_vec_start_scale_comp")
-        mult_matrix["matrixIn"][0] << aim_matrix["outputMatrix"]
-        mult_matrix["matrixIn"][1] << self.transform_node["worldInverseMatrix"][0]
-
         # vectorizing length
         vec_mult = nw.create_node("multiplyDivide", "pole_vec_len_vec")
         for attr_name in ["X", "Y", "Z"]:
@@ -641,13 +635,13 @@ class SimpleIK(base_comp.Motion):
 
         # getting ws point 
         pole_vec_ws_translate = nw.create_node("pointMatrixMult", "pole_vec_translate")
-        pole_vec_ws_translate["inMatrix"] << mult_matrix["matrixSum"]
+        pole_vec_ws_translate["inMatrix"] << aim_matrix["outputMatrix"]
         pole_vec_ws_translate["inPoint"] << vec_mult["output"]
 
         # creating 4x4 matrix blend
         pole_vec_parent_4x4 = self._create_orient_translate_blend(
             name="pole_vec_parent",
-            matrix_attr=mult_matrix["matrixSum"],
+            matrix_attr=aim_matrix["outputMatrix"],
             tx_attr=pole_vec_ws_translate["outputX"],
             ty_attr=pole_vec_ws_translate["outputY"],
             tz_attr=pole_vec_ws_translate["outputZ"])
@@ -660,7 +654,7 @@ class SimpleIK(base_comp.Motion):
             string=pole_vec_expression_str, 
             name="ik_pole_vec_expression"))
 
-        self.container_node.add_nodes(aim_matrix, vec_mult, pole_vec_expression, mult_matrix, pole_vec_ws_translate)
+        self.container_node.add_nodes(aim_matrix, vec_mult, pole_vec_expression, pole_vec_ws_translate)
         return pole_cntrl_inst
 
     def _pre_build(self, instance_name = None, parent = None, input_xforms = None, source_component = None, connect_hierarchy = None, connect_axis_vec = True, **pre_build_kwargs):

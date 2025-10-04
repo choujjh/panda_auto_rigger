@@ -54,14 +54,9 @@ class SingleXform(base_comp.Anim):
 
     def _override_build(self, control_color=None, **build_kwargs):
         setup_out_xform0 = self.setup_component.get_xform_attrs(xform_type=self.IO_ENUM.output, index=0)
-        cntrl_mult_matrix = nw.create_node("multMatrix", "cntrl_ws_offset_mat")
-        cntrl_mult_matrix["matrixIn"][0]  << setup_out_xform0.world_matrix
-        cntrl_mult_matrix["matrixIn"][1]  << self.transform_node["worldInverseMatrix"][0]
 
         cntrl_inst = control.Circle.create(parent=self, color=control_color)
-        cntrl_inst.container_node[cntrl_inst._IN_OFF_MAT] << cntrl_mult_matrix["matrixSum"]
-
-        self.container_node.add_nodes(cntrl_mult_matrix)
+        cntrl_inst.container_node[cntrl_inst._IN_OFF_MAT] << setup_out_xform0.world_matrix
 
         self._set_xform_attrs(
             index=0,
