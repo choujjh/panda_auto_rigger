@@ -1477,6 +1477,7 @@ class Anim(Hierarchy):
     _HIER_SIDE = "hierSide"
     _IN_SET_XFORM_FOLLOW_INDEX = "settingXformFollowIndex"
     _IN_SET_CNTRL_LOC_MAT = "inputSettingCntrlLocMatrix"
+    _IN_HAS_PARENT_HIER = "hasHierParent"
     _OUT_SET_CNTRL_LOC_MAT = "outputSettingCntrlLocMatrix"
     _MIRROR_SRC = "mirrorSource"
     _MIRROR_DEST = "mirrorDest"
@@ -1560,6 +1561,7 @@ class Anim(Hierarchy):
             component_data.AttrData(self._HIER_SIDE, type_=component_enum_data.CharacterSide.none, publish=True),
             component_data.AttrData(self._IN_SET_XFORM_FOLLOW_INDEX, type_="long", parent=self._IN, min=0),
             component_data.AttrData(self._IN_SET_CNTRL_LOC_MAT, type_="matrix", parent=self._IN),
+            component_data.AttrData(self._IN_HAS_PARENT_HIER, type_="bool", parent=self._IN, value=False)
         )
         return node_data 
     def _output_attr_build_data(self):
@@ -1905,6 +1907,7 @@ class Anim(Hierarchy):
         setup_inst.container_node[setup_inst._IN_SET_XFORM_FOLLOW_INDEX] << self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX]
         setup_inst.container_node[setup_inst._IN_SET_CNTRL_LOC_MAT] << self.container_node[self._IN_SET_CNTRL_LOC_MAT]
         setup_inst.container_node[setup_inst._OUT_SET_CNTRL_LOC_MAT] >> self.container_node[self._OUT_SET_CNTRL_LOC_MAT]
+        setup_inst.container_node[setup_inst._IN_HAS_PARENT_HIER] << self.container_node[self._IN_HAS_PARENT_HIER]
         utils.map_to_container(setup_inst.container_node, "setup_container")
         if self.mirror_src_component is None:
             self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX] = len(self.get_xform_attrs(self.IO_ENUM.input)) - 1
@@ -1952,4 +1955,6 @@ class Anim(Hierarchy):
         settings_mult["matrixIn"][1] << settings_choice["output"]
 
         self.container_node.add_nodes(settings_choice, settings_mult)
-
+    def hook(self, hook_src_data):
+        super().hook(hook_src_data)
+        self.container_node[self._IN_HAS_PARENT_HIER] = True

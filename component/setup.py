@@ -5,6 +5,7 @@ import component.control as control
 import utils.utils as utils
 import utils.node_wrapper as nw
 from typing import Union
+import maya.cmds as cmds
 
 class Setup(base_comp.Hierarchy):
     """A Base class for setup autorigging components. Derived from Hierarchy"""
@@ -15,7 +16,14 @@ class Setup(base_comp.Hierarchy):
     _LOC_SCALE = "locScale"
     _IN_SET_XFORM_FOLLOW_INDEX = "settingXformFollowIndex"
     _IN_SET_CNTRL_LOC_MAT = "inputSettingCntrlLocMatrix"
+    _IN_HAS_PARENT_HIER = "hasHierParent"
     _OUT_SET_CNTRL_LOC_MAT = "outputSettingCntrlLocMatrix"
+
+    @classmethod
+    def _process_kwargs(cls, instance_name = None, parent = None, input_xforms = ..., source_component = None, connect_hierarchy = True, connect_axis_vecs = True, control_color=None):
+        pre_build_kwargs, build_kwargs, post_build_kwargs = super()._process_kwargs(instance_name, parent, input_xforms, source_component, connect_hierarchy, connect_axis_vecs, control_color)
+        post_build_kwargs[cls._KWG_CNTR_CLR] = control_color
+        return pre_build_kwargs, build_kwargs, post_build_kwargs
 
     def _input_attr_build_data(self):
         node_data = super()._input_attr_build_data()
@@ -23,6 +31,7 @@ class Setup(base_comp.Hierarchy):
             component_data.AttrData(self._LOC_SCALE, type_="double", parent=self._IN, value=1, min=0.1),
             component_data.AttrData(self._IN_SET_XFORM_FOLLOW_INDEX, type_="long", parent=self._IN, min=0),
             component_data.AttrData(self._IN_SET_CNTRL_LOC_MAT, type_="matrix", parent=self._IN),
+            component_data.AttrData(self._IN_HAS_PARENT_HIER, type_="bool", parent=self._IN, value=False),
         )
         return node_data
     def _output_attr_build_data(self):
@@ -53,16 +62,60 @@ class Setup(base_comp.Hierarchy):
                     world_matrix=control_container[base_comp.Control._OUT_WS_MAT],
                 )
             )
-    def _post_build(self, **post_build_kwargs):
+    def _post_build(self, control_color=None, **post_build_kwargs):
         if not self.container_node[self._OUT_SET_CNTRL_LOC_MAT].has_src_connection():
             self.container_node[self._IN_SET_CNTRL_LOC_MAT] >> self.container_node[self._OUT_SET_CNTRL_LOC_MAT]
         super()._post_build(**post_build_kwargs)
+        self.__setup_wire(control_color)
+    def __setup_wire(self, control_color):
+        """Creates wire visualize the xforms and hier parent"""
+        output_xforms = self.get_xform_attrs(self.IO_ENUM.output)
+        if len(output_xforms.keys()) <= 1:
+            return
+        # creating wires
+        hier_wire = nw.wrap_node(cmds.curve(name="hierWire", degree=1, point=[[0, x, 0] for x in output_xforms.keys()]))
+        for transform in ["t", "r", "s", "v"]:
+            hier_wire[transform].set_locked(True)
+            hier_wire[transform].set_keyable(False)
+        hier_wire_shape = hier_wire.get_shapes()[0]
+        hier_wire_shape.rename(f"{hier_wire_shape}Shape1")
+        utils.apply_display_color(nodes=[hier_wire_shape], color=control_color)
+        hier_parent_wire = nw.wrap_node(cmds.curve(name="hierParentWire", degree=1, point=[[0, 0, 0], [0, 1, 0]]))
+        hier_parent_wire["v"] << self.container_node[self._IN_HAS_PARENT_HIER]
+        for transform in ["t", "r", "s"]:
+            hier_parent_wire[transform].set_locked(True)
+            hier_parent_wire[transform].set_keyable(False)
+        hier_parent_wire_shape = hier_parent_wire.get_shapes()[0]
+        hier_parent_wire_shape.rename(f"{hier_parent_wire}Shape1")
+        utils.apply_display_color(nodes=[hier_parent_wire_shape], color=[0, 0, 0])
+
+        # creating point mult for hier parent
+        wire_points = []
+        wire_points.append(nw.create_node("pointMatrixMult", f"hierParent_pntMatMult"))
+        wire_points[-1]["inMatrix"] << self.container_node[self.HIER_DATA.HIER_PARENT_MATRIX]
+        wire_points[-1]["output"] >> hier_parent_wire_shape["controlPoints"][0]
+
+        for index, xform in output_xforms.items():
+            connection = xform.world_matrix.get_src_connection()
+            if connection is not None:
+                wire_points.append(nw.create_node("pointMatrixMult", f"xform{index}_pntMatMult"))
+                wire_points[-1]["inMatrix"] << connection
+                wire_points[-1]["output"] >> hier_wire_shape["controlPoints"][index]
+                
+                if index == 0:
+                    wire_points[-1]["output"] >> hier_parent_wire_shape["controlPoints"][1]
+
+        cmds.parent(str(hier_wire), str(hier_parent_wire), str(self.transform_node))
+        self.container_node.add_nodes(hier_wire, hier_wire_shape, hier_parent_wire, hier_parent_wire_shape, *wire_points)
+
+
     def get_as_source_xforms(self, is_parent_component=True):
         xforms = super().get_as_source_xforms(is_parent_component)
         for xform in xforms:
             xform.init_matrix = xform.world_matrix
             xform.init_inv_matrix = xform.world_inv_matrix
         return xforms
+
 class SimpleLimb(Setup):
     """3 xform that aim and align to each other. middle xform stays inbetween and orients correctly to whatever the angle the other 2 xform make"""        
     _max_num_xforms = (3, 3)
@@ -354,8 +407,6 @@ class SimpleLimb(Setup):
         self.container_node.add_nodes(xform_matrix2_ws, xform_matrix2_loc, xform2_pick_scale_mat, xform2_mult_mat, xform_pick_mat)
 class Mirror(Setup):
     """Class that mirrors all xforms given"""
-    root_transform_name = None
-
     _IN_MIRROR_AXIS = "mirrorAxis"
     _IN_AXIS_SCALAR = "AxisScalar"
     _IN_NEG_AXIS_SCALAR = "negAxisScalar"

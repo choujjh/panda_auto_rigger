@@ -68,7 +68,7 @@ class SingleXform(base_comp.Anim):
             xform_type=self.IO_ENUM.output,
             xform=self.XFORM(
                 init_matrix=setup_out_xform0.init_matrix,
-                init_inv_matrix=setup_out_xform0.world_matrix,
+                init_inv_matrix=setup_out_xform0.init_inv_matrix,
                 world_matrix=cntrl_inst.container_node[cntrl_inst._OUT_WS_MAT],
                 world_inv_matrix=cntrl_inst.container_node[cntrl_inst._OUT_WS_INV_MAT],
             )
