@@ -216,13 +216,14 @@ def set_connect_attr_data(attr:nw.Attr, data, set_when_data_is_attr:bool=False):
         data (Any):
         set_when_attr (bool):
     """
-    if isinstance(data, nw.Attr):
-        if set_when_data_is_attr:
-            attr.set(data.value)
+    if data is not None:
+        if isinstance(data, nw.Attr):
+            if set_when_data_is_attr:
+                attr.set(data.value)
+            else:
+                data >> attr
         else:
-            data >> attr
-    else:
-        attr.set(data)
+            attr.set(data)
 
 def is_iterable(obj):
     """Returns if something is iterable 

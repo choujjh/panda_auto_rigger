@@ -179,9 +179,9 @@ class SimpleBiped(CustomCharacter):
             add_settings_cntrl=True)
         
         import component.misc as misc
-        misc.VisualizeHier.create(source_component=l_leg)
+        misc.VisualizeHier.create(source_component=l_leg, parent=self)
         r_leg = l_leg.mirror(control_color=r_char_shader, setup_color=setup_color)
-        misc.VisualizeHier.create(source_component=r_leg)
+        misc.VisualizeHier.create(source_component=r_leg, parent=self)
         # # arm
         l_arm = anim.SimpleLimb.create(
             instance_name="arm", 

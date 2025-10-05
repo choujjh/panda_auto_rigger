@@ -25,7 +25,7 @@ def axis_vec_choice_node(choice_node_name, enum_attr:nw.Attr=None):
 
     return choice_node
 
-class AxisVector(base_comp.SingletonComponent):
+class AxisVector(base_comp.Singleton):
     """Component of axis vectors that creates vectors from the enum"""
     class_namespace="axis_vec_manager"
     _OUT_AXIS = "axis"
@@ -53,7 +53,7 @@ class AxisVector(base_comp.SingletonComponent):
 
         self.output_node[self._OUT_AXIS].set_locked(True)
 
-class Color(base_comp.SingletonComponent):
+class Color(base_comp.Singleton):
     """Component of colors that creates shaders from color enum"""
     class_namespace="color_manager"
 

@@ -814,7 +814,7 @@ class Control(Component):
 
         # else:
         #     raise NotImplementedError("swap_control replace_component type \"Transform\" not implemented yet")
-class SingletonComponent(Component):
+class Singleton(Component):
     """Has instance method. only one of each singleton component exists in a character.
     usually used for enum conversion data (enum->vec)
 
@@ -836,6 +836,9 @@ class SingletonComponent(Component):
             return cls.__cls_instance
         else:
             return cls.__cls_instance
+class Matrix(Component):
+    component_type = component_enum_data.ComponentType.matrix
+    class_namespace = "matrix"
 class Hierarchy(Component):
     """A Class meant to be inherited for all hierarchy classes. hierarchy in this
     case is defined as a chain of matricies 
