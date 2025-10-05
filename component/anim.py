@@ -15,13 +15,21 @@ class SimpleLimb(base_comp.Anim):
         ik_inst = motion.SimpleIK.create(source_component=self.setup_component, control_color=control_color, parent=self)
         fk_inst = motion.FK.create(source_component=self.setup_component, control_color=control_color, parent=self)
 
-        merge_hier_inst = misc.MergeHier.create(source_components = [fk_inst, ik_inst], parent=self)
+        merge_hier_inst = misc.MergeHier.create(source_components=[fk_inst, ik_inst], parent=self)
 
-        for index, output_xform in merge_hier_inst.get_xform_attrs(xform_type=self.IO_ENUM.output).items():
+        # for index, output_xform in merge_hier_inst.get_xform_attrs(xform_type=self.IO_ENUM.output).items():
+        #     self._set_xform_attrs(
+        #         index=index, 
+        #         xform_type=self.IO_ENUM.output,
+        #         xform=output_xform)
+        twist_hier_inst = motion.TwistHier.create(source_component=merge_hier_inst, parent=self)
+        for index, output_xform in twist_hier_inst.get_xform_attrs(xform_type=self.IO_ENUM.output).items():
             self._set_xform_attrs(
-                index=index, 
+                index=index,
                 xform_type=self.IO_ENUM.output,
-                xform=output_xform)
+                xform=output_xform,
+            )
+        
 
         # promoting to settings attr
         if self.settings_component is not None:

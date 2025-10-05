@@ -1631,7 +1631,6 @@ class Anim(Hierarchy):
             control_color=control_color,
             setup_color=setup_color,
             hier_side=hier_side)
-        
         return cls._filtered_create(pre_build_kwargs=pre_build_kwargs, build_kwargs=build_kwargs, post_build_kwargs=post_build_kwargs)
     @classmethod
     def _process_kwargs(cls, 

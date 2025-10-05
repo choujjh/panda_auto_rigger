@@ -1,10 +1,12 @@
 import system.base_component as base_comp
 import component.control as control
 import component.setup as setup 
+import component.matrix as matrix
 import utils.node_wrapper as nw
 import system.component_data as component_data
 import system.component_enum_data as component_enum_data
 import maya.cmds as cmds
+
 
 
 class FK(base_comp.Motion):
@@ -16,7 +18,6 @@ class FK(base_comp.Motion):
     def _override_build(self, control_color=None, **build_kwargs):
         #qol variables
         added_nodes = []
-        HIER_DATA =self.HIER_DATA
 
         hier_parent = self.get_hier_parent_attrs()
         prev_ws_attr = hier_parent.matrix
@@ -749,39 +750,119 @@ class SimpleIK(base_comp.Motion):
 
         self.container_node.add_nodes(ik_base_mat_aim, *xform_output_nodes)
 
-class ResampleHier(base_comp.Motion):
-    def _override_build(self, control_color=None, **build_kwargs):
-        input_xforms = list(self.get_xform_attrs(xform_type=self.IO_ENUM.input).items())
+class TwistHier(base_comp.Motion):
+    class_namespace = "twist_hier"
+    _KWG_NUM_TWIST_XFORMS = "num_twist_xforms"
+
+    @classmethod
+    def create(cls, instance_name=None, parent=None, input_xforms=None, source_component=None, connect_hierarchy=True, connect_axis_vecs=True, num_twist_xforms:int=3):
         
+        pre_build_kwargs, build_kwargs, post_build_kwargs = cls._process_kwargs(instance_name, parent, input_xforms, source_component, connect_hierarchy, connect_axis_vecs, num_twist_xforms)
+
+        return cls._filtered_create(pre_build_kwargs, build_kwargs, post_build_kwargs)
+    @classmethod
+    def _process_kwargs(cls, instance_name = None, parent = None, input_xforms = ..., source_component = None, connect_hierarchy = True, connect_axis_vecs = True, num_twist_xforms=3):
+        pre_build_kwargs, build_kwargs, post_build_kwargs = super()._process_kwargs(instance_name, parent, input_xforms, source_component, connect_hierarchy, connect_axis_vecs, None)
+        build_kwargs[cls._KWG_NUM_TWIST_XFORMS] = num_twist_xforms
+
+        return pre_build_kwargs, build_kwargs, post_build_kwargs
+
+    def _override_build(self, control_color=None, num_twist_xforms=3, **build_kwargs):
+        input_xforms = list(self.get_xform_attrs(xform_type=self.IO_ENUM.input).items())
         added_nodes = []
-        factor = 3
-        for index, input_xform in input_xforms:
-            offset_index = index * (factor + 1)
+        
+        if len(input_xforms) > 0:
             self._set_xform_attrs(
-                index = offset_index,
+                index=0,
+                xform_type=self.IO_ENUM.output,
+                xform=input_xforms[0][1],
+            )
+
+        if len(input_xforms) < 2:
+            cmds.warning(f"{self.container_node}: len of xform is less than 2. no additional xforms added")
+            return
+
+        parent_init_inv_matrix = input_xforms[0][1].init_inv_matrix
+        for index, input_xform in input_xforms[1:]:
+            twist_matrix_inst = matrix.Twist.create(
+                instance_name=f"xform{index}_twist", 
+                parent=self, 
+                loc_matrix=input_xform.loc_matrix,
+                init_matrix=input_xform.init_matrix,
+                init_parent_inv_matrix=parent_init_inv_matrix,
+                primary_vec=self.container_node[self._PRM_VEC])
+            
+            # setting values for next 
+            parent_init_inv_matrix=input_xform.init_inv_matrix
+
+            # translate values
+            loc_t_rot_row = nw.create_node("rowFromMatrix", f"xform{index}_locTRotRow")
+            loc_t_rot_row["input"] = 3
+            loc_t_rot_row["matrix"] << input_xform.loc_matrix
+
+            # translate matrix
+            loc_t_rot_4x4 = nw.create_node("fourByFourMatrix", f"xform{index}_locTRot4x4")
+            loc_t_rot_4x4["in30"] << loc_t_rot_row["outputX"]
+            loc_t_rot_4x4["in31"] << loc_t_rot_row["outputY"]
+            loc_t_rot_4x4["in32"] << loc_t_rot_row["outputZ"]
+            loc_t_rot_4x4["in33"] << loc_t_rot_row["outputW"]
+
+            # creating new local matrix
+            loc_mat_rot_mult = nw.create_node("multMatrix", f"xform{index}_locRotMat")
+            loc_mat_rot_mult["matrixIn"][0] << twist_matrix_inst.container_node[twist_matrix_inst._OUT_ROT_MATRIX]
+            loc_mat_rot_mult["matrixIn"][1] << loc_t_rot_4x4["output"]
+
+            # segmenting matrix
+            loc_mat_seg_blend = nw.create_node("blendMatrix", f"xform{index}_locRotMatBlend")
+            loc_mat_seg_blend["target"][0]["targetMatrix"] << loc_mat_rot_mult["matrixSum"]
+            loc_mat_seg_blend["target"][0]["weight"] = 1 / (num_twist_xforms + 1)
+
+            # segmenting init matrix
+            loc_mat_init_seg_blend = nw.create_node("blendMatrix", f"xform{index}_locInitRotMatBlend")
+            loc_mat_init_seg_blend["target"][0]["targetMatrix"] << loc_t_rot_4x4["output"]
+            loc_mat_init_seg_blend["target"][0]["weight"] = 1 / (num_twist_xforms + 1)
+
+            added_nodes.extend([loc_t_rot_row, loc_t_rot_4x4, loc_mat_rot_mult, loc_mat_seg_blend, loc_mat_init_seg_blend])
+
+            world_space_attr = input_xforms[index-1][1].world_matrix
+            world_init_space_attr = input_xforms[index-1][1].init_matrix
+            for sub_index in range(num_twist_xforms):
+                output_index = (index-1) * (num_twist_xforms + 1) + sub_index + 1
+
+                # ws twist matrix
+                twist_world_mat = nw.create_node("multMatrix", f"xform{index}_twist{sub_index}_wsMult")
+                twist_world_mat["matrixIn"][0] << loc_mat_seg_blend["outputMatrix"]
+                twist_world_mat["matrixIn"][1] << world_space_attr
+
+                # ws init twist matrix
+                twist_init_world_mat = nw.create_node("multMatrix", f"xform{index}_init_twist{sub_index}_wsMult")
+                twist_init_world_mat["matrixIn"][0] << loc_mat_init_seg_blend["outputMatrix"]
+                twist_init_world_mat["matrixIn"][1] << world_init_space_attr
+
+                # setting attrs
+                world_space_attr = twist_world_mat["matrixSum"]
+                world_init_space_attr = twist_init_world_mat["matrixSum"]
+
+                self._set_xform_attrs(
+                    index=output_index,
+                    xform_type=self.IO_ENUM.output,
+                    xform=self.XFORM(
+                        xform_name=f"xform{index}_twist{sub_index}",
+                        init_matrix=twist_init_world_mat["matrixSum"],
+                        world_matrix=twist_world_mat["matrixSum"],
+                        loc_matrix=loc_mat_seg_blend["outputMatrix"],
+                    )
+                )
+                added_nodes.extend([twist_world_mat, twist_init_world_mat])
+
+            input_xform.loc_matrix=None
+            self._set_xform_attrs(
+                index=index * (num_twist_xforms + 1),
                 xform_type=self.IO_ENUM.output,
                 xform=input_xform,
             )
-            if index == input_xforms[-1][0]:
-                break
-            hold_mat = nw.create_node("holdMatrix")
-            input_xform.world_matrix >> hold_mat["inMatrix"]
-            added_nodes.append(hold_mat)
-            for inner_index in range(factor):
-                self._set_xform_attrs(
-                    index = offset_index + inner_index + 1,
-                    xform_type=self.IO_ENUM.output,
-                    xform=self.XFORM(
-                        xform_name=f"{input_xform.xform_name.value}_sub{inner_index}",
-                        world_matrix=hold_mat["outMatrix"],
-                        init_matrix=hold_mat["outMatrix"],
-                    )
-                )
-                
-        self.container_node.add_nodes(*added_nodes)
 
-    def _post_build(self, **post_build_kwargs):
-        self.rename_nodes()
+        self.container_node.add_nodes(*added_nodes)
 
 
             

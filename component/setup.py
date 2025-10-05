@@ -418,7 +418,6 @@ class Mirror(Setup):
     def _override_build(self, control_color=None, **kwargs):
         self.__create_mirror_scale_matrix()
         
-
         added_nodes = []
         input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
         for index, input_xform in input_xforms.items():

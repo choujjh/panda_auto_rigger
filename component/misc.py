@@ -45,7 +45,6 @@ class VisualizeHier(base_comp.Hierarchy):
                 input_attr >> output_attr
 
         self.container_node.add_nodes(ws_grp, loc_grp)
-
 class MergeHier(base_comp.Hierarchy):
     """Merges multiple components together and outputs it"""
     class_namespace="merge_hier"
