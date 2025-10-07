@@ -16,6 +16,7 @@ class CustomCharacter(base_comp.Component):
 
     _IN_COLOR_CONST = "colorConst"
     _IN_AXIS_VEC_CONST = "axisVecConst"
+    _
     _SETUP_CLR = "setupColor"
 
     def _input_attr_build_data(self):
@@ -37,6 +38,9 @@ class CustomCharacter(base_comp.Component):
                         type_="double", 
                         parent=color_item.name, value=values[index]))
             node_data.extend_attr_data(*attr_data)
+            node_data.extend_attr_data(
+                component_data.AttrData()
+            )
 
         return node_data
     def _get_char_color_side_name(self, char_side:component_enum_data.CharacterSide):
@@ -177,11 +181,8 @@ class SimpleBiped(CustomCharacter):
                 component_data.Xform(xform_name="foot", init_matrix=utils.Matrix.translate_matrix(4, 0, 0)),
             ],
             add_settings_cntrl=True)
-        
-        import component.misc as misc
-        misc.VisualizeHier.create(source_component=l_leg, parent=self)
         r_leg = l_leg.mirror(control_color=r_char_shader, setup_color=setup_color)
-        misc.VisualizeHier.create(source_component=r_leg, parent=self)
+        
         # # arm
         l_arm = anim.SimpleLimb.create(
             instance_name="arm", 
@@ -197,6 +198,12 @@ class SimpleBiped(CustomCharacter):
             add_settings_cntrl=True)
         r_arm = l_arm.mirror(control_color=r_char_shader, setup_color=setup_color)
         
+        import component.misc as misc
+        misc.VisualizeHier.create(source_component=l_leg, instance_name="l_leg", parent=self)
+        misc.VisualizeHier.create(source_component=r_leg, instance_name="r_leg", parent=self)
+        misc.VisualizeHier.create(source_component=l_arm, instance_name="l_arm", parent=self)
+        misc.VisualizeHier.create(source_component=r_arm, instance_name="r_arm", parent=self)
+
         l_leg.hook(self.root_component)
         r_leg.hook(self.root_component)
         l_arm.hook(self.root_component)

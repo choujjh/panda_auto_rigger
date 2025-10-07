@@ -17,11 +17,6 @@ class SimpleLimb(base_comp.Anim):
 
         merge_hier_inst = misc.MergeHier.create(source_components=[fk_inst, ik_inst], parent=self)
 
-        # for index, output_xform in merge_hier_inst.get_xform_attrs(xform_type=self.IO_ENUM.output).items():
-        #     self._set_xform_attrs(
-        #         index=index, 
-        #         xform_type=self.IO_ENUM.output,
-        #         xform=output_xform)
         twist_hier_inst = motion.TwistHier.create(source_component=merge_hier_inst, parent=self)
         for index, output_xform in twist_hier_inst.get_xform_attrs(xform_type=self.IO_ENUM.output).items():
             self._set_xform_attrs(
