@@ -54,12 +54,16 @@ class Component():
     _BLD_COMP_CLASS = "componentClass"
     _BLD_COMP_TYPE = "componentType"
     _BLD_INST_NAME = "instanceName"
+    _BLD_INST_FORM = "instanceFormat"
     _OUT = "output"
     _CNTNR_PAR_COMP = "parentComponent"
     _CNTNR_CHLD_COMP = "childComponents"
     _CNTNR_CNTRL_CHLDRN = "controlChildren"
+    _MIRROR_SRC = "mirrorSource"
+    _MIRROR_DEST = "mirrorDest"
     _KWG_INST_NAME = "instance_name"
     _KWG_PARENT  = "parent"
+
 
     def __init__(self, container_node:nw.Node=None):
         """initializes component with container nodes
@@ -145,7 +149,7 @@ class Component():
         if type(self).root_transform_name is not None:
             return self.input_node
     
-    def child_components(self, component_type:component_enum_data.ComponentType=None)->list:
+    def child_components(self, component_type:component_enum_data.ComponentType=None)->list["Component"]:
         """gets child components
 
         Args:
@@ -161,7 +165,7 @@ class Component():
             components = [get_component(container) for container in containers]
 
         return components
-    def get_all_descendants(self, component_type:component_enum_data.ComponentType=None)->list:
+    def get_all_descendants(self, component_type:component_enum_data.ComponentType=None)->list["Component"]:
         """Gets all descendent components
 
         Args:
@@ -190,7 +194,20 @@ class Component():
             str:
         """
         return utils.class_type_to_str(cls)
-    
+    def get_short_namespace(self, instance_name:str=None):
+        """Generates namespace without parentent namespace attached
+
+        Args:
+            instance_name (str, optional): Defaults to None.
+        """
+        format_str = self.container_node[self._BLD_INST_FORM].value
+        if instance_name is None:
+            instance_name = self.container_node[self._BLD_INST_NAME].value
+        
+        if instance_name is None:
+            instance_name = ""
+
+        return utils.strip_characters(format_str.format(instance_name), "_", leading=True, trailing=False)
     def get_namespace(self, instance_name:str=None):
         """Generates Namespace. instance_name used to check namespaces before adding them
 
@@ -206,17 +223,7 @@ class Component():
         else:
             parent_namespace = ""
 
-        if instance_name is None:
-            instance_name = ""
-            inst_name_attr = self.input_node[self._BLD_INST_NAME]
-            if inst_name_attr.value is not None and inst_name_attr.value != "":
-                instance_name = f"{inst_name_attr.value}_"
-        else:
-            instance_name = utils.strip_characters(instance_name, "_")
-            instance_name = f"{instance_name}_"
-        postfix = type(self).class_namespace
-
-        return f"{parent_namespace}:{instance_name}{postfix}"
+        return f"{parent_namespace}:{self.get_short_namespace(instance_name)}"
 
     # build attributes
     def _input_attr_build_data(self) -> component_data.NodeData:
@@ -226,12 +233,13 @@ class Component():
         Returns:
             comp_data.NodeData:
         """
-        node_data =  component_data.NodeData(
+        node_data = component_data.NodeData(
             component_data.AttrData(name=self._IN, type_="compound", publish=True),
             component_data.AttrData(name=self._BLD_DATA, type_="compound", publish=True),
             component_data.AttrData(name=self._BLD_COMP_CLASS, type_="string", value=type(self).get_class_name(), locked=True, parent=self._BLD_DATA),
             component_data.AttrData(name=self._BLD_COMP_TYPE, type_=type(self).component_type, locked=True, parent=self._BLD_DATA),
             component_data.AttrData(name=self._BLD_INST_NAME, type_="string", parent=self._BLD_DATA),
+            component_data.AttrData(name=self._BLD_INST_FORM, type_="string", parent=self._BLD_DATA, value=f"{{}}_{type(self).class_namespace}"),
         )
         return node_data
     def _output_attr_build_data(self) -> component_data.NodeData:
@@ -446,7 +454,7 @@ class Component():
         for child_comp in self.child_components():
             child_comp.rename_nodes()
 
-    def get_parent_type_component(self, parent_type:component_enum_data.ComponentType, disable_warning=False):
+    def get_parent_type_component(self, parent_type:component_enum_data.ComponentType, disable_warning=False)->"Component":
         """given a type gets the closest parent component of that type
 
         Args:
@@ -465,6 +473,91 @@ class Component():
             if not disable_warning:
                 cmds.warning(f"parent component of type {parent_type.name} not found")
             return None
+    def mirror_component(self)->"Component":
+        """Gets mirror component. Returns None if none found
+        
+        Returns:
+            Component:
+        """
+        def get_container_namespace(container:nw.Container):
+            """gets short namespace from container
+
+            Args:
+                container (nw.Container):
+
+            Returns:
+                str:
+            """
+            format_str = container[self._BLD_INST_FORM].value
+            inst_name = container[self._BLD_INST_NAME].value
+            format_args = [inst_name if inst_name is not None else ""]
+
+            if format_str.count("{}") > 1:
+                hier_side = component_enum_data.CharacterSide.get(container['hierSide'].value).value
+                if hier_side == f"{component_enum_data.CharacterSide.none.value}":
+                    hier_side = ""
+                format_args.insert(0, hier_side)
+
+            return utils.strip_characters(format_str.format(*format_args), "_", leading=True, trailing=False)
+            
+        # stack data constants
+        COMP_LEN = "comp_len"
+        COMP_INDEX = "comp_index"
+        COMP_NAMESPC = "comp_namespace"
+
+        # getting source component data
+        curr_container = self.container_node
+        mirror_container = None
+        component_data = []
+        while curr_container is not None:
+            if curr_container.has_attr(self._MIRROR_SRC):
+                curr_container[self._MIRROR_SRC]
+                mirror_container = curr_container[self._MIRROR_SRC].get_dest_connections()[0].node
+                break
+            elif curr_container.has_attr(self._MIRROR_DEST):
+                mirror_container = curr_container[self._MIRROR_DEST].get_src_connection().node
+                break
+            if curr_container.has_attr(self._CNTNR_PAR_COMP):
+                par_comp_attr = curr_container[self._CNTNR_PAR_COMP]
+                connection = par_comp_attr.get_src_connection()
+                if connection is None:
+                    break
+
+                component_data.append({
+                    COMP_LEN: len(connection.parent),
+                    COMP_INDEX: connection.index,
+                    COMP_NAMESPC: get_container_namespace(curr_container),
+                })
+                curr_container = curr_container.get_container_node()
+            else:
+                break
+
+        # if no mirror root component found
+        if mirror_container is None:
+            return None
+
+        # getting mirror component
+        for mirror_data in component_data[::-1]:
+            child_attrs = mirror_container[self._CNTNR_CHLD_COMP]
+            if len(child_attrs) == mirror_data[COMP_LEN]:
+                mirror_container = child_attrs[mirror_data[COMP_INDEX]].get_dest_connections()[0].node
+                continue
+            else:
+                mirror_container = None
+                for attr in child_attrs:
+                    new_cntnr = attr.get_dest_connections()[0].node
+                    new_cntnr_namespace = get_container_namespace(new_cntnr)
+                    if new_cntnr_namespace == mirror_data[COMP_NAMESPC]:
+                        mirror_container = new_cntnr
+                        break
+                if mirror_container is not None:
+                    continue
+            return None
+        if mirror_container is None:
+            return None
+        else:
+            return get_component(mirror_container)
+        
 class Control(Component):
     """A Base class for all control autorigging components. Derived from Component
 
@@ -1500,8 +1593,6 @@ class Anim(Hierarchy):
     _IN_SET_CNTRL_LOC_MAT = "inputSettingCntrlLocMatrix"
     _IN_HAS_PARENT_HIER = "hasHierParent"
     _OUT_SET_CNTRL_LOC_MAT = "outputSettingCntrlLocMatrix"
-    _MIRROR_SRC = "mirrorSource"
-    _MIRROR_DEST = "mirrorDest"
     _MIRROR_AXIS = "mirrorAxis"
 
     _KWG_HIER_SIDE = "hier_side"
@@ -1584,6 +1675,7 @@ class Anim(Hierarchy):
             component_data.AttrData(self._IN_SET_CNTRL_LOC_MAT, type_="matrix", parent=self._IN),
             component_data.AttrData(self._IN_HAS_PARENT_HIER, type_="bool", parent=self._IN, value=False)
         )
+        node_data.modify_add_attr_kwargs(self._BLD_INST_FORM, value=f"{{}}_{{}}_{type(self).class_namespace}")
         return node_data 
     def _output_attr_build_data(self):
         node_data = super()._output_attr_build_data()
@@ -1591,14 +1683,22 @@ class Anim(Hierarchy):
             component_data.AttrData(self._OUT_SET_CNTRL_LOC_MAT, type_="matrix", parent=self._OUT)
         )
         return node_data
+    def get_short_namespace(self, instance_name = None):
+        format_str = self.container_node[self._BLD_INST_FORM].value
 
-    def get_namespace(self, instance_name = None):
-        namespace = super().get_namespace(instance_name)
-        prefix = f"{component_enum_data.CharacterSide.get(self.input_node['hierSide'].value).value}_"
-        if prefix == f"{component_enum_data.CharacterSide.none.value}_":
-            prefix = ""
-        parent_namespace, curr_namespace = namespace.rsplit(":", 1)
-        return f"{parent_namespace}:{prefix}{curr_namespace}"
+        # instance_name
+        if instance_name is None:
+            instance_name = self.container_node[self._BLD_INST_NAME].value
+        
+        if instance_name is None:
+            instance_name = ""
+
+        # hier sode
+        hier_side = component_enum_data.CharacterSide.get(self.input_node['hierSide'].value).value
+        if hier_side == f"{component_enum_data.CharacterSide.none.value}":
+            hier_side = ""
+
+        return utils.strip_characters(format_str.format(hier_side, instance_name), "_", leading=True, trailing=False)
     
     @classmethod
     def create(cls, 
@@ -1693,7 +1793,7 @@ class Anim(Hierarchy):
 
         # if mirror source connect other attrs from last time
         if mirror_source is not None:
-            self.__connect_mirror_source(mirror_source=mirror_source)
+            self._connect_mirror_source(mirror_source=mirror_source)
             self.input_node.add_attr(self._MIRROR_AXIS, type="enum", enumName=component_enum_data.AxisEnum.maya_enum_str())
             self.container_node.publish_attr(self.input_node[self._MIRROR_AXIS], attr_bind_name=self._MIRROR_AXIS)
             self.container_node[self._MIRROR_AXIS] = component_enum_data.AxisEnum.index_of(mirror_axis)
@@ -1726,37 +1826,7 @@ class Anim(Hierarchy):
         if self.mirror_src_component is not None:
             self.__mirror_controls_from_source()
         self._attach_output_xforms_to_settings_controls()
-    def __get_source_mirror_component(self, component:Component):
-        """Given a control component get it's mirror
-
-        Args:
-            control (Control): _description_
-
-        Returns:
-            _type_: _description_
-        """
-        curr_comp = component
-        index_list = []
-        if self.mirror_src_component is None:
-            raise RuntimeError("get_mirror_control can only be called if component is mirror dest")
-        while curr_comp is not None and curr_comp.container_node != self.container_node:
-            connection = curr_comp.container_node[self._CNTNR_PAR_COMP].get_src_connection()
-            index_list.append(connection.index)
-
-            curr_comp = get_component(connection.node)
-        index_list = index_list[::-1]
-        mirrored_container = self.mirror_src_component.container_node
-        
-        for list_index, child_index in enumerate(index_list):
-            if list_index == 0:
-                set_guide = self.settings_guide_component
-                self_comp_type = component.container_node[self._BLD_COMP_TYPE].value
-                mirror_set_guide = self.mirror_src_component.settings_guide_component
-                if set_guide is None and mirror_set_guide is not None and self_comp_type != component_enum_data.ComponentType.setup.value:
-                    child_index += 1
-            mirrored_container = mirrored_container[self._CNTNR_CHLD_COMP][child_index].get_dest_connections()[0].node
-        return get_component(mirrored_container)
-     
+ 
     # settings controls
     def __create_settings_cntrls(self, setup_color=None, control_color=None):
         """Creates settings control. creates settings guide if not mirrored
@@ -1860,7 +1930,7 @@ class Anim(Hierarchy):
             add_settings_cntrl=add_settings_cntrl)
 
         return mirror_component
-    def __connect_mirror_source(self, mirror_source:"Anim"):
+    def _connect_mirror_source(self, mirror_source:"Anim"):
         """Connects all necessary attributes from mirror source
 
         Args:
@@ -1906,10 +1976,11 @@ class Anim(Hierarchy):
         Raises:
             RuntimeError: can only be called from mirror destination component
         """
+        
         if self.mirror_src_component is None:
             raise RuntimeError("__mirror_controls can only be called if component is mirror dest")
         for control in self.get_all_descendants(component_enum_data.ComponentType.control):
-            mirror_control = self.__get_source_mirror_component(control)
+            mirror_control = control.mirror_component()
             if isinstance(control, Control):
                 replace_control = control.replace_control(mirror_control, color=color)
                 
@@ -1924,7 +1995,7 @@ class Anim(Hierarchy):
                     replace_control.transform_node.freeze_transforms()
 
                     [attr.set_locked(True) for attr in locked_attrs]
-
+        
     # hooking
     def hook(self, hook_src_data):
         super().hook(hook_src_data)

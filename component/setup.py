@@ -9,7 +9,7 @@ import maya.cmds as cmds
 
 class Setup(base_comp.Hierarchy):
     """A Base class for setup autorigging components. Derived from Hierarchy"""
-    root_transform_name = "setup"
+    root_transform_name = "grp"
     component_type = component_enum_data.ComponentType.setup
     class_namespace = "setup_"
 
@@ -171,11 +171,22 @@ class SimpleLimb(Setup):
         for attr in ["rx","ry","rz","sx","sy","sz"]:
             control_inst2_translate.transform_node[attr].set_locked(True)
             control_inst2_translate.transform_node[attr].set_keyable(False)
+        format_attr = control_inst2_translate.container_node[self._BLD_INST_FORM]
+        format_str = format_attr.value
+        format_str = format_str.replace("_", f"Translt_")
+        format_attr.set(format_str)
+        control_inst2_translate.rename_nodes()
         control_inst2_orient = control.Locator.create(
-            instance_name="xform2Orient", 
+            instance_name=self.input_node[self.HIER_DATA.INPUT_XFORM][2][self.HIER_DATA.INPUT_XFORM_NAME], 
             parent=self, 
             color=control_color,
             xform_map_index=2)
+        format_attr = control_inst2_orient.container_node[self._BLD_INST_FORM]
+        format_str = format_attr.value
+        format_str = format_str.replace("_", f"Ori_")
+        format_attr.set(format_str)
+        control_inst2_orient.rename_nodes()
+        
         for attr in ["tx","ty","tz","sx","sy","sz"]:
             control_inst2_orient.transform_node[attr].set_locked(True)
             control_inst2_orient.transform_node[attr].set_keyable(False)

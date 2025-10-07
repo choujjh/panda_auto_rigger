@@ -105,6 +105,14 @@ class NodeData():
         """
         if key not in self.node_attr_dict.keys():
             raise KeyError(f"{key} not in node_attr_dict")
+        kwarg_pop_list = []
+        for kwarg_key in add_attr_kwargs.keys():
+            if hasattr(self.node_attr_dict[key], kwarg_key):
+                setattr(self.node_attr_dict[key], kwarg_key, add_attr_kwargs[kwarg_key])
+                kwarg_pop_list.append(kwarg_key)
+        for kwarg_key in kwarg_pop_list:
+            add_attr_kwargs.pop(kwarg_key)
+
         self.node_attr_dict[key].add_attr_kwargs.update(add_attr_kwargs)
 
     def publish_attr_data_attributes(self, node:nw.Node):

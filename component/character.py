@@ -16,7 +16,6 @@ class CustomCharacter(base_comp.Component):
 
     _IN_COLOR_CONST = "colorConst"
     _IN_AXIS_VEC_CONST = "axisVecConst"
-    _
     _SETUP_CLR = "setupColor"
 
     def _input_attr_build_data(self):
@@ -38,9 +37,6 @@ class CustomCharacter(base_comp.Component):
                         type_="double", 
                         parent=color_item.name, value=values[index]))
             node_data.extend_attr_data(*attr_data)
-            node_data.extend_attr_data(
-                component_data.AttrData()
-            )
 
         return node_data
     def _get_char_color_side_name(self, char_side:component_enum_data.CharacterSide):
@@ -128,9 +124,8 @@ class CustomCharacter(base_comp.Component):
         # change root transform 
         transform_shape = root_component.child_components()[-1].transform_node.get_shapes()[0]
         self.root_component.settings_guide_component.transform_node["tz"] = -9
-        for index, control_point in enumerate(transform_shape["controlPoints"]):
-            if index >= 8:
-                break
+        cntrl_pnt_len = len(transform_shape["controlPoints"])
+        for control_point in [attr for attr in transform_shape["controlPoints"]][:cntrl_pnt_len-3]:
             control_point.set(utils.Vector(control_point.value) * 7)
 
         self.rename_nodes()
@@ -183,7 +178,7 @@ class SimpleBiped(CustomCharacter):
             add_settings_cntrl=True)
         r_leg = l_leg.mirror(control_color=r_char_shader, setup_color=setup_color)
         
-        # # arm
+        # arm
         l_arm = anim.SimpleLimb.create(
             instance_name="arm", 
             parent=self,
