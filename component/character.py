@@ -17,6 +17,8 @@ class CustomCharacter(base_comp.Component):
     _IN_COLOR_CONST = "colorConst"
     _IN_AXIS_VEC_CONST = "axisVecConst"
     _SETUP_CLR = "setupColor"
+    _IN_MOT_VIS = "motionVisibility"
+    _IN_SETUP_VIS = "setupVisibility"
 
     def _input_attr_build_data(self):
         node_data = super()._input_attr_build_data()
@@ -37,7 +39,10 @@ class CustomCharacter(base_comp.Component):
                         type_="double", 
                         parent=color_item.name, value=values[index]))
             node_data.extend_attr_data(*attr_data)
-
+        node_data.extend_attr_data(
+            component_data.AttrData(self._IN_MOT_VIS, type_="bool", parent=self._IN, keyable=True, value=True),
+            component_data.AttrData(self._IN_SETUP_VIS, type_="bool", parent=self._IN, keyable=True, value=True),
+        )
         return node_data
     def _get_char_color_side_name(self, char_side:component_enum_data.CharacterSide):
         """Gets character side color name
@@ -131,6 +136,18 @@ class CustomCharacter(base_comp.Component):
         self.rename_nodes()
     def _override_build(self, **build_kwargs):
         pass
+    def _post_build(self, **post_build_kwargs):
+        child_components = self.child_components()
+        for child_component in child_components:
+            motion_vis = self.container_node[self._IN_MOT_VIS]
+            setup_vis = self.container_node[self._IN_SETUP_VIS]
+            transform_node = child_component.transform_node
+            if transform_node is not None:
+                if transform_node.has_attr(child_component._IN_MOT_VIS):
+                    transform_node[child_component._IN_MOT_VIS] << motion_vis
+                if transform_node.has_attr(child_component._IN_SETUP_VIS):
+                    transform_node[child_component._IN_SETUP_VIS] << setup_vis
+        super()._post_build(**post_build_kwargs)
 
     def axis_vec_choice_node(self, choice_node_name, enum_attr:nw.Attr=None):
         """creates a choice node for axis vectors. allows enum to generate a vector
@@ -158,7 +175,7 @@ class SimpleBiped(CustomCharacter):
     """
     def _override_build(self, **kwargs):
         # color
-        setup_color = self.get_color_shader(char_side=self._SETUP_CLR, set_color=component_enum_data.Color.green)
+        setup_color = self.get_color_shader(char_side=self._SETUP_CLR, set_color=component_enum_data.Color.purple)
 
         l_char_shader = self.get_color_shader(char_side=component_enum_data.CharacterSide.left, set_color=component_enum_data.Color.blue)
         r_char_shader = self.get_color_shader(char_side=component_enum_data.CharacterSide.right, set_color=component_enum_data.Color.red)
@@ -176,7 +193,6 @@ class SimpleBiped(CustomCharacter):
                 component_data.Xform(xform_name="foot", init_matrix=utils.Matrix.translate_matrix(4, 0, 0)),
             ],
             add_settings_cntrl=True)
-        
         r_leg = l_leg.mirror(control_color=r_char_shader, setup_color=setup_color)
         
         # arm
@@ -192,8 +208,6 @@ class SimpleBiped(CustomCharacter):
                 component_data.Xform(xform_name="hand", init_matrix=utils.Matrix.translate_matrix(8, 12, 0)),
             ],
             add_settings_cntrl=True)
-        
-        
         r_arm = l_arm.mirror(control_color=r_char_shader, setup_color=setup_color)
 
         l_leg.hook(self.root_component, hook_mirror_component=True)

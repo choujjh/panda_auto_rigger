@@ -1641,6 +1641,8 @@ class Anim(Hierarchy):
     _IN_SET_XFORM_FOLLOW_INDEX = "settingXformFollowIndex"
     _IN_SET_CNTRL_LOC_MAT = "inputSettingCntrlLocMatrix"
     _IN_HAS_PARENT_HIER = "hasHierParent"
+    _IN_MOT_VIS = "motionVisibility"
+    _IN_SETUP_VIS = "setupVisibility"
     _OUT_SET_CNTRL_LOC_MAT = "outputSettingCntrlLocMatrix"
     _MIRROR_AXIS = "mirrorAxis"
 
@@ -1657,7 +1659,6 @@ class Anim(Hierarchy):
     def setup_component_type(self):
         """Returns class specific _setup_component_type. works for inherited classes"""
         return type(self)._setup_component_type
-    
     @property
     def setup_component(self)->setup.Setup:
         """Returns setup component
@@ -1686,6 +1687,14 @@ class Anim(Hierarchy):
         if not self.container_node.has_attr("settings_guide_container"):
             return
         return self._get_node_from_key("settings_guide_container", as_component=True)
+    @property
+    def motion_transform_node(self)->setup.Setup:
+        """Returns setup component
+
+        Returns:
+            setup.Setup:
+        """
+        return self._get_node_from_key("motion_node")
     @property
     def mirror_dest_component(self)->"Anim":
         """Get mirror destination component
@@ -1722,7 +1731,9 @@ class Anim(Hierarchy):
             component_data.AttrData(self._HIER_SIDE, type_=component_enum_data.CharacterSide.none, publish=True),
             component_data.AttrData(self._IN_SET_XFORM_FOLLOW_INDEX, type_="long", parent=self._IN, min=0),
             component_data.AttrData(self._IN_SET_CNTRL_LOC_MAT, type_="matrix", parent=self._IN),
-            component_data.AttrData(self._IN_HAS_PARENT_HIER, type_="bool", parent=self._IN, value=False)
+            component_data.AttrData(self._IN_HAS_PARENT_HIER, type_="bool", parent=self._IN, value=False),
+            component_data.AttrData(self._IN_MOT_VIS, type_="bool", parent=self._IN, keyable=True, value=True),
+            component_data.AttrData(self._IN_SETUP_VIS, type_="bool", parent=self._IN, keyable=True, value=True),
         )
         node_data.modify_add_attr_kwargs(self._BLD_INST_FORM, value=f"{{}}_{{}}_{type(self).class_namespace}")
         return node_data 
@@ -1864,11 +1875,16 @@ class Anim(Hierarchy):
         
         # create setup component
         self.__create_setup_component(input_xforms=input_xforms, setup_color=setup_color, mirror_source=mirror_source, mirror_axis=mirror_axis)
+        
 
         # adding settings cntrl
         if add_settings_cntrl:
             self.__create_settings_cntrls(setup_color=setup_color, control_color=control_color)
-            
+
+        # creating motion grp
+        self.__create_motion_grp()
+        self.__internal_vis_setup()
+
         self.rename_nodes()
     def _post_build(self, **post_build_kwargs):
         super()._post_build(**post_build_kwargs)
@@ -1952,6 +1968,38 @@ class Anim(Hierarchy):
                         output_xform.world_matrix >> settings_choice["input"][index]
 
         # do it for settings
+    
+    # motion grp
+    def __create_motion_grp(self):
+        """Creates motion group"""
+        motion_grp = nw.create_node("transform", "motion_grp")
+        cmds.parent(str(motion_grp), str(self.transform_node))
+        for attr in ["t", "r", "s"]:
+            for axis in ["x", "y", "z"]:
+                motion_grp[f"{attr}{axis}"].set_locked(True)
+                motion_grp[f"{attr}{axis}"].set_keyable(False)
+        motion_grp["v"].set_keyable(False)
+        self.container_node.add_nodes(motion_grp)
+        utils.map_to_container(motion_grp, "motion_node")
+    # setup anim inner visibility
+    def __internal_vis_setup(self):
+        """Sets up visibility for setup and motion groups"""
+        # settings components
+        settings_inst = self.settings_component
+        settings_guide_inst = self.settings_guide_component
+
+        # visibility attrs
+        motion_vis_attr = self.container_node[self._IN_MOT_VIS]
+        setup_vis_attr = self.container_node[self._IN_SETUP_VIS]
+
+        # connecting
+        motion_vis_attr >> self.motion_transform_node["v"]
+        setup_vis_attr >> self.setup_component.transform_node["v"]
+
+        if settings_inst is not None:
+            motion_vis_attr >> settings_inst.transform_node["v"]
+        if settings_guide_inst is not None:
+            setup_vis_attr >> settings_guide_inst.transform_node["v"]
 
     # mirroring
     def mirror(self, control_color:component_enum_data.Color=None, setup_color:component_enum_data.Color=None, mirror_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x):
@@ -2109,3 +2157,13 @@ class Anim(Hierarchy):
         utils.map_to_container(setup_inst.container_node, "setup_container")
         if self.mirror_src_component is None:
             self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX] = len(self.get_xform_attrs(self.IO_ENUM.input)) - 1
+    def parent_to_motion(self, *motion_components:list[Component]):
+        """parents components to motion grp
+
+        Args:
+            motion_components(list[Component]):
+        """
+        if self.motion_transform_node is None:
+            return
+        component_transforms = [str(comp.transform_node) for comp in motion_components if issubclass(type(comp), Component) and comp.transform_node is not None]
+        cmds.parent(*component_transforms, str(self.motion_transform_node))

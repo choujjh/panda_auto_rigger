@@ -69,15 +69,14 @@ class NodeData():
         for data in data_list:
             # dealing with attr value
             if data.value is not None:
-                if isinstance(data.value, nw.Attr):
-                    data.value >> node[data.name]
-                else:
-                    node[data.name] = data.value
+                utils.set_connect_attr_data(node[data.name], data.value)
 
+        # locking and keyable
         for data in data_list:
-            # locking
             if data.locked:
                 node[data.name].set_locked(True)
+            if data.keyable:
+                node[data.name].set_keyable(True)
 
     def remove(self, *keys:str):
         """Given keys removes attrData
