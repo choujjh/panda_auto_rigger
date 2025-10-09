@@ -176,6 +176,7 @@ class SimpleBiped(CustomCharacter):
                 component_data.Xform(xform_name="foot", init_matrix=utils.Matrix.translate_matrix(4, 0, 0)),
             ],
             add_settings_cntrl=True)
+        
         r_leg = l_leg.mirror(control_color=r_char_shader, setup_color=setup_color)
         
         # arm
@@ -191,15 +192,9 @@ class SimpleBiped(CustomCharacter):
                 component_data.Xform(xform_name="hand", init_matrix=utils.Matrix.translate_matrix(8, 12, 0)),
             ],
             add_settings_cntrl=True)
-        r_arm = l_arm.mirror(control_color=r_char_shader, setup_color=setup_color)
         
-        import component.misc as misc
-        misc.VisualizeHier.create(source_component=l_leg, instance_name="l_leg", parent=self)
-        misc.VisualizeHier.create(source_component=r_leg, instance_name="r_leg", parent=self)
-        misc.VisualizeHier.create(source_component=l_arm, instance_name="l_arm", parent=self)
-        misc.VisualizeHier.create(source_component=r_arm, instance_name="r_arm", parent=self)
+        
+        r_arm = l_arm.mirror(control_color=r_char_shader, setup_color=setup_color)
 
-        l_leg.hook(self.root_component)
-        r_leg.hook(self.root_component)
-        l_arm.hook(self.root_component)
-        r_arm.hook(self.root_component)
+        l_leg.hook(self.root_component, hook_mirror_component=True)
+        l_arm.hook(self.root_component, hook_mirror_component=True)

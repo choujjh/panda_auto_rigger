@@ -473,7 +473,7 @@ class Component():
             if not disable_warning:
                 cmds.warning(f"parent component of type {parent_type.name} not found")
             return None
-    def mirror_component(self)->"Component":
+    def get_mirror_component(self, container:nw.Container=None)->"Component":
         """Gets mirror component. Returns None if none found
         
         Returns:
@@ -506,7 +506,10 @@ class Component():
         COMP_NAMESPC = "comp_namespace"
 
         # getting source component data
-        curr_container = self.container_node
+        if container is not None:
+            curr_container = container
+        else:
+            curr_container = self.container_node
         mirror_container = None
         component_data = []
         while curr_container is not None:
@@ -1348,21 +1351,27 @@ class Hierarchy(Component):
             if hier_parent is not None:
                 utils.set_connect_attr_data(attr=set_hier_parent, data=hier_parent, set_when_data_is_attr=set_when_data_is_attr)
     # hooking
-    def hook(self, hook_src_data):
+    def hook(self, hook_src_data, hook_mirror_component:bool=True):
         """Hooks xform to hier parent
 
         Args:
-            hook_src_data (any): _description_
+            hook_src_data (any): hook data that will be setting the hier parent
+            hook_mirror(bool): also hooks mirror to it's corresponding source
+
         """
         # get parent hier that can be hooked first
-        hier_parent = self.unhook()
-
+        hier_parent = self.get_hook_hier_parent()
+        
+        self.unhook(False)
         # convert hook data (go from highest level hier)
         hier_src_data = self.get_hook_source_data(hook_src_data=hook_src_data)
-
+        
         for hook_src, hook_hier_parent in zip(hier_src_data, hier_parent):
             hook_src >> hook_hier_parent
-    def unhook(self):
+
+        if hook_mirror_component:
+            self._hook_mirror_component()
+    def unhook(self, unhook_mirror_component:bool=True):
         """Unhooks Hierarchy
 
         Returns:
@@ -1373,8 +1382,40 @@ class Hierarchy(Component):
         for attr in hier_parent:
             if attr.has_src_connection():
                 ~attr
-        return hier_parent
+        if unhook_mirror_component:
+            self.__unhook_mirror_component()
 
+    def _hook_mirror_component(self):
+        """Hooking the mirror component"""
+        mirror_component = self.get_mirror_component()
+        if mirror_component is None:
+            return
+        
+        hook_src = self.get_hook_hier_parent()
+        hook_src.matrix = hook_src.matrix.get_src_connection()
+        hook_src.inv_matrix = hook_src.inv_matrix.get_src_connection()
+        hook_src.init_inv_matrix = hook_src.init_inv_matrix.get_src_connection()
+
+        if hook_src.matrix is not None:
+            hook_src_cntnr = hook_src.matrix.node.get_container_node()
+            if hook_src_cntnr is not None:
+                mirror_hook_src_cntnr = get_component(hook_src_cntnr)
+                mirror_hook_src_cntnr = mirror_hook_src_cntnr.get_mirror_component()
+                # TODO rather find the node of each attribute then try to find it in the published container_nodes
+                if mirror_hook_src_cntnr is not None:
+                    hook_src.matrix = mirror_hook_src_cntnr.container_node[hook_src.matrix.attr_name]
+                    hook_src.inv_matrix = mirror_hook_src_cntnr.container_node[hook_src.inv_matrix.attr_name]
+                    hook_src.init_inv_matrix = mirror_hook_src_cntnr.container_node[hook_src.init_inv_matrix.attr_name]
+
+        if [x for x in hook_src.attrs if x is not None] == []:
+            return
+
+        mirror_component.hook(hook_src, hook_mirror_component=False)
+    def __unhook_mirror_component(self):
+        """Unhook Mirror component"""
+        mirror_component = self.get_mirror_component()
+        if mirror_component is not None:
+            mirror_component.unhook(unhook_mirror_component=False)
     def __get_hier_parent_source(self, hier_parent:component_data.HierParent):
         """Gets hier parent source and casts it to hier parent. returns none if source is not hier parent
 
@@ -1418,6 +1459,12 @@ class Hierarchy(Component):
             component_data.hierParent:
         """
         control_inst=None
+        if isinstance(hook_src_data, self.HIER_PARENT):
+            return hook_src_data
+        if isinstance(hook_src_data, nw.Attr) and (
+            self.HIER_DATA.is_input_xform_attr(hook_src_data) or 
+            self.HIER_DATA.is_output_xform_attr(hook_src_data)):
+            return component_data.xform_to_hier_parent(self.get_hook_xform(hook_src_data))
         if isinstance(hook_src_data, nw.Transform) and hook_src_data.get_container_node() is not None:
             control_inst = get_component(hook_src_data.get_container_node())
         elif isinstance(hook_src_data, nw.Transform):
@@ -1469,11 +1516,12 @@ class Hierarchy(Component):
         if not issubclass(utils.string_to_class(xform.node.get_container_node()[self._BLD_COMP_CLASS].value), Hierarchy):
             raise RuntimeError(f"xform not attached to hierarchy component")
         
-        ancestor_hier = self.__get_ancestor_hierarchy()
+        
         HIER_DATA = self.HIER_DATA
 
         curr_xform = xform
         xform_container = xform.node.get_container_node()
+        ancestor_hier = self.__get_ancestor_hierarchy(xform_container)
         xform_index = xform.index
         io_len = [len(xform_container[HIER_DATA.INPUT_XFORM]), len(xform_container[HIER_DATA.OUTPUT_XFORM])]
         
@@ -1518,17 +1566,18 @@ class Hierarchy(Component):
             xform_container = curr_xform.node.get_container_node()
             io_len[1] = len(xform_container[HIER_DATA.OUTPUT_XFORM])
             # get output_len
-
             if xform_container == ancestor_hier.container_node:
                 return self.XFORM(curr_xform)
-    def __get_ancestor_hierarchy(self):
+    def __get_ancestor_hierarchy(self, container:nw.Container):
         """Gets highest ancestor that's of Hierarchy class/subclass
 
         Returns:
             Hierarchy:
         """
+        if container is None:
+            return None
         parent_component_class = None
-        ancestor_container = self.container_node
+        ancestor_container = container
         while True:
             parent_container = ancestor_container.get_container_node()
             if parent_container is None or not parent_container.has_attr(self._BLD_COMP_CLASS):
@@ -1537,7 +1586,7 @@ class Hierarchy(Component):
             if issubclass(parent_component_class, Hierarchy):
                 ancestor_container = ancestor_container.get_container_node()
             else:
-                break
+                break           
 
         if parent_component_class is None:
             return self
@@ -1928,6 +1977,7 @@ class Anim(Hierarchy):
             connect_hierarchy=False, 
             connect_axis_vecs=False, 
             add_settings_cntrl=add_settings_cntrl)
+        self._hook_mirror_component()
 
         return mirror_component
     def _connect_mirror_source(self, mirror_source:"Anim"):
@@ -1980,7 +2030,7 @@ class Anim(Hierarchy):
         if self.mirror_src_component is None:
             raise RuntimeError("__mirror_controls can only be called if component is mirror dest")
         for control in self.get_all_descendants(component_enum_data.ComponentType.control):
-            mirror_control = control.mirror_component()
+            mirror_control = control.get_mirror_component()
             if isinstance(control, Control):
                 replace_control = control.replace_control(mirror_control, color=color)
                 
@@ -1997,16 +2047,15 @@ class Anim(Hierarchy):
                     [attr.set_locked(True) for attr in locked_attrs]
         
     # hooking
-    def hook(self, hook_src_data):
-        super().hook(hook_src_data)
+    def hook(self, hook_src_data, hook_mirror_component:bool=True):
+        super().hook(hook_src_data, hook_mirror_component)
         if not self.container_node[self._IN_HAS_PARENT_HIER].has_src_connection():
             self.container_node[self._IN_HAS_PARENT_HIER] = True
-    def unhook(self):
-        hier_parent = super().unhook()
+    def unhook(self, unhook_mirror_component:bool=True):
+        hier_parent = super().unhook(unhook_mirror_component)
         if not self.container_node[self._IN_HAS_PARENT_HIER].has_src_connection():
             self.container_node[self._IN_HAS_PARENT_HIER] = False
         return hier_parent
-                
    # other
     def __set_vectors(self):
         """Creates nodes for primary, secondary, and tertiary vectors
