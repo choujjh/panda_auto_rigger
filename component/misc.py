@@ -4,12 +4,12 @@ import component.control as control
 import utils.node_wrapper as nw
 import maya.cmds as cmds
 
-class VisualizeHier(base_comp.Hierarchy):
+class VisualizeHier(base_comp._Hierarchy):
     """Helps visualize and debug hierarchies by creating chains for world space and local visualization"""
     root_transform_name = "v_grp"
     class_namespace = "hier_vis"
 
-    def _override_build(self, **kwargs):
+    def _override_build(self, control_color=None, **kwargs):
         ws_grp = nw.create_node("transform", "worldSpace_grp")
         loc_grp = nw.create_node("transform", "localSpace_grp")
         cmds.parent(str(loc_grp), str(ws_grp), str(self.transform_node))
@@ -29,14 +29,14 @@ class VisualizeHier(base_comp.Hierarchy):
             
             # setting up the rest of ws matrix
             cmds.parent(str(control_ws_inst.transform_node), str(ws_grp))
-            input_xform.world_matrix >> control_ws_inst.container_node[base_comp.Control._IN_OFF_MAT]
+            input_xform.world_matrix >> control_ws_inst.container_node[control._Control._IN_OFF_MAT]
 
             # setting up the rest of local matrix
             cmds.parent(str(control_loc_inst.transform_node), str(prev_loc_transform))
             if index != 0:
-                input_xform.loc_matrix >> control_loc_inst.container_node[base_comp.Control._IN_OFF_MAT]
+                input_xform.loc_matrix >> control_loc_inst.container_node[control._Control._IN_OFF_MAT]
             else:
-                input_xform.world_matrix >> control_loc_inst.container_node[base_comp.Control._IN_OFF_MAT]
+                input_xform.world_matrix >> control_loc_inst.container_node[control._Control._IN_OFF_MAT]
             prev_loc_transform = control_loc_inst.transform_node
 
             # connecting to component output
@@ -45,7 +45,7 @@ class VisualizeHier(base_comp.Hierarchy):
                 input_attr >> output_attr
 
         self.container_node.add_nodes(ws_grp, loc_grp)
-class MergeHier(base_comp.Hierarchy):
+class MergeHier(base_comp._Hierarchy):
     """Merges multiple components together and outputs it"""
     class_namespace="merge_hier"
 
@@ -55,11 +55,6 @@ class MergeHier(base_comp.Hierarchy):
     _IN_HIER_BLEND = "hierBlend"
     _OUT_HIER_VIS = "hierVisibility"
 
-    _KWG_SRC_COMPS = "source_components"
-
-    def __init__(self, container_node=None):
-        super().__init__(container_node)
-        self.__hier_comp = base_comp.Hierarchy(container_node=container_node)
     def _input_attr_build_data(self):
         node_data = super()._input_attr_build_data()
         node_data.extend_attr_data(
@@ -78,25 +73,13 @@ class MergeHier(base_comp.Hierarchy):
         return node_data
 
     @classmethod
-    def create(cls, instance_name = None, parent = None, source_components=[]):
-        
-        pre_build_kwargs, build_kwargs, post_build_kwargs = cls._process_kwargs(instance_name=instance_name, parent=parent, source_components=source_components)
-
-        return cls._filtered_create(pre_build_kwargs, build_kwargs, post_build_kwargs)
+    def create(cls, instance_name = None, parent=None, source_components=[]):
+        return cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
     
-    @classmethod
-    def _process_kwargs(cls, instance_name=None, parent=None, source_components=[]):
-        pre_build_kwargs, build_kwargs, post_build_kwargs = super()._process_kwargs(
-            instance_name=instance_name,
-            parent=parent)
-        pre_build_kwargs[cls._KWG_SRC_COMPS] = source_components
-
-        return pre_build_kwargs, build_kwargs, post_build_kwargs
-
     def _pre_build(self, instance_name=None, parent=None, source_components=[], **pre_build_kwargs):
         # get initial source_component
         source_component = None if len(source_components) < 1 else source_components[0]
-        super()._pre_build(instance_name=instance_name, parent=parent, source_component=source_component, connect_hierarchy=True, connect_axis_vec=True)
+        super()._pre_build(instance_name=instance_name, parent=parent, source_component=source_component, connect_parent_hier=True, connect_axis_vecs=True)
         
         # checking components
         self.__check_source_components(source_components=source_components)
@@ -131,7 +114,7 @@ class MergeHier(base_comp.Hierarchy):
                 raise RuntimeError(f"{source_component.container_node} has mismatched len. expecting {xform_len} got {component_len}")
             if source_component.container_node in container_parents:
                 raise RuntimeError("source container cannot be parent of merge container")
-            if not issubclass(type(source_component), base_comp.Hierarchy):
+            if not issubclass(type(source_component), base_comp._Hierarchy):
                 raise RuntimeError(f"{source_component.container_node} is not hierarchy component")
     def __connect_components(self, source_component, source_components=[]):
         """Connects source components up to local hierarchy attribute

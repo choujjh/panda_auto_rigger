@@ -1,15 +1,18 @@
 import system.base_component as base_comp
 import system.component_data as component_data
+import system.component_enum_data as component_enum_data
 import utils.node_wrapper as nw
 import utils.utils as utils
 
-class OrientTransformBlend(base_comp.Matrix):
-    def _override_build(self, **build_kwargs):
-        pass
+class _Matrix(base_comp.Component):
+    component_type = component_enum_data.ComponentType.matrix
+    class_namespace = "matrix"
 
 
-
-class Twist(base_comp.Matrix):
+class OrientTransformBlend(_Matrix):
+    pass
+class Twist(_Matrix):
+    class_namespace = "matrixTwist"
 
     _IN_INIT_MATRIX = "initMatrix"
     _IN_INIT_PAR_INV_MATRIX = "initParentInvMatrix"
@@ -20,11 +23,6 @@ class Twist(base_comp.Matrix):
     _IN_PRM_VEC_Y = "primaryVecY"
     _IN_PRM_VEC_Z = "primaryVecZ"
     _OUT_ROT_MATRIX = "rotMatrix"
-    _KWG_LOC_MAT = "loc_matrix"
-    _KWG_LOC_INIT_MAT = "loc_init_matrix"
-    _KWG_INIT_MAT = "init_matrix"
-    _KWG_INIT_PAR_INV_MAT = "init_parent_inv_matrix"
-    _KWG_PRM_VEC = "primary_vec"
 
 
     def _input_attr_build_data(self):
@@ -58,33 +56,7 @@ class Twist(base_comp.Matrix):
                init_matrix:nw.Attr=None, 
                init_parent_inv_matrix:nw.Attr=None,
                primary_vec=None):
-        pre_build_kwargs, build_kwargs, post_build_kwargs = cls._process_kwargs(
-            instance_name=instance_name, 
-            parent=parent, 
-            loc_matrix=loc_matrix, 
-            loc_init_matrix=loc_init_matrix, 
-            init_matrix=init_matrix, 
-            init_parent_inv_matrix=init_parent_inv_matrix,
-            primary_vec=primary_vec)
-        return cls._filtered_create(pre_build_kwargs=pre_build_kwargs, build_kwargs=build_kwargs, post_build_kwargs=post_build_kwargs)
-    @classmethod
-    def _process_kwargs(cls,
-                        instance_name=None, 
-                        parent=None, 
-                        loc_matrix:nw.Attr=None, 
-                        loc_init_matrix:nw.Attr=None, 
-                        init_matrix:nw.Attr=None, 
-                        init_parent_inv_matrix:nw.Attr=None,
-                        primary_vec=None):
-        pre_build_kwargs, build_kwargs, post_build_kwargs = super()._process_kwargs(instance_name, parent)
-        pre_build_kwargs.update({
-            cls._KWG_LOC_MAT: loc_matrix,
-            cls._KWG_LOC_INIT_MAT: loc_init_matrix,
-            cls._KWG_INIT_MAT: init_matrix,
-            cls._KWG_INIT_PAR_INV_MAT: init_parent_inv_matrix,
-            cls._KWG_PRM_VEC: primary_vec, 
-        })
-        return pre_build_kwargs, build_kwargs, post_build_kwargs
+        return cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
     def _pre_build(self, 
                    instance_name = None, 
                    parent = None, 
@@ -93,14 +65,14 @@ class Twist(base_comp.Matrix):
                    init_matrix:nw.Attr=None, 
                    init_parent_inv_matrix:nw.Attr=None,
                    primary_vec:nw.Attr=None,
-                   **pre_build_kwargs):
-        super()._pre_build(instance_name, parent, **pre_build_kwargs)
+                   **kwargs):
+        super()._pre_build(instance_name, parent, **kwargs)
         utils.set_connect_attr_data(self.container_node[self._IN_LOC_MATRIX], loc_matrix)
         utils.set_connect_attr_data(self.container_node[self._IN_LOC_INIT_MATRIX], loc_init_matrix)
         utils.set_connect_attr_data(self.container_node[self._IN_INIT_MATRIX], init_matrix)
         utils.set_connect_attr_data(self.container_node[self._IN_INIT_PAR_INV_MATRIX], init_parent_inv_matrix)
         utils.set_connect_attr_data(self.container_node[self._IN_PRM_VEC], primary_vec)
-    def _override_build(self, **build_kwargs):
+    def _override_build(self, **kwargs):
         loc_matrix = self.container_node[self._IN_LOC_MATRIX]
         loc_init_matrix = self.container_node[self._IN_LOC_INIT_MATRIX]
         init_matrix = self.container_node[self._IN_INIT_MATRIX]

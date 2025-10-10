@@ -7,13 +7,18 @@ import system.component_data as component_data
 import system.component_enum_data as component_enum_data
 import maya.cmds as cmds
 
-class FK(base_comp.Motion):
+class _Motion(base_comp._Hierarchy):
+    """Base class for motion autorigging components. Derived from Hierarchy"""
+    component_type = component_enum_data.ComponentType.motion
+    root_transform_name = "grp"
+    class_namespace = "motion"
+
+class FK(_Motion):
     """Given a hierarchy creates an FK chain to accompany it"""
 
     class_namespace = "FK"
     root_transform_name = "fk_grp"
-    
-    def _override_build(self, control_color=None, **build_kwargs):
+    def _override_build(self, control_color=None, **kwargs):
         #qol variables
         added_nodes = []
 
@@ -38,21 +43,21 @@ class FK(base_comp.Motion):
             ws_mult_matrix["matrixIn"][0] << input_xform.world_matrix
             ws_mult_matrix["matrixIn"][1] << prev_inv_attr
             ws_mult_matrix["matrixIn"][2] << prev_ws_attr
-            ws_mult_matrix["matrixSum"] >> control_inst.container_node[base_comp.Control._IN_OFF_MAT]
+            ws_mult_matrix["matrixSum"] >> control_inst.container_node[control._Control._IN_OFF_MAT]
             
-            prev_ws_attr = control_inst.container_node[base_comp.Control._OUT_WS_MAT]
+            prev_ws_attr = control_inst.container_node[control._Control._OUT_WS_MAT]
             prev_inv_attr = input_xform.world_inv_matrix
 
             self._set_xform_attrs(
                 index=index,
                 xform_type=self.IO_ENUM.output,
                 xform=self.XFORM(
-                    world_matrix=control_inst.container_node[base_comp.Control._OUT_WS_MAT]
+                    world_matrix=control_inst.container_node[control._Control._OUT_WS_MAT]
                 )
             )
         self.container_node.add_nodes(*added_nodes)
 
-class SimpleIK(base_comp.Motion):
+class SimpleIK(_Motion):
     """Given the SimpleLimb creates a 2 chain IK chain"""
     class_namespace = "simple_IK"
     root_transform_name = "ik_grp"
@@ -94,6 +99,16 @@ class SimpleIK(base_comp.Motion):
             component_data.AttrData(self._IK_BLEND_CRV, type_=component_enum_data.SoftIKBlendCurve.quadratic, parent=self._IK),
         )
         return node_data
+    def _pre_build(self, instance_name = None, parent = None, input_xforms = None, source_component = None, connect_parent_hier = None, connect_axis_vecs = True, **kwargs):
+        super()._pre_build(instance_name, parent, input_xforms, source_component, connect_parent_hier, connect_axis_vecs, **kwargs)
+        xforms = source_component.get_xform_attrs(xform_type=self.IO_ENUM.output, index=[0, 2])
+        if isinstance(source_component, setup.Mirror):
+            # get from input
+            self.container_node[self._ROOT_WORLD_MAT] << xforms[0].init_matrix
+            self.container_node[self._ROOT_INIT_INV_MAT] << xforms[0].init_inv_matrix
+            self.container_node[self._END_WORLD_MAT] << xforms[2].init_matrix
+            self.container_node[self._END_INIT_INV_MAT] << xforms[2].init_inv_matrix
+    
     def __create_space_switch_nodes(self):
         """Creates internal space switch nodes"""
         space_switch_choice = nw.create_node("choice", "spaceMatrixChoice")
@@ -147,7 +162,7 @@ class SimpleIK(base_comp.Motion):
         mult_node["matrixIn"][1] << parent_init_inv_matrix
         mult_node["matrixIn"][2] << parent_world_matrix
 
-        control_inst.container_node[base_comp.Control._IN_OFF_MAT] << mult_node["matrixSum"]
+        control_inst.container_node[control._Control._IN_OFF_MAT] << mult_node["matrixSum"]
 
         end_orient_matrix = control_inst.container_node[control_inst._OUT_WS_MAT]
         if build_offset:
@@ -644,7 +659,7 @@ class SimpleIK(base_comp.Motion):
             tx_attr=pole_vec_ws_translate["outputX"],
             ty_attr=pole_vec_ws_translate["outputY"],
             tz_attr=pole_vec_ws_translate["outputZ"])
-        pole_vec_parent_4x4["output"] >> pole_cntrl_inst.container_node[base_comp.Control._IN_OFF_MAT]
+        pole_vec_parent_4x4["output"] >> pole_cntrl_inst.container_node[control._Control._IN_OFF_MAT]
 
         # pole vec expression
         pole_vec_expression_str = __pole_vec_expression_str(pole_vec_control=pole_cntrl_inst.transform_node)
@@ -656,15 +671,7 @@ class SimpleIK(base_comp.Motion):
         self.container_node.add_nodes(aim_matrix, vec_mult, pole_vec_expression, pole_vec_ws_translate)
         return pole_cntrl_inst
 
-    def _pre_build(self, instance_name = None, parent = None, input_xforms = None, source_component = None, connect_hierarchy = None, connect_axis_vec = True, **pre_build_kwargs):
-        super()._pre_build(instance_name, parent, input_xforms, source_component, connect_hierarchy, connect_axis_vec, **pre_build_kwargs)
-        xforms = source_component.get_xform_attrs(xform_type=self.IO_ENUM.output, index=[0, 2])
-        if isinstance(source_component, setup.Mirror):
-            # get from input
-            self.container_node[self._ROOT_WORLD_MAT] << xforms[0].init_matrix
-            self.container_node[self._ROOT_INIT_INV_MAT] << xforms[0].init_inv_matrix
-            self.container_node[self._END_WORLD_MAT] << xforms[2].init_matrix
-            self.container_node[self._END_INIT_INV_MAT] << xforms[2].init_inv_matrix
+    
 
     def _override_build(self, control_color=None, **kwargs):
         # space switch to plug into controls
@@ -706,7 +713,7 @@ class SimpleIK(base_comp.Motion):
         ik_base_mat_aim["inputMatrix"] << root_offset_matrix
         ik_base_mat_aim["primaryTargetMatrix"] << end_offset_matrix
         ik_base_mat_aim["primaryInputAxis"] << self.container_node[self._PRM_VEC]
-        ik_base_mat_aim["secondaryTargetMatrix"] << pole_cntrl_inst.container_node[base_comp.Control._OUT_WS_MAT]
+        ik_base_mat_aim["secondaryTargetMatrix"] << pole_cntrl_inst.container_node[control._Control._OUT_WS_MAT]
         ik_base_mat_aim["secondaryInputAxis"] << self.container_node[self._SEC_VEC]
         ik_base_mat_aim["secondaryTargetVector"] << self.container_node[self._SEC_VEC]
         ik_base_mat_aim["secondaryMode"] = 2
@@ -748,29 +755,16 @@ class SimpleIK(base_comp.Motion):
 
         self.container_node.add_nodes(ik_base_mat_aim, *xform_output_nodes)
 
-class TwistHier(base_comp.Motion):
+class TwistHier(_Motion):
     """creates a hier with twist joints. inbetween twist joint number can be specified"""
 
     class_namespace = "twist_hier"
     root_transform_name = None
-    _KWG_NUM_TWIST_XFORMS = "num_twist_xforms"
-    _KWG_COUNTER_ROT_ROOT = "counter_rot_root"
 
     @classmethod
-    def create(cls, instance_name=None, parent=None, input_xforms=None, source_component=None, connect_hierarchy=True, connect_axis_vecs=True, num_twist_xforms:int=3, counter_rot_root:bool=True):
-        
-        pre_build_kwargs, build_kwargs, post_build_kwargs = cls._process_kwargs(instance_name, parent, input_xforms, source_component, connect_hierarchy, connect_axis_vecs, num_twist_xforms, counter_rot_root)
-
-        return cls._filtered_create(pre_build_kwargs, build_kwargs, post_build_kwargs)
-    @classmethod
-    def _process_kwargs(cls, instance_name = None, parent = None, input_xforms = ..., source_component = None, connect_hierarchy = True, connect_axis_vecs = True, num_twist_xforms=3, counter_rot_root:bool=True):
-        pre_build_kwargs, build_kwargs, post_build_kwargs = super()._process_kwargs(instance_name, parent, input_xforms, source_component, connect_hierarchy, connect_axis_vecs, None)
-        build_kwargs[cls._KWG_NUM_TWIST_XFORMS] = num_twist_xforms
-        build_kwargs[cls._KWG_COUNTER_ROT_ROOT] = counter_rot_root
-
-        return pre_build_kwargs, build_kwargs, post_build_kwargs
-
-    def _override_build(self, control_color=None, num_twist_xforms=3, counter_rot_root:bool=True, **build_kwargs):
+    def create(cls, instance_name=None, parent=None, input_xforms=None, source_component=None, connect_parent_hier=True, connect_axis_vecs=True, num_twist_xforms:int=3, counter_rot_root:bool=True):
+        return cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
+    def _override_build(self, control_color=None, num_twist_xforms=3, counter_rot_root:bool=True, **kwargs):
         input_xforms = list(self.get_xform_attrs(xform_type=self.IO_ENUM.input).items())
         added_nodes = []
         

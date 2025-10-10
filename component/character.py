@@ -6,9 +6,7 @@ import system.component_data as component_data
 import utils.utils as utils
 from typing import Union
 
-base_comp.Anim
-
-class CustomCharacter(base_comp.Component):
+class _Character(base_comp.Component):
     """Base class for character"""
     component_type = component_enum_data.ComponentType.character
     class_namespace = "char"
@@ -97,16 +95,13 @@ class CustomCharacter(base_comp.Component):
         return shader
 
     @property
-    def root_component(self) -> anim.SingleXform:
+    def root_component(self)->anim.SingleXform:
         """Root component
 
         Returns:
             base_comp.Anim:
         """
         return self.child_components()[0]
-    @classmethod
-    def create(cls, instance_name = None, parent=None):
-        return super().create(instance_name, parent)
     
     def _pre_build(self, instance_name = None, parent=None):
         super()._pre_build(instance_name, parent)
@@ -134,9 +129,7 @@ class CustomCharacter(base_comp.Component):
             control_point.set(utils.Vector(control_point.value) * 7)
 
         self.rename_nodes()
-    def _override_build(self, **build_kwargs):
-        pass
-    def _post_build(self, **post_build_kwargs):
+    def _post_build(self, **kwargs):
         child_components = self.child_components()
         for child_component in child_components:
             motion_vis = self.container_node[self._IN_MOT_VIS]
@@ -147,7 +140,7 @@ class CustomCharacter(base_comp.Component):
                     transform_node[child_component._IN_MOT_VIS] << motion_vis
                 if transform_node.has_attr(child_component._IN_SETUP_VIS):
                     transform_node[child_component._IN_SETUP_VIS] << setup_vis
-        super()._post_build(**post_build_kwargs)
+        super()._post_build(**kwargs)
 
     def axis_vec_choice_node(self, choice_node_name, enum_attr:nw.Attr=None):
         """creates a choice node for axis vectors. allows enum to generate a vector
@@ -166,8 +159,10 @@ class CustomCharacter(base_comp.Component):
             enum_attr  >> choice_node["selector"]
 
         return choice_node
-
-class SimpleBiped(CustomCharacter):
+class CustomCharacter(_Character):
+    def _override_build(self, **kwargs):
+        pass
+class SimpleBiped(_Character):
     """Class for character component of a simple character
 
     Args:

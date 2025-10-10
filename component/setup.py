@@ -4,10 +4,10 @@ import system.component_enum_data as component_enum_data
 import component.control as control
 import utils.utils as utils
 import utils.node_wrapper as nw
-from typing import Union
 import maya.cmds as cmds
+from typing import Union
 
-class Setup(base_comp.Hierarchy):
+class _Setup(base_comp._Hierarchy):
     """A Base class for setup autorigging components. Derived from Hierarchy"""
     root_transform_name = "grp"
     component_type = component_enum_data.ComponentType.setup
@@ -18,12 +18,6 @@ class Setup(base_comp.Hierarchy):
     _IN_SET_CNTRL_LOC_MAT = "inputSettingCntrlLocMatrix"
     _IN_HAS_PARENT_HIER = "hasHierParent"
     _OUT_SET_CNTRL_LOC_MAT = "outputSettingCntrlLocMatrix"
-
-    @classmethod
-    def _process_kwargs(cls, instance_name = None, parent = None, input_xforms = ..., source_component = None, connect_hierarchy = True, connect_axis_vecs = True, control_color=None):
-        pre_build_kwargs, build_kwargs, post_build_kwargs = super()._process_kwargs(instance_name, parent, input_xforms, source_component, connect_hierarchy, connect_axis_vecs, control_color)
-        post_build_kwargs[cls._KWG_CNTR_CLR] = control_color
-        return pre_build_kwargs, build_kwargs, post_build_kwargs
 
     def _input_attr_build_data(self):
         node_data = super()._input_attr_build_data()
@@ -42,30 +36,10 @@ class Setup(base_comp.Hierarchy):
 
         return node_data
 
-    def _override_build(self, control_color=None, **kwargs):
-        input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
-        for index, input_xform in input_xforms.items():
-            # creating control
-            control_inst = control.Locator.create(instance_name=input_xform.xform_name, parent=self, color=control_color, xform_map_index=index)
-            control_container = control_inst.container_node
-            control_container[control_inst._LOC_SCALE] << self.input_node[self._LOC_SCALE]
-            utils.Matrix.translate_matrix(0, index*1.5, 0).set_transform(control_inst.transform_node, world_space=True)
-            if input_xform.init_matrix.value is not None:
-                utils.Matrix(input_xform.init_matrix).set_transform(control_inst.transform_node, world_space=True)
-                
-            # connecting to output
-            self._set_xform_attrs(
-                index=index,
-                xform_type=self.IO_ENUM.output,
-                xform=self.XFORM(
-                    init_matrix=control_container[base_comp.Control._OUT_WS_MAT],
-                    world_matrix=control_container[base_comp.Control._OUT_WS_MAT],
-                )
-            )
-    def _post_build(self, control_color=None, **post_build_kwargs):
+    def _post_build(self, control_color=None, **kwargs):
         if not self.container_node[self._OUT_SET_CNTRL_LOC_MAT].has_src_connection():
             self.container_node[self._IN_SET_CNTRL_LOC_MAT] >> self.container_node[self._OUT_SET_CNTRL_LOC_MAT]
-        super()._post_build(**post_build_kwargs)
+        super()._post_build(**kwargs)
         self.__setup_wire(control_color)
     def get_as_source_xforms(self, is_parent_component=True):
         xforms = super().get_as_source_xforms(is_parent_component)
@@ -127,7 +101,29 @@ class Setup(base_comp.Hierarchy):
             self.container_node[self._IN_HAS_PARENT_HIER] = False
         return hier_parent
 
-class SimpleLimb(Setup):
+class Setup(_Setup):
+    """Basic Setup component"""
+    def _override_build(self, control_color=None, **kwargs):
+        input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
+        for index, input_xform in input_xforms.items():
+            # creating control
+            control_inst = control.Locator.create(instance_name=input_xform.xform_name, parent=self, color=control_color, xform_map_index=index)
+            control_container = control_inst.container_node
+            control_container[control_inst._LOC_SCALE] << self.input_node[self._LOC_SCALE]
+            utils.Matrix.translate_matrix(0, index*1.5, 0).set_transform(control_inst.transform_node, world_space=True)
+            if input_xform.init_matrix.value is not None:
+                utils.Matrix(input_xform.init_matrix).set_transform(control_inst.transform_node, world_space=True)
+                
+            # connecting to output
+            self._set_xform_attrs(
+                index=index,
+                xform_type=self.IO_ENUM.output,
+                xform=self.XFORM(
+                    init_matrix=control_container[control._Control._OUT_WS_MAT],
+                    world_matrix=control_container[control._Control._OUT_WS_MAT],
+                )
+            )
+class SimpleLimb(_Setup):
     """3 xform that aim and align to each other. middle xform stays inbetween and orients correctly to whatever the angle the other 2 xform make"""        
     _max_num_xforms = (3, 3)
     
@@ -197,19 +193,19 @@ class SimpleLimb(Setup):
 
         # mid interp matrix
         mid_interp_matrix, xform2_translate = self.__create_mid_interp_matrix(
-            control_inst0.container_node[base_comp.Control._OUT_WS_MAT], 
-            control_inst2_translate.container_node[base_comp.Control._OUT_WS_MAT])
-        control_inst1.container_node[base_comp.Control._IN_OFF_MAT] << mid_interp_matrix
+            control_inst0.container_node[control._Control._OUT_WS_MAT], 
+            control_inst2_translate.container_node[control._Control._OUT_WS_MAT])
+        control_inst1.container_node[control._Control._IN_OFF_MAT] << mid_interp_matrix
 
         # xform0
         xform0_ws_mat_attr, xform0_inv_attr = self.__create_xform0(
-            guide_transform0_ws_mat=control_inst0.container_node[base_comp.Control._OUT_WS_MAT], 
-            guide_transform1_ws_mat=control_inst1.container_node[base_comp.Control._OUT_WS_MAT])
+            guide_transform0_ws_mat=control_inst0.container_node[control._Control._OUT_WS_MAT], 
+            guide_transform1_ws_mat=control_inst1.container_node[control._Control._OUT_WS_MAT])
 
         # xform1
         xform1_ws_mat_attr, xform1_inv_attr = self.__create_xform1(
-            guide_transform1_ws_mat=control_inst1.container_node[base_comp.Control._OUT_WS_MAT], 
-            guide_transform2_ws_mat=control_inst2_translate.container_node[base_comp.Control._OUT_WS_MAT],
+            guide_transform1_ws_mat=control_inst1.container_node[control._Control._OUT_WS_MAT], 
+            guide_transform2_ws_mat=control_inst2_translate.container_node[control._Control._OUT_WS_MAT],
             xform0_ws_mat=xform0_ws_mat_attr,
             xform0_inv_mat=xform0_inv_attr)
         
@@ -399,22 +395,12 @@ class SimpleLimb(Setup):
             )
         )
         self.container_node.add_nodes(xform_matrix2_ws, xform_matrix2_loc, xform2_mult_mat)
-class Mirror(Setup):
+class Mirror(_Setup):
     """Class that mirrors all xforms given"""
     _IN_MIRROR_AXIS = "mirrorAxis"
     _IN_AXIS_SCALAR = "AxisScalar"
     _IN_NEG_AXIS_SCALAR = "negAxisScalar"
     _IN_MIRROR_MAT = "mirrorMatrix"
-    _KWG_MIRROR_AXIS = "mirror_axis"
-
-    @classmethod
-    def create(cls, instance_name = None, parent = None, input_xforms:Union[list[component_data.Xform], int]=[], mirror_axis:Union[component_enum_data.AxisEnum, nw.Attr]=component_enum_data.AxisEnum.x, source_component = None, connect_hierarchy = True, connect_axis_vecs = True, control_color=None):
-        setup_inst = super().create(instance_name, parent, input_xforms, source_component, connect_hierarchy, connect_axis_vecs, control_color)
-        if isinstance(mirror_axis, nw.Attr):
-            setup_inst.container_node[cls._IN_MIRROR_AXIS] << mirror_axis
-        else:
-            setup_inst.container_node[cls._IN_MIRROR_AXIS] = mirror_axis.name
-        return setup_inst
 
     def _input_attr_build_data(self):
         node_data = super()._input_attr_build_data()
@@ -425,7 +411,25 @@ class Mirror(Setup):
             component_data.AttrData(self._IN_MIRROR_MAT, type_="matrix", parent=self._IN),
         )
         return node_data
-
+    
+    @classmethod
+    def create(cls, 
+               instance_name:Union[str, nw.Attr]=None, 
+               parent:base_comp.Component=None, 
+               input_xforms:Union[list[component_data.Xform], int]=None, 
+               mirror_axis:Union[component_enum_data.AxisEnum, nw.Attr]=component_enum_data.AxisEnum.x,
+               source_component:base_comp.Component=None, 
+               connect_parent_hier:bool=True, 
+               connect_axis_vecs:bool=True, 
+               control_color=None): 
+        return cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
+    
+    def _pre_build(self, instance_name = None, parent = None, input_xforms = None, mirror_axis:Union[component_enum_data.AxisEnum, nw.Attr]=component_enum_data.AxisEnum.x, source_component = None, connect_parent_hier = None, connect_axis_vecs = True, **kwargs):
+        super()._pre_build(instance_name, parent, input_xforms, source_component, connect_parent_hier, connect_axis_vecs, **kwargs)
+        if isinstance(mirror_axis, nw.Attr):
+            self.container_node[self._IN_MIRROR_AXIS] << mirror_axis
+        else:
+            self.container_node[self._IN_MIRROR_AXIS] = mirror_axis.name
     def _override_build(self, control_color=None, **kwargs):
         self.__create_mirror_scale_matrix()
         
