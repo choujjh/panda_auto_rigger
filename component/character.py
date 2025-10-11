@@ -103,7 +103,7 @@ class _Character(base_comp.Component):
         """
         return self.child_components()[0]
     
-    def _pre_build(self, instance_name = None, parent=None):
+    def _pre_build(self, instance_name = None, parent=None, **kwargs):
         super()._pre_build(instance_name, parent)
 
         m_color = component_enum_data.Color.yellow
@@ -136,9 +136,9 @@ class _Character(base_comp.Component):
             setup_vis = self.container_node[self._IN_SETUP_VIS]
             transform_node = child_component.transform_node
             if transform_node is not None:
-                if transform_node.has_attr(child_component._IN_MOT_VIS):
-                    transform_node[child_component._IN_MOT_VIS] << motion_vis
-                if transform_node.has_attr(child_component._IN_SETUP_VIS):
+                if transform_node.has_attr(self._IN_MOT_VIS):
+                    transform_node[self._IN_MOT_VIS] << motion_vis
+                if transform_node.has_attr(self._IN_SETUP_VIS):
                     transform_node[child_component._IN_SETUP_VIS] << setup_vis
         super()._post_build(**kwargs)
 
@@ -168,13 +168,29 @@ class SimpleBiped(_Character):
     Args:
         CustomCharacter (_type_): _description_
     """
-    def _override_build(self, **kwargs):
+    @classmethod
+    def create(cls, instance_name = None, parent = None, num_twist_xforms:int=3, counter_rot_root:bool=True, **kwargs):
+        cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
+    def _override_build(self, num_twist_xforms=3, counter_rot_root=True, **kwargs):
         # color
         setup_color = self.get_color_shader(char_side=self._SETUP_CLR, set_color=component_enum_data.Color.purple)
 
         l_char_shader = self.get_color_shader(char_side=component_enum_data.CharacterSide.left, set_color=component_enum_data.Color.blue)
         r_char_shader = self.get_color_shader(char_side=component_enum_data.CharacterSide.right, set_color=component_enum_data.Color.red)
-                
+        m_char_shader = self.get_color_shader(char_side=component_enum_data.CharacterSide.mid)
+
+        spine = anim.FK.create(
+            instance_name="spine",
+            parent=self,
+            hier_side=component_enum_data.CharacterSide.mid, 
+            control_color=m_char_shader, 
+            setup_color=setup_color,
+            input_xforms=[
+                component_data.Xform(xform_name="waist", init_matrix=utils.Matrix.translate_matrix(0, 8, 0)),
+                component_data.Xform(xform_name="mid_spine", init_matrix=utils.Matrix.translate_matrix(0, 11.5, 0)),
+                component_data.Xform(xform_name="chest", init_matrix=utils.Matrix.translate_matrix(0, 15, 0)),],
+            add_settings_cntrl=False)
+
         # leg
         l_leg = anim.SimpleLimb.create(
             instance_name="leg", 
@@ -187,23 +203,32 @@ class SimpleBiped(_Character):
                 component_data.Xform(xform_name="loleg"),
                 component_data.Xform(xform_name="foot", init_matrix=utils.Matrix.translate_matrix(4, 0, 0)),
             ],
-            add_settings_cntrl=True)
+            num_twist_xforms=num_twist_xforms,
+            counter_rot_root=counter_rot_root)
         r_leg = l_leg.mirror(control_color=r_char_shader, setup_color=setup_color)
         
         # arm
         l_arm = anim.SimpleLimb.create(
-            instance_name="arm", 
+            instance_name="arm",
             parent=self,
-            hier_side=component_enum_data.CharacterSide.left, 
-            control_color=l_char_shader, 
+            hier_side=component_enum_data.CharacterSide.left,
+            control_color=l_char_shader,
             setup_color=setup_color,
             input_xforms=[
                 component_data.Xform(xform_name="uparm", init_matrix=utils.Matrix.translate_matrix(3, 15, 0)),
                 component_data.Xform(xform_name="loarm", loc_matrix=utils.Matrix.translate_matrix(0, 0, -1)),
                 component_data.Xform(xform_name="hand", init_matrix=utils.Matrix.translate_matrix(8, 12, 0)),
             ],
-            add_settings_cntrl=True)
+            num_twist_xforms=num_twist_xforms,
+            counter_rot_root=counter_rot_root)
         r_arm = l_arm.mirror(control_color=r_char_shader, setup_color=setup_color)
 
-        l_leg.hook(self.root_component, hook_mirror_component=True)
-        l_arm.hook(self.root_component, hook_mirror_component=True)
+        l_leg.hook(spine.container_node[spine.HIER_DATA.INPUT_XFORM][0], hook_mirror_component=True)
+        l_arm.hook(spine.container_node[spine.HIER_DATA.INPUT_XFORM][2], hook_mirror_component=True)
+        spine.hook(self.root_component)
+
+        import component.misc as misc
+        misc.VisualizeHier.create(instance_name="l_leg", parent=self, source_component=l_leg)
+        misc.VisualizeHier.create(instance_name="r_leg", parent=self, source_component=r_leg)
+        misc.VisualizeHier.create(instance_name="l_arm", parent=self, source_component=l_arm)
+        misc.VisualizeHier.create(instance_name="r_arm", parent=self, source_component=r_arm)

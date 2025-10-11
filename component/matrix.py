@@ -102,6 +102,12 @@ class Twist(_Matrix):
         rot_matrix_mult["matrixIn"][0] << loc_matrix
         rot_matrix_mult["matrixIn"][1] << no_rot_inv["outputMatrix"]
 
-        self.container_node[self._OUT_ROT_MATRIX] << rot_matrix_mult["matrixSum"]
+        pick_mat = nw.create_node("pickMatrix", "rotMatPick")
+        pick_mat["inputMatrix"] << rot_matrix_mult["matrixSum"]
+        pick_mat["useTranslate"] = False
+        pick_mat["useScale"] = False
+        pick_mat["useShear"] = False
+
+        self.container_node[self._OUT_ROT_MATRIX] << pick_mat["outputMatrix"]
         
-        self.container_node.add_nodes(aim_no_rot_matrix, no_rot_inv, rot_matrix_mult)
+        self.container_node.add_nodes(aim_no_rot_matrix, no_rot_inv, rot_matrix_mult, loc_init_matrix_mult, pick_mat)

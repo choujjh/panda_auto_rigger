@@ -287,7 +287,6 @@ class Component():
                 kwarg_dict.pop(key)
 
         return kwarg_dict
-
     @classmethod
     def _kwarg_create(cls, **kwargs):
         """Creates with kwarg arguments

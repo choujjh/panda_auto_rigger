@@ -334,7 +334,7 @@ class _Anim(base_comp._Hierarchy):
             setup_vis_attr >> settings_guide_inst.transform_node["v"]
 
     # mirroring
-    def mirror(self, control_color:component_enum_data.Color=None, setup_color:component_enum_data.Color=None, mirror_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x):
+    def mirror(self, control_color:component_enum_data.Color=None, setup_color:component_enum_data.Color=None, mirror_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x, **kwargs):
         """Mirrors component. returns new mirrored componenet
 
         Args:
@@ -356,7 +356,8 @@ class _Anim(base_comp._Hierarchy):
             setup_color=setup_color, 
             connect_parent_hier=False, 
             connect_axis_vecs=False, 
-            add_settings_cntrl=add_settings_cntrl)
+            add_settings_cntrl=add_settings_cntrl, 
+            **kwargs)
         self._hook_mirror_component()
 
         return mirror_component
@@ -502,13 +503,34 @@ class SimpleLimb(_Anim):
     _setup_component_type = setup.SimpleLimb
     _max_num_xforms = (3, 3)
 
-    def _override_build(self, control_color=None, **kwargs):
+
+    @classmethod
+    def create(cls, 
+               instance_name:Union[str, nw.Attr]=None, 
+               parent:base_comp.Component=None, 
+               input_xforms:Union[int, tuple]=0, 
+               primary_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x,
+               secondary_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.y,
+               add_settings_cntrl:bool=True,
+               mirror_source:"_Anim"=None,
+               mirror_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x,
+               source_component:base_comp.Component=None, 
+               connect_parent_hier:bool=True, 
+               connect_axis_vecs:bool=True, 
+               control_color=None,
+               setup_color=None,
+               hier_side:component_enum_data.CharacterSide=component_enum_data.CharacterSide.none,
+               num_twist_xforms:int=3, 
+               counter_rot_root:bool=True,
+               **kwargs):
+        return cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
+    def _override_build(self, control_color=None, num_twist_xforms:int=3, counter_rot_root:bool=True, **kwargs):
         ik_inst = motion.SimpleIK.create(source_component=self.setup_component, control_color=control_color, parent=self)
         fk_inst = motion.FK.create(source_component=self.setup_component, control_color=control_color, parent=self)
 
         merge_hier_inst = misc.MergeHier.create(source_components=[fk_inst, ik_inst], parent=self)
 
-        twist_hier_inst = motion.TwistHier.create(source_component=merge_hier_inst, parent=self)
+        twist_hier_inst = motion.TwistHier.create(source_component=merge_hier_inst, parent=self, num_twist_xforms=num_twist_xforms, counter_rot_root=counter_rot_root)
         for index, output_xform in twist_hier_inst.get_xform_attrs(xform_type=self.IO_ENUM.output).items():
             self._set_xform_attrs(
                 index=index,
@@ -542,6 +564,11 @@ class SimpleLimb(_Anim):
             ter_vec = self.container_node[self._TER_VEC].value
             if ter_vec != utils.Vector(0, 1, 0) or ter_vec != utils.Vector(0, -1, 0):
                 self.settings_guide_component.transform_node["r"] = 90 * utils.Vector(0, 1, 0) ^ ter_vec
+    def mirror(self, control_color = None, setup_color = None, mirror_axis = component_enum_data.AxisEnum.x, **kwargs):
+        num_twist_xforms=int(((len(self.get_xform_attrs(self.IO_ENUM.output))-1) / 2) - 1)
+        counter_rot_root=True if len(self.container_node[self._CNTNR_CHLD_COMP]) == 3 else False
+        
+        return super().mirror(control_color=control_color, setup_color=setup_color, mirror_axis=mirror_axis, num_twist_xforms=num_twist_xforms, counter_rot_root=counter_rot_root)
 class SingleXform(_Anim):
     """Single Joint Component"""
     _max_num_xforms = (1, 1)
@@ -566,3 +593,14 @@ class SingleXform(_Anim):
         )
         if self.settings_guide_component is not None:
             self.settings_guide_component.transform_node["t"] = [0, 0, -3]
+class FK(_Anim):
+    """Anim FK"""
+    def _override_build(self, control_color=None, **kwargs):
+        fk_inst=motion.FK.create(source_component=self.setup_component, control_color=control_color)
+
+        for index, xform in fk_inst.get_xform_attrs(self.IO_ENUM.output).items():
+            self._set_xform_attrs(
+                index=index,
+                xform_type=self.IO_ENUM.output,
+                xform=xform,
+            )

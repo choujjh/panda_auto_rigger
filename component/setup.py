@@ -71,10 +71,14 @@ class _Setup(base_comp._Hierarchy):
         hier_parent_wire_shape.rename(f"{hier_parent_wire}Shape1")
         utils.apply_display_color(nodes=[hier_parent_wire_shape], color=[0, 0, 0])
 
+        # parent init mat
+        parent_init_mat = nw.create_node("inverseMatrix", "hierParentInitMat_inv")
+        parent_init_mat["inputMatrix"] << self.container_node[self.HIER_DATA.HIER_PARENT_INIT_INV_MATRIX]
+
         # creating point mult for hier parent
         wire_points = []
         wire_points.append(nw.create_node("pointMatrixMult", f"hierParent_pntMatMult"))
-        wire_points[-1]["inMatrix"] << self.container_node[self.HIER_DATA.HIER_PARENT_MATRIX]
+        wire_points[-1]["inMatrix"] << parent_init_mat["outputMatrix"]
         wire_points[-1]["output"] >> hier_parent_wire_shape["controlPoints"][0]
 
         for index, xform in output_xforms.items():
@@ -88,7 +92,7 @@ class _Setup(base_comp._Hierarchy):
                     wire_points[-1]["output"] >> hier_parent_wire_shape["controlPoints"][1]
 
         cmds.parent(str(hier_wire), str(hier_parent_wire), str(self.transform_node))
-        self.container_node.add_nodes(hier_wire, hier_wire_shape, hier_parent_wire, hier_parent_wire_shape, *wire_points)
+        self.container_node.add_nodes(hier_wire, hier_wire_shape, hier_parent_wire, hier_parent_wire_shape, parent_init_mat, *wire_points)
 
     # hooking
     def hook(self, hook_src_data):
