@@ -123,7 +123,7 @@ class _Character(base_comp.Component):
 
         # change root transform 
         transform_shape = root_component.child_components()[-1].transform_node.get_shapes()[0]
-        self.root_component.settings_guide_component.transform_node["tz"] = -9
+        self.root_component._settings_guide_component.transform_node["tz"] = -9
         cntrl_pnt_len = len(transform_shape["controlPoints"])
         for control_point in [attr for attr in transform_shape["controlPoints"]][:cntrl_pnt_len-3]:
             control_point.set(utils.Vector(control_point.value) * 7)
@@ -189,7 +189,7 @@ class SimpleBiped(_Character):
                 component_data.Xform(xform_name="waist", init_matrix=utils.Matrix.translate_matrix(0, 8, 0)),
                 component_data.Xform(xform_name="mid_spine", init_matrix=utils.Matrix.translate_matrix(0, 11.5, 0)),
                 component_data.Xform(xform_name="chest", init_matrix=utils.Matrix.translate_matrix(0, 15, 0)),],
-            add_settings_cntrl=False)
+            add_settings_cntrl=False,)
 
         # leg
         l_leg = anim.SimpleLimb.create(
@@ -223,12 +223,13 @@ class SimpleBiped(_Character):
             counter_rot_root=counter_rot_root)
         r_arm = l_arm.mirror(control_color=r_char_shader, setup_color=setup_color)
 
+        # hooking
         l_leg.hook(spine.container_node[spine.HIER_DATA.INPUT_XFORM][0], hook_mirror_component=True)
         l_arm.hook(spine.container_node[spine.HIER_DATA.INPUT_XFORM][2], hook_mirror_component=True)
         spine.hook(self.root_component)
 
-        import component.misc as misc
-        misc.VisualizeHier.create(instance_name="l_leg", parent=self, source_component=l_leg)
-        misc.VisualizeHier.create(instance_name="r_leg", parent=self, source_component=r_leg)
-        misc.VisualizeHier.create(instance_name="l_arm", parent=self, source_component=l_arm)
-        misc.VisualizeHier.create(instance_name="r_arm", parent=self, source_component=r_arm)
+        # adding root as default ik space
+        l_leg.add_ik_space(space_name="root", space_src_data=self.root_component)
+        r_leg.add_ik_space(space_name="root", space_src_data=self.root_component)
+        l_arm.add_ik_space(space_name="root", space_src_data=self.root_component)
+        r_arm.add_ik_space(space_name="root", space_src_data=self.root_component)

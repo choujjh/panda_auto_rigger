@@ -6,6 +6,7 @@ import utils.node_wrapper as nw
 import system.component_data as component_data
 import system.component_enum_data as component_enum_data
 import maya.cmds as cmds
+import utils.utils as utils
 
 class _Motion(base_comp._Hierarchy):
     """Base class for motion autorigging components. Derived from Hierarchy"""
@@ -114,7 +115,7 @@ class SimpleIK(_Motion):
         space_switch_choice = nw.create_node("choice", "spaceMatrixChoice")
         space_switch_init_inv_choice = nw.create_node("choice", "spaceInitInvMatrix_choice")
 
-        space_len = len(self._SPACE_SWITCH)
+        space_len = len(self.container_node[self._SPACE_SWITCH])
         if space_len == 0:
             space_len = 1
         for index in range(space_len):
@@ -157,12 +158,12 @@ class SimpleIK(_Motion):
             control_inv_matrix=input_xform.world_inv_matrix
             build_offset=False
 
-        mult_node = nw.create_node("multMatrix", f"{name}_cntrl_ws_mat")
-        mult_node["matrixIn"][0] << control_matrix
-        mult_node["matrixIn"][1] << parent_init_inv_matrix
-        mult_node["matrixIn"][2] << parent_world_matrix
+        cntrl_ws_mult_node = nw.create_node("multMatrix", f"{name}_cntrl_ws_mat")
+        cntrl_ws_mult_node["matrixIn"][0] << control_matrix
+        cntrl_ws_mult_node["matrixIn"][1] << parent_init_inv_matrix
+        cntrl_ws_mult_node["matrixIn"][2] << parent_world_matrix
 
-        control_inst.container_node[control._Control._IN_OFF_MAT] << mult_node["matrixSum"]
+        control_inst.container_node[control._Control._IN_OFF_MAT] << cntrl_ws_mult_node["matrixSum"]
 
         end_orient_matrix = control_inst.container_node[control_inst._OUT_WS_MAT]
         if build_offset:
@@ -171,9 +172,9 @@ class SimpleIK(_Motion):
             loc_mat["matrixIn"][1] << control_inv_matrix
             loc_mat["matrixIn"][2] << control_inst.container_node[control_inst._OUT_WS_MAT]
             end_orient_matrix = loc_mat["matrixSum"]
-            self.container_node.add_nodes(mult_node, loc_mat)
+            self.container_node.add_nodes(cntrl_ws_mult_node, loc_mat)
 
-        self.container_node.add_nodes(mult_node)
+        self.container_node.add_nodes(cntrl_ws_mult_node)
 
         return end_orient_matrix
     def __create_dist_nodes(self, root_world_matrix:nw.Attr, end_world_matrix:nw.Attr):
@@ -186,6 +187,7 @@ class SimpleIK(_Motion):
             len1_node:nw.Node, len2_node:nw.Node, curr_len_nodenw.Node:
         """
         input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
+        hier_parent = self.get_hier_parent_attrs()
 
         len1_node = nw.create_node("distanceBetween", "len1_init_dist")
         len1_node["inMatrix1"] << input_xforms[0].world_matrix
@@ -193,9 +195,18 @@ class SimpleIK(_Motion):
         len2_node = nw.create_node("distanceBetween", "len2_init_dist")
         len2_node["inMatrix1"] << input_xforms[1].world_matrix
         len2_node["inMatrix2"] << input_xforms[2].world_matrix
+
+        start_hierParent_invMult = nw.create_node("multMatrix", "start_hierParentInvMult")
+        start_hierParent_invMult["matrixIn"][0] << root_world_matrix
+        start_hierParent_invMult["matrixIn"][1] << hier_parent.inv_matrix
+
+        end_hierParent_invMult = nw.create_node("multMatrix", "end_hierParentInvMult")
+        end_hierParent_invMult["matrixIn"][0] << end_world_matrix
+        end_hierParent_invMult["matrixIn"][1] << hier_parent.inv_matrix
+
         curr_len_node = nw.create_node("distanceBetween", "curr_total_dist")
-        curr_len_node["inMatrix1"] << root_world_matrix
-        curr_len_node["inMatrix2"] << end_world_matrix
+        curr_len_node["inMatrix1"] << start_hierParent_invMult["matrixSum"]
+        curr_len_node["inMatrix2"] << end_hierParent_invMult["matrixSum"]
 
         self.container_node.add_nodes(len1_node, len2_node, curr_len_node)
         return len1_node["distance"], len2_node["distance"], curr_len_node["distance"]
@@ -671,8 +682,6 @@ class SimpleIK(_Motion):
         self.container_node.add_nodes(aim_matrix, vec_mult, pole_vec_expression, pole_vec_ws_translate)
         return pole_cntrl_inst
 
-    
-
     def _override_build(self, control_color=None, **kwargs):
         # space switch to plug into controls
         space_switch_choice, space_switch_init_inv_choice = self.__create_space_switch_nodes()
@@ -754,7 +763,50 @@ class SimpleIK(_Motion):
         self._set_xform_attrs(index=2, xform_type=self.IO_ENUM.output, xform=self.XFORM(world_matrix=xform2_world_matrix["output"]))
 
         self.container_node.add_nodes(ik_base_mat_aim, *xform_output_nodes)
+    
+    def add_ik_space(self, space_name:str, space_src_data):
+        space_switch_attr = self.container_node[self._SPACE_SWITCH]
+        space_init_inv_mat_node = space_switch_attr[0][self._SPACE_INIT_INV_MAT].get_dest_connections()[0].node
+        space_mat_node = space_switch_attr[0][self._SPACE_MAT].get_dest_connections()[0].node
 
+        space_src_data = self.get_hook_source_data(hook_src_data=space_src_data)
+        if space_src_data is None:
+            return
+        space_index = 0
+        if self.container_node[self._SPACE_SWITCH][0][self._SPACE_INIT_INV_MAT].has_src_connection():
+            space_index = len(self.container_node[self._SPACE_SWITCH])
+
+        # space thing
+        utils.set_connect_attr_data(attr=space_switch_attr[space_index][self._SPACE_MAT], data=space_src_data.matrix)
+        utils.set_connect_attr_data(attr=space_switch_attr[space_index][self._SPACE_INIT_INV_MAT], data=space_src_data.init_inv_matrix)
+
+        if space_index != 0:
+            space_switch_attr[space_index][self._SPACE_MAT] >> space_mat_node["input"][space_index]
+            space_switch_attr[space_index][self._SPACE_INIT_INV_MAT] >> space_init_inv_mat_node["input"][space_index]
+        
+        # change enum name
+        space_attr = self.container_node[self._SPACE]
+        enum_names = cmds.attributeQuery(space_attr.short_name, node=str(space_attr.node), listEnum=True)[0]
+
+        # getting all enums connected that are the same
+        enum_connect_attributes = []
+        connection = space_attr
+        while connection is not None:
+            if connection.type_ != "enum":
+                break
+            if cmds.attributeQuery(connection.short_name, node=str(connection.node), listEnum=True)[0] != enum_names:
+                break
+            enum_connect_attributes.append(connection)
+
+            connection = connection.get_src_connection()
+
+        for attr in enum_connect_attributes:
+            if space_index == 0:
+                enum_names = space_name
+            else:
+                enum_names = f"{enum_names}:{space_name}"
+            cmds.addAttr(str(attr), edit=True, enumName=enum_names)
+        
 class TwistHier(_Motion):
     """creates a hier with twist joints. inbetween twist joint number can be specified"""
 

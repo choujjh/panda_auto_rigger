@@ -952,12 +952,12 @@ class _Hierarchy(Component):
         # get parent hier that can be hooked first
         hier_parent = self.get_hook_hier_parent()
         
-        self.unhook(False)
+        self.unhook(unhook_mirror_component=hook_mirror_component)
         # convert hook data (go from highest level hier)
         hier_src_data = self.get_hook_source_data(hook_src_data=hook_src_data)
         
         for hook_src, hook_hier_parent in zip(hier_src_data, hier_parent):
-            hook_src >> hook_hier_parent
+            utils.set_connect_attr_data(attr=hook_hier_parent, data=hook_src)
 
         if hook_mirror_component:
             self._hook_mirror_component()
@@ -1066,8 +1066,8 @@ class _Hierarchy(Component):
         if issubclass(type(hook_src_data), _Hierarchy):
             hook_xform = self.get_hook_xform(hook_src_data.container_node[self.HIER_DATA.INPUT_XFORM][0])
             return component_data.xform_to_hier_parent(hook_xform)
-
-        if issubclass(type(hook_src_data), Control):
+        from component.control import _Control
+        if issubclass(type(hook_src_data), _Control):
             control_inst = hook_src_data
 
         if control_inst is not None:

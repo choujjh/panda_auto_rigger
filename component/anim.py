@@ -15,7 +15,7 @@ import maya.cmds as cmds
 class _Anim(base_comp._Hierarchy):
     """Base class for anim autorigging components. Derived from Hierarchy"""
     component_type = component_enum_data.ComponentType.anim
-    _setup_component_type = utils.string_to_class("component.setup.Setup")
+    __setup_component_type = utils.string_to_class("component.setup.Setup")
     root_transform_name = "grp"
     class_namespace = "anim"
     
@@ -31,11 +31,11 @@ class _Anim(base_comp._Hierarchy):
     _MIRROR_AXIS = "mirrorAxis"
     
     @property
-    def setup_component_type(self):
+    def _setup_component_type(self):
         """Returns class specific _setup_component_type. works for inherited classes"""
-        return type(self)._setup_component_type
+        return type(self).__setup_component_type
     @property
-    def setup_component(self)->setup.Setup:
+    def _setup_component(self)->setup.Setup:
         """Returns setup component
 
         Returns:
@@ -43,7 +43,7 @@ class _Anim(base_comp._Hierarchy):
         """
         return self._get_node_from_key("setup_container", as_component=True)
     @property
-    def settings_component(self)->control._Control:
+    def _settings_component(self)->control._Control:
         """Returns settings component (if one exists)
 
         Returns:
@@ -53,7 +53,7 @@ class _Anim(base_comp._Hierarchy):
             return
         return self._get_node_from_key("settings_container", as_component=True)
     @property
-    def settings_guide_component(self)->control._Control:
+    def _settings_guide_component(self)->control._Control:
         """Returns settings guide component (if one exists)
 
         Returns:
@@ -63,7 +63,7 @@ class _Anim(base_comp._Hierarchy):
             return
         return self._get_node_from_key("settings_guide_container", as_component=True)
     @property
-    def motion_transform_node(self)->setup.Setup:
+    def _motion_transform_node(self)->setup.Setup:
         """Returns setup component
 
         Returns:
@@ -71,7 +71,7 @@ class _Anim(base_comp._Hierarchy):
         """
         return self._get_node_from_key("motion_node")
     @property
-    def mirror_dest_component(self)->"_Anim":
+    def _mirror_dest_component(self)->"_Anim":
         """Get mirror destination component
 
         Returns:
@@ -79,7 +79,7 @@ class _Anim(base_comp._Hierarchy):
         """
         return self._get_node_from_key(self._MIRROR_SRC, as_component=True)
     @property
-    def mirror_src_component(self)->"_Anim":
+    def _mirror_src_component(self)->"_Anim":
         """Get mirror source component
 
         Returns:
@@ -191,7 +191,7 @@ class _Anim(base_comp._Hierarchy):
             self.container_node[self._MIRROR_AXIS] = component_enum_data.AxisEnum.index_of(mirror_axis)
 
             # setting correct input xform
-            setup_xforms = mirror_source.setup_component.get_xform_attrs(self.IO_ENUM.input)
+            setup_xforms = mirror_source._setup_component.get_xform_attrs(self.IO_ENUM.input)
             setup_xforms = {index: mirror_source.get_hook_xform(xform.init_matrix.parent) for index, xform in setup_xforms.items()}
             
             input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
@@ -220,7 +220,7 @@ class _Anim(base_comp._Hierarchy):
         self.rename_nodes()
     def _post_build(self, **kwargs):
         super()._post_build(**kwargs)
-        if self.mirror_src_component is not None:
+        if self._mirror_src_component is not None:
             self.__mirror_controls_from_source()
         self._attach_output_xforms_to_settings_controls()
  
@@ -232,7 +232,7 @@ class _Anim(base_comp._Hierarchy):
             setup_color (component_enum_data.Color, optional): Defaults to None.
             control_color (component_enum_data.Color, optional): Defaults to None.
         """
-        has_mirror_src  = self.mirror_src_component is not None
+        has_mirror_src  = self._mirror_src_component is not None
 
         #settings init
         settings_init_choice = None
@@ -264,14 +264,14 @@ class _Anim(base_comp._Hierarchy):
             settings_init.container_node[settings_init._IN_OFF_MAT] << settings_init_choice["output"]
             settings_init.container_node[settings_init._OUT_LOC_MAT] >> self.container_node[self._IN_SET_CNTRL_LOC_MAT]
         settings.container_node[settings._IN_OFF_MAT] << settings_mult["matrixSum"]
-        settings_mult["matrixIn"][0] << self.setup_component.container_node[self._OUT_SET_CNTRL_LOC_MAT]
+        settings_mult["matrixIn"][0] << self._setup_component.container_node[self._OUT_SET_CNTRL_LOC_MAT]
         settings_mult["matrixIn"][1] << settings_choice["output"]
 
         self.container_node.add_nodes(settings_choice, settings_mult)
     def _attach_output_xforms_to_settings_controls(self):
         """Takes finished output xforms and applies it to settings init choice"""
         output_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.output)
-        settings_guide = self.settings_guide_component
+        settings_guide = self._settings_guide_component
         if settings_guide is not None:
             settings_guide_choice = settings_guide.container_node[settings_guide._IN_OFF_MAT].get_src_connection().node
             for index, output_xform in output_xforms.items():
@@ -289,7 +289,7 @@ class _Anim(base_comp._Hierarchy):
             # set to max
             settings_guide.transform_node[self._IN_SET_XFORM_FOLLOW_INDEX] = max
 
-        settings = self.settings_component
+        settings = self._settings_component
         if settings is not None:
             settings_choice = settings.container_node[settings._IN_OFF_MAT].get_src_connection().node["matrixIn"][1].get_src_connection().node
             for index, output_xform in output_xforms.items():
@@ -317,16 +317,16 @@ class _Anim(base_comp._Hierarchy):
     def __internal_vis_setup(self):
         """Sets up visibility for setup and motion groups"""
         # settings components
-        settings_inst = self.settings_component
-        settings_guide_inst = self.settings_guide_component
+        settings_inst = self._settings_component
+        settings_guide_inst = self._settings_guide_component
 
         # visibility attrs
         motion_vis_attr = self.container_node[self._IN_MOT_VIS]
         setup_vis_attr = self.container_node[self._IN_SETUP_VIS]
 
         # connecting
-        motion_vis_attr >> self.motion_transform_node["v"]
-        setup_vis_attr >> self.setup_component.transform_node["v"]
+        motion_vis_attr >> self._motion_transform_node["v"]
+        setup_vis_attr >> self._setup_component.transform_node["v"]
 
         if settings_inst is not None:
             motion_vis_attr >> settings_inst.transform_node["v"]
@@ -346,7 +346,7 @@ class _Anim(base_comp._Hierarchy):
             Hierarchy:
         """
         parent = self.container_node.get_container_node()
-        add_settings_cntrl = self.settings_component is not None
+        add_settings_cntrl = self._settings_component is not None
         mirror_component = type(self).create(
             parent=parent, 
             source_component=self, 
@@ -408,7 +408,7 @@ class _Anim(base_comp._Hierarchy):
             RuntimeError: can only be called from mirror destination component
         """
         
-        if self.mirror_src_component is None:
+        if self._mirror_src_component is None:
             raise RuntimeError("__mirror_controls can only be called if component is mirror dest")
         for child_cntrl in self.get_all_descendants(component_enum_data.ComponentType.control):
             mirror_control = child_cntrl.get_mirror_component()
@@ -477,7 +477,7 @@ class _Anim(base_comp._Hierarchy):
             mirror_source (Anim, optional): . Defaults to None.
         """
         if mirror_source is None:
-            setup_inst = self.setup_component_type.create(input_xforms=input_xforms, control_color=setup_color, parent=self, source_component=self)
+            setup_inst = self._setup_component_type.create(input_xforms=input_xforms, control_color=setup_color, parent=self, source_component=self)
         else:
             setup_inst = setup.Mirror.create(input_xforms=input_xforms, control_color=setup_color, parent=self, source_component=self, mirror_axis=mirror_axis)
 
@@ -486,7 +486,7 @@ class _Anim(base_comp._Hierarchy):
         setup_inst.container_node[setup_inst._OUT_SET_CNTRL_LOC_MAT] >> self.container_node[self._OUT_SET_CNTRL_LOC_MAT]
         setup_inst.container_node[setup_inst._IN_HAS_PARENT_HIER] << self.container_node[self._IN_HAS_PARENT_HIER]
         utils.map_to_container(setup_inst.container_node, "setup_container")
-        if self.mirror_src_component is None:
+        if self._mirror_src_component is None:
             self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX] = len(self.get_xform_attrs(self.IO_ENUM.input)) - 1
     def parent_to_motion(self, *motion_components:list[base_comp.Component]):
         """parents components to motion grp
@@ -494,15 +494,23 @@ class _Anim(base_comp._Hierarchy):
         Args:
             motion_components(list[Component]):
         """
-        if self.motion_transform_node is None:
+        if self._motion_transform_node is None:
             return
         component_transforms = [str(comp.transform_node) for comp in motion_components if issubclass(type(comp), base_comp.Component) and comp.transform_node is not None]
-        cmds.parent(*component_transforms, str(self.motion_transform_node))
+        cmds.parent(*component_transforms, str(self._motion_transform_node))
 class SimpleLimb(_Anim):
     """Simple Limb Anim component (has a merged fk, ik, and a settings control). used in conjunction with simpleLimb setup"""
     _setup_component_type = setup.SimpleLimb
     _max_num_xforms = (3, 3)
 
+    @property
+    def _ik_component(self)->motion.SimpleIK:
+        """Returns ik component
+
+        Returns:
+            motion.SetupIK:
+        """
+        return self._get_node_from_key("ik_container", as_component=True)
 
     @classmethod
     def create(cls, 
@@ -525,8 +533,10 @@ class SimpleLimb(_Anim):
                **kwargs):
         return cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
     def _override_build(self, control_color=None, num_twist_xforms:int=3, counter_rot_root:bool=True, **kwargs):
-        ik_inst = motion.SimpleIK.create(source_component=self.setup_component, control_color=control_color, parent=self)
-        fk_inst = motion.FK.create(source_component=self.setup_component, control_color=control_color, parent=self)
+        ik_inst = motion.SimpleIK.create(source_component=self._setup_component, control_color=control_color, parent=self)
+        fk_inst = motion.FK.create(source_component=self._setup_component, control_color=control_color, parent=self)
+
+        utils.map_to_container(ik_inst.container_node, "ik_container")
 
         merge_hier_inst = misc.MergeHier.create(source_components=[fk_inst, ik_inst], parent=self)
 
@@ -541,40 +551,43 @@ class SimpleLimb(_Anim):
         self.parent_to_motion(ik_inst, fk_inst, merge_hier_inst, twist_hier_inst)
 
         # promoting to settings attr
-        if self.settings_component is not None:
-            settings_transform = self.settings_component.transform_node
+        if self._settings_component is not None:
+            settings_transform = self._settings_component.transform_node
 
             settings_transform.add_attr("_", type="enum", enumName="FK_IK:")
             settings_transform["_"].set_locked(True)
             settings_transform["_"].set_keyable(True)
-            self.settings_component.promote_attr_to_keyable(attr=merge_hier_inst.container_node[merge_hier_inst._IN_HIER_BLEND], name="blend")
+            self._settings_component.promote_attr_to_keyable(attr=merge_hier_inst.container_node[merge_hier_inst._IN_HIER_BLEND], name="blend")
 
             settings_transform.add_attr("__", type="enum", enumName="IK:")
             settings_transform["__"].set_locked(True)
             settings_transform["__"].set_keyable(True)
-            self.settings_component.promote_attr_to_keyable(attr=ik_inst.container_node[ik_inst._IK_STRETCH_ENAB])
-            self.settings_component.promote_attr_to_keyable(attr=ik_inst.container_node[ik_inst._IK_SOFT_IK_ENAB])
-            self.settings_component.promote_attr_to_keyable(attr=ik_inst.container_node[ik_inst._IK_SOFT_BLEND_START])
-            self.settings_component.promote_attr_to_keyable(attr=ik_inst.container_node[ik_inst._IK_BLEND_TYP])
-            self.settings_component.promote_attr_to_keyable(attr=ik_inst.container_node[ik_inst._IK_BLEND_CRV])
+            self._settings_component.promote_attr_to_keyable(attr=ik_inst.container_node[ik_inst._SPACE])
+            self._settings_component.promote_attr_to_keyable(attr=ik_inst.container_node[ik_inst._IK_STRETCH_ENAB])
+            self._settings_component.promote_attr_to_keyable(attr=ik_inst.container_node[ik_inst._IK_SOFT_IK_ENAB])
+            self._settings_component.promote_attr_to_keyable(attr=ik_inst.container_node[ik_inst._IK_SOFT_BLEND_START])
+            self._settings_component.promote_attr_to_keyable(attr=ik_inst.container_node[ik_inst._IK_BLEND_TYP])
+            self._settings_component.promote_attr_to_keyable(attr=ik_inst.container_node[ik_inst._IK_BLEND_CRV])
 
         # setting settings transform
-        if self.settings_guide_component is not None:
-            self.settings_guide_component.transform_node["t"] = -3 * self.container_node[self._SEC_VEC].value
+        if self._settings_guide_component is not None:
+            self._settings_guide_component.transform_node["t"] = -3 * self.container_node[self._SEC_VEC].value
             ter_vec = self.container_node[self._TER_VEC].value
             if ter_vec != utils.Vector(0, 1, 0) or ter_vec != utils.Vector(0, -1, 0):
-                self.settings_guide_component.transform_node["r"] = 90 * utils.Vector(0, 1, 0) ^ ter_vec
+                self._settings_guide_component.transform_node["r"] = 90 * utils.Vector(0, 1, 0) ^ ter_vec
     def mirror(self, control_color = None, setup_color = None, mirror_axis = component_enum_data.AxisEnum.x, **kwargs):
         num_twist_xforms=int(((len(self.get_xform_attrs(self.IO_ENUM.output))-1) / 2) - 1)
         counter_rot_root=True if len(self.container_node[self._CNTNR_CHLD_COMP]) == 3 else False
         
         return super().mirror(control_color=control_color, setup_color=setup_color, mirror_axis=mirror_axis, num_twist_xforms=num_twist_xforms, counter_rot_root=counter_rot_root)
+    def add_ik_space(self, space_name:str, space_src_data):
+        self._ik_component.add_ik_space(space_name=space_name, space_src_data=space_src_data)
 class SingleXform(_Anim):
     """Single Joint Component"""
     _max_num_xforms = (1, 1)
 
     def _override_build(self, control_color=None, **kwargs):
-        setup_out_xform0 = self.setup_component.get_xform_attrs(xform_type=self.IO_ENUM.output, index=0)
+        setup_out_xform0 = self._setup_component.get_xform_attrs(xform_type=self.IO_ENUM.output, index=0)
 
         cntrl_inst = control.Circle.create(parent=self, color=control_color)
         cntrl_inst.container_node[cntrl_inst._IN_OFF_MAT] << setup_out_xform0.world_matrix
@@ -591,12 +604,12 @@ class SingleXform(_Anim):
                 world_inv_matrix=cntrl_inst.container_node[cntrl_inst._OUT_WS_INV_MAT],
             )
         )
-        if self.settings_guide_component is not None:
-            self.settings_guide_component.transform_node["t"] = [0, 0, -3]
+        if self._settings_guide_component is not None:
+            self._settings_guide_component.transform_node["t"] = [0, 0, -3]
 class FK(_Anim):
     """Anim FK"""
     def _override_build(self, control_color=None, **kwargs):
-        fk_inst=motion.FK.create(source_component=self.setup_component, control_color=control_color)
+        fk_inst=motion.FK.create(source_component=self._setup_component, parent=self, control_color=control_color)
 
         for index, xform in fk_inst.get_xform_attrs(self.IO_ENUM.output).items():
             self._set_xform_attrs(
@@ -604,3 +617,5 @@ class FK(_Anim):
                 xform_type=self.IO_ENUM.output,
                 xform=xform,
             )
+
+        self.parent_to_motion(fk_inst)

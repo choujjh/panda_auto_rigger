@@ -95,12 +95,12 @@ class _Setup(base_comp._Hierarchy):
         self.container_node.add_nodes(hier_wire, hier_wire_shape, hier_parent_wire, hier_parent_wire_shape, parent_init_mat, *wire_points)
 
     # hooking
-    def hook(self, hook_src_data):
-        super().hook(hook_src_data)
+    def hook(self, hook_src_data, hook_mirror_component:bool=True):
+        super().hook(hook_src_data, hook_mirror_component)
         if not self.container_node[self._IN_HAS_PARENT_HIER].has_src_connection():
             self.container_node[self._IN_HAS_PARENT_HIER] = True
-    def unhook(self):
-        hier_parent = super().unhook()
+    def unhook(self, unhook_mirror_component:bool=True):
+        hier_parent = super().unhook(unhook_mirror_component)
         if not self.container_node[self._IN_HAS_PARENT_HIER].has_src_connection():
             self.container_node[self._IN_HAS_PARENT_HIER] = False
         return hier_parent
