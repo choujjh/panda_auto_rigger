@@ -573,6 +573,8 @@ class _Hierarchy(Component):
     class_namespace = "hier"
     component_type = component_enum_data.ComponentType.hier
     _max_num_xforms = (-1, -1)
+    _populate_output=True
+    _check_output=True
 
     HIER_DATA = component_data.HierData
     IO_ENUM = component_enum_data.IO
@@ -608,7 +610,7 @@ class _Hierarchy(Component):
         if source_component is not None and hasattr(source_component, "get_as_source_xforms"):
             source_xforms = source_component.get_as_source_xforms(is_parent_component=utils.if_container_is_ancestor(child=self.container_node, ancestor=source_component.container_node))
         
-        self.__initialize_input_xform(input_xforms=input_xforms, source_xforms=source_xforms)
+        self._initialize_input_xform(input_xforms=input_xforms, source_xforms=source_xforms)
         
         #connect source component
         if source_xforms is not None:
@@ -617,18 +619,20 @@ class _Hierarchy(Component):
         return super()._override_build(**kwargs)
     def _post_build(self, **kwargs):
         super()._post_build()
-        self.__populate_output_xforms()
+        if type(self)._populate_output:
+            self._populate_output_xforms()
         self.rename_nodes()
-        self._check_output_xforms()
+        if type(self)._check_output:
+            self._check_output_xforms()
     
     def _input_attr_build_data(self):
         node_data = super()._input_attr_build_data()
         node_data.extend_attr_data(self.HIER_DATA.get_hier_parent_data())
-        node_data.extend_attr_data(self.HIER_DATA.get_input_xform_data())
+        node_data.extend_attr_data(self.HIER_DATA.get_xform_data(self.IO_ENUM.input))
         return node_data
     def _output_attr_build_data(self):
         node_data = super()._output_attr_build_data()
-        node_data.extend_attr_data(self.HIER_DATA.get_output_xform_data())
+        node_data.extend_attr_data(self.HIER_DATA.get_xform_data(self.IO_ENUM.output))
         node_data.extend_attr_data(
             component_data.AttrData(self._PRM_VEC, type_="double3", parent=self._OUT, value=[1, 0, 0]),
             component_data.AttrData(self._PRM_VEC_X, type_="double", parent=self._PRM_VEC),
@@ -645,12 +649,13 @@ class _Hierarchy(Component):
         )
         return node_data
     #pre build
-    def __initialize_input_xform(self, input_xforms:Union[list[component_data.Xform], int]=None, source_xforms:list=None):
+    def _initialize_input_xform(self, input_xforms:Union[list[component_data.Xform], int]=None, source_xforms:list=None):
         """initializes input xform
 
         Args:
             input_xforms (Union[list[component_data.Xform], int], optional): Defaults to [].
             source_xforms (list, optional): Defaults to None.
+            disable_warning (bool):
 
         Raises:
             RuntimeError: if list contains item that is not component_data
@@ -699,19 +704,19 @@ class _Hierarchy(Component):
             index (int): xform index
         """
         # set variables
-        output_name = self.output_node[self.HIER_DATA.OUTPUT_XFORM][index][self.HIER_DATA.OUTPUT_XFORM_NAME]
+        output_name = self.output_node[self.HIER_DATA.OUT_XFORM][index][self.HIER_DATA.OUT_XFORM_NAME]
         if output_name.has_src_connection():
             return
-        input_name = self.input_node[self.HIER_DATA.INPUT_XFORM][index][self.HIER_DATA.INPUT_XFORM_NAME]
-        output_ws_src = self.output_node[self.HIER_DATA.OUTPUT_XFORM][index][self.HIER_DATA.OUTPUT_WORLD_MATRIX].get_src_connection()
+        input_name = self.input_node[self.HIER_DATA.IN_XFORM][index][self.HIER_DATA.IN_XFORM_NAME]
+        output_ws_src = self.output_node[self.HIER_DATA.OUT_XFORM][index][self.HIER_DATA.OUT_WORLD_MAT].get_src_connection()
         
         # check if needs to be set
         if output_name.value is not None and output_name.value != "":
             pass
 
         # if input and output xform match
-        elif (len(self.input_node[self.HIER_DATA.INPUT_XFORM]) >=
-            len(self.output_node[self.HIER_DATA.OUTPUT_XFORM])):
+        elif (len(self.input_node[self.HIER_DATA.IN_XFORM]) >=
+            len(self.output_node[self.HIER_DATA.OUT_XFORM])):
             input_name >> output_name
         
         elif output_ws_src is not None:
@@ -782,9 +787,9 @@ class _Hierarchy(Component):
         # connect to parent
         else:
             if index == 0:
-                prev_world_inv_matrix_src = self.container_node[self.HIER_DATA.HIER_PARENT_INV_MATRIX]
+                prev_world_inv_matrix_src = self.container_node[self.HIER_DATA.HIER_PAR_INV_MAT]
             else:
-                prev_world_inv_matrix_src = self.container_node[self.HIER_DATA.OUTPUT_XFORM][index-1][self.HIER_DATA.OUTPUT_WORLD_INV_MATRIX]
+                prev_world_inv_matrix_src = self.container_node[self.HIER_DATA.OUT_XFORM][index-1][self.HIER_DATA.OUT_WORLD_INV_MAT]
                 prev_world_inv_matrix_src = prev_world_inv_matrix_src.get_src_connection()
             if prev_world_inv_matrix_src is None:
                 return []
@@ -798,7 +803,7 @@ class _Hierarchy(Component):
             added_nodes.append(mat_mult)
 
             return added_nodes
-    def __populate_output_xforms(self):
+    def _populate_output_xforms(self):
         """Goes through the output xform attributes and tries to connect name, local matrix, and init matricies"""
         added_nodes = []
         output_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.output)
@@ -850,18 +855,22 @@ class _Hierarchy(Component):
                 if source_container.has_attr(attr) and self_container.has_attr(attr):
                     source_container[attr] >> self_container[attr]
     #post build
-    def _check_output_xforms(self, check_len=True):
-        """After component is built, checks to see if xforms were properly set"""
+    def _check_output_xforms(self, check_len:bool=True):
+        """After component is built, checks to see if xforms were properly set
+
+        Args:
+            check_len (bool, optional): Defaults to True.
+        """
         if check_len:
-            input_xform_len = len(self.input_node[self.HIER_DATA.INPUT_XFORM])
-            output_xform_len = len(self.output_node[self.HIER_DATA.OUTPUT_XFORM])
+            input_xform_len = len(self.input_node[self.HIER_DATA.IN_XFORM])
+            output_xform_len = len(self.output_node[self.HIER_DATA.OUT_XFORM])
             if output_xform_len == 0:
                 cmds.warning(f"{self.container_node} component has no xform output")
 
             if input_xform_len > output_xform_len:
                 cmds.warning(f"input xform (len {input_xform_len}) longer than output xform (len {output_xform_len})")
 
-        for xform_attr in self.output_node[self.HIER_DATA.OUTPUT_XFORM]:
+        for xform_attr in self.output_node[self.HIER_DATA.OUT_XFORM]:
             for xform_sub_attr in xform_attr:
                 if xform_sub_attr.type_ == "string":
                     if xform_sub_attr.value == None or xform_sub_attr.value == "":
@@ -891,12 +900,12 @@ class _Hierarchy(Component):
         """
         if index is None:
             input_len = 0
-            if self.container_node.has_attr(self.HIER_DATA.INPUT_XFORM):
-                input_len = len(self.container_node[self.HIER_DATA.INPUT_XFORM])
+            if self.container_node.has_attr(self.HIER_DATA.IN_XFORM):
+                input_len = len(self.container_node[self.HIER_DATA.IN_XFORM])
             if self.HIER_DATA.is_input_enum(xform_type):
                 indicies = utils.length_index_list(input_len)
             else:
-                output_len = len(self.container_node[self.HIER_DATA.OUTPUT_XFORM])
+                output_len = len(self.container_node[self.HIER_DATA.OUT_XFORM])
                 if output_len > input_len:
                     indicies = utils.length_index_list(output_len)
                 else:
@@ -928,7 +937,7 @@ class _Hierarchy(Component):
         Returns:
             component_data.HierParent:
         """
-        return self.HIER_PARENT(self.container_node[self.HIER_DATA.HIER_PARENT])
+        return self.HIER_PARENT(self.container_node[self.HIER_DATA.HIER_PAR])
     def _set_hier_parent_attrs(self, hier_parent:component_data.HierParent, set_when_data_is_attr:bool=False):
         """Sets HierParent
 
@@ -1064,7 +1073,7 @@ class _Hierarchy(Component):
                 init_inv_matrix=hook_src_data["worldInverseMatrix"][0].value)
     
         if issubclass(type(hook_src_data), _Hierarchy):
-            hook_xform = self.get_hook_xform(hook_src_data.container_node[self.HIER_DATA.INPUT_XFORM][0])
+            hook_xform = self.get_hook_xform(hook_src_data.container_node[self.HIER_DATA.IN_XFORM][0])
             return component_data.xform_to_hier_parent(hook_xform)
         from component.control import _Control
         if issubclass(type(hook_src_data), _Control):
@@ -1077,17 +1086,17 @@ class _Hierarchy(Component):
                 if cntrl_map_attr.has_src_connection():
                     connection = cntrl_map_attr.get_src_connection()
                     if issubclass(type(parent_component), _Hierarchy):
-                        hook_xform = self.get_hook_xform(parent_component.container_node[self.HIER_DATA.INPUT_XFORM][connection.index])
+                        hook_xform = self.get_hook_xform(parent_component.container_node[self.HIER_DATA.IN_XFORM][connection.index])
                         return component_data.xform_to_hier_parent(hook_xform)
                 else:
-                    hook_xform = self.get_hook_xform(parent_component.container_node[self.HIER_DATA.INPUT_XFORM][0])
+                    hook_xform = self.get_hook_xform(parent_component.container_node[self.HIER_DATA.IN_XFORM][0])
                     return component_data.xform_to_hier_parent(hook_xform)
             else:
                 return self.HIER_PARENT(
                     matrix=control_inst.transform_node["worldMatrix"][0],
                     inv_matrix=control_inst.transform_node["worldInverseMatrix"][0],
                     init_inv_matrix=control_inst.transform_node["worldInverseMatrix"][0].value)
-    def get_hook_xform(self, xform:nw.Attr):
+    def get_hook_xform(self, xform_attr:nw.Attr, ancestor_hier_comp:"_Hierarchy"=None):
         """Gets hook xform at the end of chain that can be used to set hook data
 
         Args:
@@ -1101,87 +1110,79 @@ class _Hierarchy(Component):
         Returns:
             component_data.Xform:
         """
-        if not self.HIER_DATA.is_input_xform_attr(xform) and self.HIER_DATA.is_output_xform_attr(xform):
-            raise RuntimeError(f"{xform} is not xform attribute")
-        if not issubclass(utils.string_to_class(xform.node.get_container_node()[self._BLD_COMP_CLASS].value), _Hierarchy):
-            raise RuntimeError(f"xform not attached to hierarchy component")
-        
-        
         HIER_DATA = self.HIER_DATA
 
-        curr_xform = xform
-        xform_container = xform.node.get_container_node()
-        ancestor_hier = self.__get_ancestor_hierarchy(xform_container)
-        xform_index = xform.index
-        io_len = [len(xform_container[HIER_DATA.INPUT_XFORM]), len(xform_container[HIER_DATA.OUTPUT_XFORM])]
+        #error checking
+        if not self.HIER_DATA.is_input_xform_attr(xform_attr) and HIER_DATA.is_output_xform_attr(xform_attr):
+            raise RuntimeError(f"{xform_attr} is not xform attribute")
+        if not issubclass(utils.string_to_class(xform_attr.node.get_container_node()[self._BLD_COMP_CLASS].value), _Hierarchy):
+            raise RuntimeError(f"xform not attached to hierarchy component")
         
-        while True:
+        # ancestor hier
+        ancestors = self.__get_hierarchy_ancestors(xform_attr.node.get_container_node())
+        if ancestor_hier_comp is not None and ancestor_hier_comp.container_node in ancestors:
+            ancestor=ancestor_hier_comp.container_node
+        else:
+            ancestor=ancestors[-1]
+
+        # going from xform to xform
+        while not (HIER_DATA.is_output_xform_attr(xform_attr) and xform_attr.node.get_container_node() == ancestor):
+            xform = self.XFORM(xform_attr)
+            container = xform_attr.node.get_container_node()
+
             # input to output
-            if io_len[0] == io_len[1]:
-                curr_xform = xform_container[HIER_DATA.OUTPUT_XFORM][xform_index]
-            else:
-                check_func = lambda attr: attr.parent is not None and (HIER_DATA.is_output_xform_attr(attr.parent) or HIER_DATA.is_input_xform_attr(attr.parent))
-                dest_attrs = curr_xform[HIER_DATA.INPUT_INIT_MATRIX].get_dest_connections()
-                if dest_attrs == []:
-                    dest_attrs = curr_xform[HIER_DATA.INPUT_XFORM_NAME].get_dest_connections()
-                dest_attrs = [attr.parent for attr in dest_attrs if check_func(attr=attr)]
-
-                if len(dest_attrs) > 1:
-                    raise RuntimeError(f"{curr_xform} does not only have one connection to output node")
-                if len(dest_attrs) < 1:
-                    raise RuntimeError(f"{curr_xform} does not one connection to xform")
-                if HIER_DATA.is_input_xform_attr(dest_attrs[0]):
-                    curr_xform = dest_attrs[0]
-                    xform_container = curr_xform.node.get_container_node()
-                    xform_index = curr_xform.index
-                    io_len[0] = len(curr_xform.parent)
-                    io_len[1] = len(xform_container[HIER_DATA.OUTPUT_XFORM])
+            if HIER_DATA.is_input_xform_attr(xform_attr):
+                if len(container[HIER_DATA.IN_XFORM]) == len(container[HIER_DATA.OUT_XFORM]):
+                    xform_attr = container[HIER_DATA.OUT_XFORM][xform_attr.index]
                     continue
-                curr_xform = dest_attrs[0]                
-            # updating index
-            xform_index = curr_xform.index
 
-            # updating input len
-            io_len[0] = len(curr_xform.parent)
-
-            # get connection
-            check_func = lambda attr: attr.parent is not None and attr.parent.index != -1
-            connection = [attr.parent for attr in curr_xform[HIER_DATA.OUTPUT_LOC_MATRIX].get_dest_connections() if check_func(attr=attr)]
-
-            if len(connection) <= 0:
-                return self.XFORM(curr_xform)
+            # connect to next xform
+            xform_filt = lambda attr: attr.parent is not None and (HIER_DATA.is_input_xform_attr(attr.parent) or HIER_DATA.is_output_xform_attr(attr.parent))
+            xform_connections = [attr.parent for attr in xform.init_matrix.get_dest_connections() if xform_filt(attr)]
+            output_connections = [attr for attr in xform_connections if HIER_DATA.is_output_xform_attr(attr)]
+            if len(output_connections) != 0:
+                xform_attr = output_connections[0]
+                continue
+            if len(xform_connections) != 0:
+                xform_attr = xform_connections[0]
+                continue
             
-            #updating other things
-            curr_xform = connection[0]
-            xform_container = curr_xform.node.get_container_node()
-            io_len[1] = len(xform_container[HIER_DATA.OUTPUT_XFORM])
-            # get output_len
-            if xform_container == ancestor_hier.container_node:
-                return self.XFORM(curr_xform)
-    def __get_ancestor_hierarchy(self, container:nw.Container):
+            # if connections is none try loc matrix
+            if HIER_DATA.is_output_xform_attr(xform_attr):
+                index = xform_attr.index
+                connected_containers = []
+                for attr in xform.loc_matrix.get_dest_connections():
+                    container = attr.node.get_container_node()
+                    if (container is not None and
+                        container.has_attr(self._BLD_COMP_CLASS) and 
+                        issubclass(utils.string_to_class(container[self._BLD_COMP_CLASS].value), _Hierarchy)
+                    ):
+                        connected_containers.append(container)
+                if len(connected_containers) != 0:
+                    xform_attr = connected_containers[0][HIER_DATA.IN_XFORM][index]
+                    continue
+            
+            # if connection is still none then break
+            break
+        
+        return self.XFORM(xform_attr)
+    def __get_hierarchy_ancestors(self, container:nw.Container):
         """Gets highest ancestor that's of Hierarchy class/subclass
 
         Returns:
-            Hierarchy:
+            list[nw.Container]:
         """
         if container is None:
             return None
-        parent_component_class = None
-        ancestor_container = container
+        ancestor_containers = [container]
         while True:
-            parent_container = ancestor_container.get_container_node()
+            parent_container = ancestor_containers[-1].get_container_node()
             if parent_container is None or not parent_container.has_attr(self._BLD_COMP_CLASS):
-                break
-            parent_component_class = utils.string_to_class(parent_container[self._BLD_COMP_CLASS].value)
-            if issubclass(parent_component_class, _Hierarchy):
-                ancestor_container = ancestor_container.get_container_node()
-            else:
-                break           
-
-        if parent_component_class is None:
-            return self
-        return parent_component_class(ancestor_container)
-        
+                return ancestor_containers
+            if not issubclass(utils.string_to_class(parent_container[self._BLD_COMP_CLASS].value), _Hierarchy):
+                return ancestor_containers
+            ancestor_containers.append(parent_container)
+                    
     #other functionality
     def _create_orient_translate_blend(self, name:str, matrix_attr:nw.Attr, tx_attr:nw.Attr=None, ty_attr:nw.Attr=None, tz_attr:nw.Attr=None, tw_attr:nw.Attr=None):
         """Creates a blended matrix where the translate values are overriden

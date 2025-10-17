@@ -545,17 +545,24 @@ class Container(Node):
                 remove_list.extend(curr_remove_nodes)
         cmds.container(str(self), edit=True, removeNode=remove_list, force=True)
 
-    def publish_attr(self, attr, attr_bind_name:str):
+    def publish_attr(self, attr:Union["Attr", str], attr_bind_name:str):
         """Publish attributes to container
 
         Args:
             attr (Attr): Attribute to be published
             attr_bind_name (str): Attribute published name
         """
-        if attr.node in self.get_nodes():
+        if isinstance(attr, Attr):
+            node = attr.node
+            attr = str(attr)
+        else:
+            node = wrap_node(attr.split(".", 1)[0])
+
+        
+        if node in self.get_nodes():
             cmds.container(str(self), edit=True, publishAndBind=[str(attr), attr_bind_name])
         else:
-            raise RuntimeError(f"{attr.node} is not a node of container {str(self)}")
+            raise RuntimeError(f"{node} is not a node of container {str(self)}")
 
     def unpublish_attr(self, attr):
         """Unpublish attr

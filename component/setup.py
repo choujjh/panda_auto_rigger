@@ -19,6 +19,17 @@ class _Setup(base_comp._Hierarchy):
     _IN_HAS_PARENT_HIER = "hasHierParent"
     _OUT_SET_CNTRL_LOC_MAT = "outputSettingCntrlLocMatrix"
 
+    @classmethod
+    def create(cls, 
+               instance_name:Union[str, nw.Attr]=None, 
+               parent:base_comp.Component=None, 
+               input_xforms:Union[list[component_data.Xform], int]=None, 
+               source_component:base_comp.Component=None, 
+               connect_parent_hier:bool=True, 
+               connect_axis_vecs:bool=True, 
+               control_color=None,
+               build_wire:bool=True):        
+        return cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
     def _input_attr_build_data(self):
         node_data = super()._input_attr_build_data()
         node_data.extend_attr_data(
@@ -36,11 +47,12 @@ class _Setup(base_comp._Hierarchy):
 
         return node_data
 
-    def _post_build(self, control_color=None, **kwargs):
+    def _post_build(self, control_color=None, build_wire:bool=True, **kwargs):
         if not self.container_node[self._OUT_SET_CNTRL_LOC_MAT].has_src_connection():
             self.container_node[self._IN_SET_CNTRL_LOC_MAT] >> self.container_node[self._OUT_SET_CNTRL_LOC_MAT]
         super()._post_build(**kwargs)
-        self.__setup_wire(control_color)
+        if build_wire:
+            self.__setup_wire(control_color)
     def get_as_source_xforms(self, is_parent_component=True):
         xforms = super().get_as_source_xforms(is_parent_component)
         for xform in xforms:
@@ -73,7 +85,7 @@ class _Setup(base_comp._Hierarchy):
 
         # parent init mat
         parent_init_mat = nw.create_node("inverseMatrix", "hierParentInitMat_inv")
-        parent_init_mat["inputMatrix"] << self.container_node[self.HIER_DATA.HIER_PARENT_INIT_INV_MATRIX]
+        parent_init_mat["inputMatrix"] << self.container_node[self.HIER_DATA.HIER_PAR_INIT_INV_MAT]
 
         # creating point mult for hier parent
         wire_points = []
@@ -137,7 +149,7 @@ class SimpleLimb(_Setup):
         # creating controls
         # control 0
         control_inst0 = control.Locator.create(
-            instance_name=self.input_node[self.HIER_DATA.INPUT_XFORM][0][self.HIER_DATA.INPUT_XFORM_NAME], 
+            instance_name=self.input_node[self.HIER_DATA.IN_XFORM][0][self.HIER_DATA.IN_XFORM_NAME], 
             parent=self, 
             color=control_color,
             xform_map_index=0,)
@@ -150,7 +162,7 @@ class SimpleLimb(_Setup):
             input_xforms[0].init_matrix.value.set_transform(control_inst0.transform_node, world_space=True)
         # control 1
         control_inst1 = control.Locator.create(
-            instance_name=self.input_node[self.HIER_DATA.INPUT_XFORM][1][self.HIER_DATA.INPUT_XFORM_NAME], 
+            instance_name=self.input_node[self.HIER_DATA.IN_XFORM][1][self.HIER_DATA.IN_XFORM_NAME], 
             parent=self, 
             color=control_color,
             xform_map_index=1,)
@@ -163,7 +175,7 @@ class SimpleLimb(_Setup):
             input_xforms[1].loc_matrix.value.set_transform(control_inst1.transform_node)
         # control 2
         control_inst2_translate = control.Sphere.create(
-            instance_name=self.input_node[self.HIER_DATA.INPUT_XFORM][2][self.HIER_DATA.INPUT_XFORM_NAME], 
+            instance_name=self.input_node[self.HIER_DATA.IN_XFORM][2][self.HIER_DATA.IN_XFORM_NAME], 
             parent=self, 
             build_s=0.4, 
             color=control_color,
@@ -177,7 +189,7 @@ class SimpleLimb(_Setup):
         format_attr.set(format_str)
         control_inst2_translate.rename_nodes()
         control_inst2_orient = control.Locator.create(
-            instance_name=self.input_node[self.HIER_DATA.INPUT_XFORM][2][self.HIER_DATA.INPUT_XFORM_NAME], 
+            instance_name=self.input_node[self.HIER_DATA.IN_XFORM][2][self.HIER_DATA.IN_XFORM_NAME], 
             parent=self, 
             color=control_color,
             xform_map_index=2)
@@ -425,7 +437,8 @@ class Mirror(_Setup):
                source_component:base_comp.Component=None, 
                connect_parent_hier:bool=True, 
                connect_axis_vecs:bool=True, 
-               control_color=None): 
+               control_color=None,
+               build_wire:bool=True): 
         return cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
     
     def _pre_build(self, instance_name = None, parent = None, input_xforms = None, mirror_axis:Union[component_enum_data.AxisEnum, nw.Attr]=component_enum_data.AxisEnum.x, source_component = None, connect_parent_hier = None, connect_axis_vecs = True, **kwargs):

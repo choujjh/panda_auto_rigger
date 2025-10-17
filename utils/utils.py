@@ -295,7 +295,7 @@ def get_rgb_from_index(index:Union[int, component_enum_data.Color]):
     if not isinstance(index, int):
         index = index.value
     return cmds.colorIndex(index, query=True)
-def map_to_container(node:nw.Node, node_message_name:str, container_message_name:str ="container_node"):
+def map_to_container(node:nw.Node, node_message_name:str, container_message_name:str ="container_node", container:nw.Container=None):
     """Maps the node to the container by creating an attribute on both and connectiong
     them
 
@@ -304,7 +304,8 @@ def map_to_container(node:nw.Node, node_message_name:str, container_message_name
         node_message_name (str): 
         container_message_name (str, optional): Defaults to "container_node".
     """
-    container = node.get_container_node()
+    if container is None:
+        container = node.get_container_node()
 
     if container is not None:
         node.add_attr(long_name=container_message_name, type="message")
@@ -752,7 +753,6 @@ class Matrix(om2.MMatrix):
         matrix[10] = scale[2]
 
         return matrix
-
 class Vector(om2.MVector):
     """Vector inherited from om2.Vector"""
     def __add__(self, other):

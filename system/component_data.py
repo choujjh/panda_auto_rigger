@@ -231,10 +231,10 @@ class HierData:
     """Class with constants and checks for Hierarchy in Autorigger
     
     Attributes:
-        HIERARCHY (str):
-        HIER_NAME (str):
         HIER_PARENT_MATRIX (str):
-        HIER_PARENT_INIT_MATRIX (str):
+        HIER_PARENT_MATRIX (str):
+        HIER_PARENT_INV_MATRIX (str):
+        HIER_PARENT_INIT_INV_MATRIX (str):
         INPUT_XFORM (str):
         INPUT_XFORM_NAME (str):
         INPUT_INIT_MATRIX (str):
@@ -254,68 +254,49 @@ class HierData:
         OUTPUT_DATA_NAMES (list(str)):
         """
 
-    HIER_PARENT = "hierParent"
-    HIER_PARENT_MATRIX = "hierParentMatrix" 
-    HIER_PARENT_INV_MATRIX = "hierParentInvMatrix" 
-    HIER_PARENT_INIT_INV_MATRIX = "hierParentInitInvMatrix"
+    HIER_PAR = "hierParent"
+    HIER_PAR_MAT = "hierParentMatrix" 
+    HIER_PAR_INV_MAT = "hierParentInvMatrix" 
+    HIER_PAR_INIT_INV_MAT = "hierParentInitInvMatrix"
 
-    INPUT_XFORM = "inputXform"
-    INPUT_XFORM_NAME = "inputXformName" 
-    INPUT_INIT_MATRIX = "inputInitMatrix"
-    INPUT_INIT_INV_MATRIX = "inputInitInvMatrix"
-    INPUT_WORLD_MATRIX = "inputWorldMatrix"
-    INPUT_WORLD_INV_MATRIX = "inputWorldInvMatrix"
-    INPUT_LOC_MATRIX = "inputLocMatrix"
+    IN_XFORM = "inXform"
+    IN_XFORM_NAME = "inXformName" 
+    IN_INIT_MAT = "inInitMatrix"
+    IN_INIT_INV_MAT = "inInitInvMatrix"
+    IN_WORLD_MAT = "inWorldMatrix"
+    IN_WORLD_INV_MAT = "inWorldInvMatrix"
+    IN_LOC_MAT = "inLocMatrix"
 
-    OUTPUT_XFORM = "outputXform"
-    OUTPUT_XFORM_NAME = "outputXformName"
-    OUTPUT_INIT_MATRIX = "outputInitMatrix"
-    OUTPUT_INIT_INV_MATRIX = "outputInitInvMatrix"
-    OUTPUT_WORLD_MATRIX = "outputWorldMatrix"
-    OUTPUT_WORLD_INV_MATRIX = "outputWorldInvMatrix"
-    OUTPUT_LOC_MATRIX = "outputLocMatrix"
+    OUT_XFORM = "outXform"
+    OUT_XFORM_NAME = "outXformName"
+    OUT_INIT_MAT = "outInitMatrix"
+    OUT_INIT_INV_MAT = "outInitInvMatrix"
+    OUT_WORLD_MAT = "outWorldMatrix"
+    OUT_WORLD_INV_MAT = "outWorldInvMatrix"
+    OUT_LOC_MAT = "outLocMatrix"
 
-    HIER_PARENT_DATA_NAMES = [
-        HIER_PARENT_MATRIX,
-        HIER_PARENT_INV_MATRIX,
-        HIER_PARENT_INIT_INV_MATRIX
+    HIER_PAR_DATA_NAMES = [
+        HIER_PAR_MAT,
+        HIER_PAR_INV_MAT,
+        HIER_PAR_INIT_INV_MAT
     ]
-    INPUT_DATA_NAMES = [
-        INPUT_XFORM_NAME,
-        INPUT_INIT_MATRIX,
-        INPUT_INIT_INV_MATRIX,
-        INPUT_WORLD_MATRIX,
-        INPUT_WORLD_INV_MATRIX,
-        INPUT_LOC_MATRIX
+    IN_DATA_NAMES = [
+        IN_XFORM_NAME,
+        IN_INIT_MAT,
+        IN_INIT_INV_MAT,
+        IN_WORLD_MAT,
+        IN_WORLD_INV_MAT,
+        IN_LOC_MAT
     ]
-    OUTPUT_DATA_NAMES = [
-        OUTPUT_XFORM_NAME,
-        OUTPUT_INIT_MATRIX,
-        OUTPUT_INIT_INV_MATRIX,
-        OUTPUT_WORLD_MATRIX,
-        OUTPUT_WORLD_INV_MATRIX,
-        OUTPUT_LOC_MATRIX
+    OUT_DATA_NAMES = [
+        OUT_XFORM_NAME,
+        OUT_INIT_MAT,
+        OUT_INIT_INV_MAT,
+        OUT_WORLD_MAT,
+        OUT_WORLD_INV_MAT,
+        OUT_LOC_MAT
     ]
 
-    @classmethod
-    def get_paired_names(cls, src:component_enum_data.IO, dest:component_enum_data.IO):
-        """gives name pairs for hier names. src and dest are either input or output. has input init matricies removes Init matricies
-        names
-
-        Args:
-            src (component_enum_data.IO): 
-            dest (component_enum_data.IO): 
-            has_input_init_matricies (bool, optional): Defaults to False.
-
-        Returns:
-            list(tuples(str)): 
-        """
-        input_names = cls.INPUT_DATA_NAMES
-        output_names = cls.OUTPUT_DATA_NAMES
-        src_names = input_names if cls.is_input_enum(src) else output_names
-        dest_names = input_names if cls.is_input_enum(dest) else output_names
-        return [(src_name, dest_name) for src_name, dest_name in zip(src_names, dest_names)]
-    
     @classmethod
     def is_input_enum(cls, enum:component_enum_data.IO):
         """checks to see if it's input io
@@ -340,9 +321,9 @@ class HierData:
             list(str):
         """
         if cls.is_input_enum(xform_type):
-            return cls.INPUT_DATA_NAMES
+            return cls.IN_DATA_NAMES
         else:
-            return cls.OUTPUT_DATA_NAMES
+            return cls.OUT_DATA_NAMES
     @classmethod
     def get_xform_parent_name(cls, xform_type:component_enum_data.IO):
         """Gets xform parent name given the type (input or output)
@@ -354,9 +335,9 @@ class HierData:
             str:
         """
         if cls.is_input_enum(xform_type):
-            return cls.INPUT_XFORM
+            return cls.IN_XFORM
         else:
-            return cls.OUTPUT_XFORM
+            return cls.OUT_XFORM
 
     @classmethod
     def is_hier_parent_attr(cls, attr:nw.Attr):
@@ -368,7 +349,7 @@ class HierData:
         Returns:
             bool:
         """
-        hier_names = cls.HIER_PARENT_DATA_NAMES
+        hier_names = cls.HIER_PAR_DATA_NAMES
         for attr_name in hier_names:
             if not attr.has_attr(attr_name):
                 return False
@@ -383,7 +364,7 @@ class HierData:
         Returns:
             bool:
         """
-        xform_names = cls.INPUT_DATA_NAMES
+        xform_names = cls.IN_DATA_NAMES
         for attr_name in xform_names:
             if not attr.has_attr(attr_name):
                 return False
@@ -399,7 +380,7 @@ class HierData:
         Returns:
             bool:
         """
-        xform_names = cls.OUTPUT_DATA_NAMES
+        xform_names = cls.OUT_DATA_NAMES
         for attr_name in xform_names:
             if not attr.has_attr(attr_name):
                 return False
@@ -433,9 +414,9 @@ class HierData:
         Returns:
             NodeData:
         """
-        return cls.__gen_hier_node_data(cls.HIER_PARENT, cls.HIER_PARENT_DATA_NAMES, multi=False)
+        return cls.__gen_hier_node_data(cls.HIER_PAR, cls.HIER_PAR_DATA_NAMES, multi=False)
     @classmethod
-    def get_input_xform_data(cls):
+    def get_xform_data(cls, xform_type:component_enum_data.IO):
         """Returns NodeData for an input xform
 
         Args:
@@ -444,15 +425,10 @@ class HierData:
         Returns:
             NodeData:
         """
-        return cls.__gen_hier_node_data(cls.INPUT_XFORM, cls.INPUT_DATA_NAMES, multi=True)
-    @classmethod
-    def get_output_xform_data(cls):
-        """Returns NodeData for an output xform
-
-        Returns:
-            NodeData:
-        """
-        return cls.__gen_hier_node_data(cls.OUTPUT_XFORM, cls.OUTPUT_DATA_NAMES, multi=True)
+        if cls.is_input_enum(xform_type):
+            return cls.__gen_hier_node_data(cls.IN_XFORM, cls.IN_DATA_NAMES, multi=True)
+        else:
+            return cls.__gen_hier_node_data(cls.OUT_XFORM, cls.OUT_DATA_NAMES, multi=True)
 
 def xform_to_hier_parent(xform:"Xform"):
         """Converts xform to hier_parent
@@ -483,9 +459,9 @@ class HierParent():
         if hier_parent_attr is not None:
             if not HierData.is_hier_parent_attr(hier_parent_attr):
                 raise RuntimeError(f"{hier_parent_attr} is not hier parent attribute")
-            self.matrix = hier_parent_attr[HierData.HIER_PARENT_MATRIX]
-            self.inv_matrix = hier_parent_attr[HierData.HIER_PARENT_INV_MATRIX]
-            self.init_inv_matrix = hier_parent_attr[HierData.HIER_PARENT_INIT_INV_MATRIX]
+            self.matrix = hier_parent_attr[HierData.HIER_PAR_MAT]
+            self.inv_matrix = hier_parent_attr[HierData.HIER_PAR_INV_MAT]
+            self.init_inv_matrix = hier_parent_attr[HierData.HIER_PAR_INIT_INV_MAT]
         else:
             self.matrix = matrix
             self.inv_matrix = inv_matrix
@@ -544,19 +520,19 @@ class Xform():
                 raise RuntimeError(f"{xform_attr} is not an xform attribute")
             
             if HierData.is_input_enum(self.xform_type):
-                self.xform_name = xform_attr[HierData.INPUT_XFORM_NAME]
-                self.init_matrix = xform_attr[HierData.INPUT_INIT_MATRIX]
-                self.init_inv_matrix = xform_attr[HierData.INPUT_INIT_INV_MATRIX]
-                self.world_matrix = xform_attr[HierData.INPUT_WORLD_MATRIX]
-                self.world_inv_matrix = xform_attr[HierData.INPUT_WORLD_INV_MATRIX]
-                self.loc_matrix = xform_attr[HierData.INPUT_LOC_MATRIX]
+                self.xform_name = xform_attr[HierData.IN_XFORM_NAME]
+                self.init_matrix = xform_attr[HierData.IN_INIT_MAT]
+                self.init_inv_matrix = xform_attr[HierData.IN_INIT_INV_MAT]
+                self.world_matrix = xform_attr[HierData.IN_WORLD_MAT]
+                self.world_inv_matrix = xform_attr[HierData.IN_WORLD_INV_MAT]
+                self.loc_matrix = xform_attr[HierData.IN_LOC_MAT]
             else:
-                self.xform_name = xform_attr[HierData.OUTPUT_XFORM_NAME]
-                self.init_matrix = xform_attr[HierData.OUTPUT_INIT_MATRIX]
-                self.init_inv_matrix = xform_attr[HierData.OUTPUT_INIT_INV_MATRIX]
-                self.world_matrix = xform_attr[HierData.OUTPUT_WORLD_MATRIX]
-                self.world_inv_matrix = xform_attr[HierData.OUTPUT_WORLD_INV_MATRIX]
-                self.loc_matrix = xform_attr[HierData.OUTPUT_LOC_MATRIX]
+                self.xform_name = xform_attr[HierData.OUT_XFORM_NAME]
+                self.init_matrix = xform_attr[HierData.OUT_INIT_MAT]
+                self.init_inv_matrix = xform_attr[HierData.OUT_INIT_INV_MAT]
+                self.world_matrix = xform_attr[HierData.OUT_WORLD_MAT]
+                self.world_inv_matrix = xform_attr[HierData.OUT_WORLD_INV_MAT]
+                self.loc_matrix = xform_attr[HierData.OUT_LOC_MAT]
 
         else:
             self.xform_type = xform_type

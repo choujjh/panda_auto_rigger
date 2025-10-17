@@ -14,7 +14,7 @@ class _Control(base_comp.Component):
         can_set_color (bool): can set color of component
     """
     component_type = component_enum_data.ComponentType.control
-    root_transform_name = "control"
+    root_transform_name = "cntrl"
     class_namespace = "cntrl"
     can_set_color = True
     lock_transform = False

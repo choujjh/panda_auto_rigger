@@ -14,11 +14,18 @@ class _Motion(base_comp._Hierarchy):
     root_transform_name = "grp"
     class_namespace = "motion"
 
+class MotionWrapper(_Motion):
+    """wraps motion components for anim use"""
+    _populate_output=False
+    _check_output=False
+    def _override_build(self, control_color=None, **kwargs):
+        pass
+
 class FK(_Motion):
     """Given a hierarchy creates an FK chain to accompany it"""
 
     class_namespace = "FK"
-    root_transform_name = "fk_grp"
+    root_transform_name = "grp"
     def _override_build(self, control_color=None, **kwargs):
         #qol variables
         added_nodes = []
@@ -60,8 +67,8 @@ class FK(_Motion):
 
 class SimpleIK(_Motion):
     """Given the SimpleLimb creates a 2 chain IK chain"""
-    class_namespace = "simple_IK"
-    root_transform_name = "ik_grp"
+    class_namespace = "simpleIK"
+    root_transform_name = "grp"
     _max_num_xforms = (3, 3)
 
     _ROOT_WORLD_MAT = "rootWorldMatrix"
@@ -486,7 +493,7 @@ class SimpleIK(_Motion):
         ik_build_data_attrData.add_attrs_to_node(ik_build_data_node)
 
         xform1_loc_matrix_row = nw.create_node("rowFromMatrix", name="xform1_loc_matrix_row")
-        xform1_loc_matrix_row["matrix"] << self.container_node[self.HIER_DATA.INPUT_XFORM][1][self.HIER_DATA.INPUT_LOC_MATRIX]
+        xform1_loc_matrix_row["matrix"] << self.container_node[self.HIER_DATA.IN_XFORM][1][self.HIER_DATA.IN_LOC_MAT]
 
         ik_trig_expression_str = __ik_build_data_expression_str(
             len1_attr=len1_attr,

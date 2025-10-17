@@ -31,17 +31,33 @@ class _Anim(base_comp._Hierarchy):
     _MIRROR_AXIS = "mirrorAxis"
     
     @property
+    def _output_buffer_node(self):
+        """Returns setup component
+
+        Returns:
+            setup.Setup:
+        """
+        return self._get_node_from_key("output_buffer_node", as_component=True)
+    @property
     def _setup_component_type(self):
         """Returns class specific _setup_component_type. works for inherited classes"""
         return type(self).__setup_component_type
     @property
-    def _setup_component(self)->setup.Setup:
+    def _setup_component(self)->setup._Setup:
         """Returns setup component
 
         Returns:
             setup.Setup:
         """
         return self._get_node_from_key("setup_container", as_component=True)
+    @property
+    def _motion_component(self)->motion.MotionWrapper:
+        """Returns setup component
+
+        Returns:
+            setup.Setup:
+        """
+        return self._get_node_from_key("motion_container", as_component=True)
     @property
     def _settings_component(self)->control._Control:
         """Returns settings component (if one exists)
@@ -62,14 +78,6 @@ class _Anim(base_comp._Hierarchy):
         if not self.container_node.has_attr("settings_guide_container"):
             return
         return self._get_node_from_key("settings_guide_container", as_component=True)
-    @property
-    def _motion_transform_node(self)->setup.Setup:
-        """Returns setup component
-
-        Returns:
-            setup.Setup:
-        """
-        return self._get_node_from_key("motion_node")
     @property
     def _mirror_dest_component(self)->"_Anim":
         """Get mirror destination component
@@ -169,6 +177,9 @@ class _Anim(base_comp._Hierarchy):
                    connect_parent_hier:bool=None, 
                    connect_axis_vecs:bool=True,
                    **kwargs):
+        
+        
+
         # calling super
         super()._pre_build(
             instance_name=instance_name, 
@@ -178,11 +189,13 @@ class _Anim(base_comp._Hierarchy):
             connect_parent_hier=connect_parent_hier, 
             connect_axis_vecs=connect_axis_vecs, 
             **kwargs)
+        
+
         # setting values
         self.container_node[self._HIER_SIDE]=hier_side.name
         self.container_node[self._IN_PRM_AXIS]=primary_axis.name
         self.container_node[self._IN_SEC_AXIS]=secondary_axis.name
-
+        
         # if mirror source connect other attrs from last time
         if mirror_source is not None:
             self._connect_mirror_source(mirror_source=mirror_source)
@@ -207,23 +220,25 @@ class _Anim(base_comp._Hierarchy):
         
         # create setup component
         self.__create_setup_component(input_xforms=input_xforms, setup_color=setup_color, mirror_source=mirror_source, mirror_axis=mirror_axis)
-        
+        self.__create_motion_component()
 
         # adding settings cntrl
         if add_settings_cntrl:
             self.__create_settings_cntrls(setup_color=setup_color, control_color=control_color)
 
         # creating motion grp
-        self.__create_motion_grp()
         self.__internal_vis_setup()
 
         self.rename_nodes()
     def _post_build(self, **kwargs):
+        for index, mot_xform in self._motion_component.get_xform_attrs(xform_type=self.IO_ENUM.output).items():
+            self._set_xform_attrs(index=index, xform=mot_xform, xform_type=self.IO_ENUM.output)
+
         super()._post_build(**kwargs)
         if self._mirror_src_component is not None:
             self.__mirror_controls_from_source()
         self._attach_output_xforms_to_settings_controls()
- 
+
     # settings controls
     def __create_settings_cntrls(self, setup_color=None, control_color=None):
         """Creates settings control. creates settings guide if not mirrored
@@ -240,10 +255,14 @@ class _Anim(base_comp._Hierarchy):
         if not has_mirror_src:
             settings_init_choice = nw.create_node("choice", "settings_init_choice")
             settings_init_choice["selector"] << self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX]
-            settings_init = control.Locator.create(instance_name="settings_guide", parent=self, color=setup_color)
+            settings_init = control.Locator.create(instance_name="settings_guide", parent=self._setup_component, color=setup_color)
             settings_init.promote_attr_to_keyable(self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX])
             settings_init.transform_node["translate"] = [1, 1, 1]
-            utils.map_to_container(settings_init.container_node, "settings_guide_container")
+            utils.map_to_container(
+                node=settings_init.container_node, 
+                node_message_name="settings_guide_container",
+                container_message_name="anim_container", 
+                container=self.container_node)
 
             self.container_node.add_nodes(settings_init_choice)
 
@@ -252,8 +271,12 @@ class _Anim(base_comp._Hierarchy):
         settings_mult = nw.create_node("multMatrix", "settings_ws_mult")
         
         # setting up controls
-        settings = control.Gear.create(instance_name="settings", parent=self, color=control_color)
-        utils.map_to_container(settings.container_node, "settings_container")
+        settings = control.Gear.create(instance_name="settings", parent=self._motion_component, color=control_color)
+        utils.map_to_container(
+            node=settings.container_node, 
+            node_message_name="settings_container",
+            container_message_name="anim_container", 
+            container=self.container_node)
         for attr in ["t", "r", "s"]:
             for axis in ["x", "y", "z"]:
                 settings.transform_node[f"{attr}{axis}"].set_locked(True)
@@ -275,11 +298,7 @@ class _Anim(base_comp._Hierarchy):
         if settings_guide is not None:
             settings_guide_choice = settings_guide.container_node[settings_guide._IN_OFF_MAT].get_src_connection().node
             for index, output_xform in output_xforms.items():
-                if not settings_guide_choice["input"][index].has_src_connection():
-                    if output_xform.init_matrix.has_src_connection():
-                        output_xform.init_matrix.get_src_connection() >> settings_guide_choice["input"][index]
-                    else:
-                        output_xform.init_matrix >> settings_guide_choice["input"][index]
+                output_xform.init_matrix >> settings_guide_choice["input"][index]
 
             # reset max
             max = len(output_xforms.keys()) - 1
@@ -293,27 +312,7 @@ class _Anim(base_comp._Hierarchy):
         if settings is not None:
             settings_choice = settings.container_node[settings._IN_OFF_MAT].get_src_connection().node["matrixIn"][1].get_src_connection().node
             for index, output_xform in output_xforms.items():
-                if not settings_choice["input"][index].has_src_connection():
-                    if output_xform.world_matrix.has_src_connection():
-                        output_xform.world_matrix.get_src_connection() >> settings_choice["input"][index]
-                    else:
-                        output_xform.world_matrix >> settings_choice["input"][index]
-
-        # do it for settings
-    
-    # motion grp
-    def __create_motion_grp(self):
-        """Creates motion group"""
-        motion_grp = nw.create_node("transform", "motion_grp")
-        cmds.parent(str(motion_grp), str(self.transform_node))
-        for attr in ["t", "r", "s"]:
-            for axis in ["x", "y", "z"]:
-                motion_grp[f"{attr}{axis}"].set_locked(True)
-                motion_grp[f"{attr}{axis}"].set_keyable(False)
-        motion_grp["v"].set_keyable(False)
-        self.container_node.add_nodes(motion_grp)
-        utils.map_to_container(motion_grp, "motion_node")
-    # setup anim inner visibility
+                output_xform.world_matrix >> settings_choice["input"][index]
     def __internal_vis_setup(self):
         """Sets up visibility for setup and motion groups"""
         # settings components
@@ -325,7 +324,7 @@ class _Anim(base_comp._Hierarchy):
         setup_vis_attr = self.container_node[self._IN_SETUP_VIS]
 
         # connecting
-        motion_vis_attr >> self._motion_transform_node["v"]
+        motion_vis_attr >> self._motion_component.transform_node["v"]
         setup_vis_attr >> self._setup_component.transform_node["v"]
 
         if settings_inst is not None:
@@ -437,7 +436,7 @@ class _Anim(base_comp._Hierarchy):
         if not self.container_node[self._IN_HAS_PARENT_HIER].has_src_connection():
             self.container_node[self._IN_HAS_PARENT_HIER] = False
         return hier_parent
-   # other
+    # other
     def __set_vectors(self):
         """Creates nodes for primary, secondary, and tertiary vectors
 
@@ -488,16 +487,9 @@ class _Anim(base_comp._Hierarchy):
         utils.map_to_container(setup_inst.container_node, "setup_container")
         if self._mirror_src_component is None:
             self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX] = len(self.get_xform_attrs(self.IO_ENUM.input)) - 1
-    def parent_to_motion(self, *motion_components:list[base_comp.Component]):
-        """parents components to motion grp
-
-        Args:
-            motion_components(list[Component]):
-        """
-        if self._motion_transform_node is None:
-            return
-        component_transforms = [str(comp.transform_node) for comp in motion_components if issubclass(type(comp), base_comp.Component) and comp.transform_node is not None]
-        cmds.parent(*component_transforms, str(self._motion_transform_node))
+    def __create_motion_component(self):
+        motion_inst = motion.MotionWrapper.create(source_component=self._setup_component, parent=self)
+        utils.map_to_container(motion_inst.container_node, "motion_container")
 class SimpleLimb(_Anim):
     """Simple Limb Anim component (has a merged fk, ik, and a settings control). used in conjunction with simpleLimb setup"""
     _setup_component_type = setup.SimpleLimb
@@ -511,7 +503,6 @@ class SimpleLimb(_Anim):
             motion.SetupIK:
         """
         return self._get_node_from_key("ik_container", as_component=True)
-
     @classmethod
     def create(cls, 
                instance_name:Union[str, nw.Attr]=None, 
@@ -533,23 +524,25 @@ class SimpleLimb(_Anim):
                **kwargs):
         return cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
     def _override_build(self, control_color=None, num_twist_xforms:int=3, counter_rot_root:bool=True, **kwargs):
-        ik_inst = motion.SimpleIK.create(source_component=self._setup_component, control_color=control_color, parent=self)
-        fk_inst = motion.FK.create(source_component=self._setup_component, control_color=control_color, parent=self)
+        ik_inst = motion.SimpleIK.create(source_component=self._motion_component, control_color=control_color, parent=self._motion_component)
+        fk_inst = motion.FK.create(source_component=self._motion_component, control_color=control_color, parent=self._motion_component)
 
-        utils.map_to_container(ik_inst.container_node, "ik_container")
+        utils.map_to_container(
+            node=ik_inst.container_node, 
+            node_message_name="ik_container", 
+            container_message_name="anim_container", 
+            container=self.container_node)
 
-        merge_hier_inst = misc.MergeHier.create(source_components=[fk_inst, ik_inst], parent=self)
+        merge_hier_inst = misc.MergeHier.create(source_components=[fk_inst, ik_inst], parent=self._motion_component)
 
-        twist_hier_inst = motion.TwistHier.create(source_component=merge_hier_inst, parent=self, num_twist_xforms=num_twist_xforms, counter_rot_root=counter_rot_root)
+        twist_hier_inst = motion.TwistHier.create(source_component=merge_hier_inst, parent=self._motion_component, num_twist_xforms=num_twist_xforms, counter_rot_root=counter_rot_root)
         for index, output_xform in twist_hier_inst.get_xform_attrs(xform_type=self.IO_ENUM.output).items():
-            self._set_xform_attrs(
+            self._motion_component._set_xform_attrs(
                 index=index,
                 xform_type=self.IO_ENUM.output,
                 xform=output_xform,
             )
         
-        self.parent_to_motion(ik_inst, fk_inst, merge_hier_inst, twist_hier_inst)
-
         # promoting to settings attr
         if self._settings_component is not None:
             settings_transform = self._settings_component.transform_node
@@ -589,12 +582,10 @@ class SingleXform(_Anim):
     def _override_build(self, control_color=None, **kwargs):
         setup_out_xform0 = self._setup_component.get_xform_attrs(xform_type=self.IO_ENUM.output, index=0)
 
-        cntrl_inst = control.Circle.create(parent=self, color=control_color)
+        cntrl_inst = control.Circle.create(parent=self._motion_component, color=control_color)
         cntrl_inst.container_node[cntrl_inst._IN_OFF_MAT] << setup_out_xform0.world_matrix
 
-        self.parent_to_motion(cntrl_inst)
-
-        self._set_xform_attrs(
+        self._motion_component._set_xform_attrs(
             index=0,
             xform_type=self.IO_ENUM.output,
             xform=self.XFORM(
@@ -609,13 +600,11 @@ class SingleXform(_Anim):
 class FK(_Anim):
     """Anim FK"""
     def _override_build(self, control_color=None, **kwargs):
-        fk_inst=motion.FK.create(source_component=self._setup_component, parent=self, control_color=control_color)
+        fk_inst=motion.FK.create(source_component=self._motion_component, parent=self._motion_component, control_color=control_color)
 
         for index, xform in fk_inst.get_xform_attrs(self.IO_ENUM.output).items():
-            self._set_xform_attrs(
+            self._motion_component._set_xform_attrs(
                 index=index,
                 xform_type=self.IO_ENUM.output,
                 xform=xform,
             )
-
-        self.parent_to_motion(fk_inst)

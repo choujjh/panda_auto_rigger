@@ -1,12 +1,14 @@
 import system.base_component as base_comp
 import system.component_data as component_data
+import system.component_enum_data as component_enum_data
+import utils.utils as utils
 import component.control as control
 import utils.node_wrapper as nw
 import maya.cmds as cmds
 
 class VisualizeHier(base_comp._Hierarchy):
     """Helps visualize and debug hierarchies by creating chains for world space and local visualization"""
-    root_transform_name = "v_grp"
+    root_transform_name = "grp"
     class_namespace = "hier_vis"
 
     def _override_build(self, control_color=None, **kwargs):
@@ -67,7 +69,6 @@ class MergeHier(base_comp._Hierarchy):
         return node_data
     def _output_attr_build_data(self):
         node_data = super()._output_attr_build_data()
-        node_data.extend_attr_data(self.HIER_DATA.get_output_xform_data())
         node_data.extend_attr_data(component_data.AttrData(self._OUT_HIER_VIS, type_="double", multi=True, parent=self._OUT, min=0, max=1))
 
         return node_data
@@ -102,14 +103,14 @@ class MergeHier(base_comp._Hierarchy):
         """
         if len(source_components) < 1:
             return
-        xform_len = len(source_components[0].container_node[self.HIER_DATA.OUTPUT_XFORM])
+        xform_len = len(source_components[0].container_node[self.HIER_DATA.OUT_XFORM])
         container_parents = []
         curr_par_cntnr = self.container_node.get_container_node()
         while curr_par_cntnr is not None:
             container_parents.append(curr_par_cntnr)
             curr_par_cntnr = curr_par_cntnr.get_container_node()
         for source_component in source_components:
-            component_len = len(source_component.container_node[self.HIER_DATA.OUTPUT_XFORM])
+            component_len = len(source_component.container_node[self.HIER_DATA.OUT_XFORM])
             if xform_len != component_len:
                 raise RuntimeError(f"{source_component.container_node} has mismatched len. expecting {xform_len} got {component_len}")
             if source_component.container_node in container_parents:
@@ -126,7 +127,7 @@ class MergeHier(base_comp._Hierarchy):
             None if component.transform_node is None else 
             self.container_node[self._OUT_HIER_VIS][index] >> component.transform_node["visibility"])
         connect_hier_parent = lambda index, component: (
-            component.container_node[self.HIER_DATA.HIER_PARENT_MATRIX] >> self.container_node[self._IN_HIER_PAR_MAT][index]
+            component.container_node[self.HIER_DATA.HIER_PAR_MAT] >> self.container_node[self._IN_HIER_PAR_MAT][index]
         )
 
         set_component_vis(index=0, component=source_component)
@@ -135,8 +136,8 @@ class MergeHier(base_comp._Hierarchy):
             # hier parent
             hier_attr = self.container_node[self._IN_HIER][component_index][self._IN_HIER_LOC_MAT]
 
-            for xform_index, xform in enumerate(curr_component.container_node[self.HIER_DATA.OUTPUT_XFORM]):
-                hier_attr[xform_index] << xform[self.HIER_DATA.OUTPUT_LOC_MATRIX]
+            for xform_index, xform in enumerate(curr_component.container_node[self.HIER_DATA.OUT_XFORM]):
+                hier_attr[xform_index] << xform[self.HIER_DATA.OUT_LOC_MAT]
 
             # connecting to visibility
             set_component_vis(index=component_index+1, component=curr_component)
@@ -248,3 +249,91 @@ class MergeHier(base_comp._Hierarchy):
         hier_vis_remap["outValue"] >> self.container_node[self._OUT_HIER_VIS][hier_index]
 
         return hier_vis_remap
+class Cluster(base_comp._Hierarchy):
+    class_namespace="clust"
+    _check_output=False
+    _max_num_xforms=(0, 0)
+
+    _IN_CLUST_XFORM = "inClustXform"
+    _OUT_CLUST_XFORM = "outClustXform"
+
+    @classmethod
+    def create(cls, instance_name = None, parent = None, input_xforms = None, source_component = None, connect_parent_hier = True, connect_axis_vecs = True, control_color=None):
+        return super().create(instance_name, parent, None, source_component, connect_parent_hier, connect_axis_vecs, control_color)
+
+    def _override_build(self, control_color=None, **kwargs):
+        pass        
+    def add_clust_xform(self, name:str, parent_xform:component_data.Xform=None, mirror_axis:component_enum_data.AxisEnum=None):
+        """adds xform to cluster
+
+        Args:
+            name (str, optional): _description_. Defaults to "".
+            parent_xform (component_data.Xform, optional): _description_. Defaults to None.
+            mirror_axis (component_enum_data.AxisEnum, optional): _description_. Defaults to None.
+        """
+
+        input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
+        len_index = len(input_xforms)
+        input_xform = self.get_xform_attrs(index=len_index, xform_type=self.IO_ENUM.input)
+
+        if parent_xform is not None:
+            if mirror_axis is not None:
+                parent_xform.xform_name = name
+            else:
+                parent_xform.xform_name = None
+            parent_xform.loc_matrix = None
+
+            self._set_xform_attrs(
+                index=len_index,
+                xform_type=self.IO_ENUM.input,
+                xform=parent_xform)
+        else:
+            self._set_xform_attrs(
+                index=len_index, 
+                xform_type=self.IO_ENUM.input,
+                xform=self.XFORM(xform_name=name))
+        added_nodes = []
+        inv_attr = None
+        if mirror_axis is None:
+            setup_cntrl = control.Locator.create(instance_name=input_xform.xform_name, parent=self)
+            setup_cntrl.container_node[setup_cntrl._IN_OFF_MAT] << input_xform.world_matrix
+            ws_attr = setup_cntrl.container_node[setup_cntrl._OUT_WS_MAT]
+            setup_cntrl.container_node[setup_cntrl._BLD_INST_FORM] = setup_cntrl.container_node[setup_cntrl._BLD_INST_FORM].value.replace("_c", "_setup_c")
+            setup_cntrl.transform_node["t"] = self.container_node[self._SEC_VEC].value * 2
+            setup_cntrl.rename_nodes()
+        else:
+            mirror_plane_scale_val = [1 if x == 0 else -1 for x in  mirror_axis.value]
+            
+            mult_mat = nw.create_node("multMatrix", f"{input_xform.xform_name.value}_mirror_mat")
+            mult_mat["matrixIn"][0].set(utils.Matrix.scale_matrix(-1, -1, -1))
+            mult_mat["matrixIn"][1] << input_xform.loc_matrix
+            mult_mat["matrixIn"][2].set(utils.Matrix.scale_matrix(*mirror_plane_scale_val))
+            mult_mat["matrixIn"][3] << input_xform.world_matrix
+            ws_attr = mult_mat["matrixSum"]
+
+            inv_mat = nw.create_node("inverseMatrix", f"{input_xform.xform_name.value}_init_inv")
+            inv_mat["inputMatrix"] << ws_attr
+            inv_attr = inv_mat["outputMatrix"]
+
+            added_nodes.extend([mult_mat, inv_mat])
+
+        sphere_cntrl = control.Sphere.create(instance_name=input_xform.xform_name, parent=self, axis_vec=component_enum_data.AxisEnum.y, build_s=0.5)
+        sphere_cntrl.container_node[sphere_cntrl._IN_OFF_MAT] << ws_attr
+
+        self._set_xform_attrs(
+            index=len_index,
+            xform_type=self.IO_ENUM.output,
+            xform=self.XFORM(
+                init_matrix=ws_attr,
+                init_inv_matrix=inv_attr,
+                world_matrix=sphere_cntrl.container_node[sphere_cntrl._OUT_WS_MAT],
+                loc_matrix=sphere_cntrl.container_node[sphere_cntrl._OUT_LOC_MAT]
+            )
+        )
+        self._populate_output_xforms()
+
+        self.container_node.add_nodes(*added_nodes)
+            
+
+
+

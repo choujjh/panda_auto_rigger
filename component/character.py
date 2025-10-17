@@ -121,8 +121,8 @@ class _Character(base_comp.Component):
             setup_color=setup_char_shader
         )
 
-        # change root transform 
-        transform_shape = root_component.child_components()[-1].transform_node.get_shapes()[0]
+        # change root transform
+        transform_shape = root_component.child_components()[-1].child_components()[1].transform_node.get_shapes()[0]
         self.root_component._settings_guide_component.transform_node["tz"] = -9
         cntrl_pnt_len = len(transform_shape["controlPoints"])
         for control_point in [attr for attr in transform_shape["controlPoints"]][:cntrl_pnt_len-3]:
@@ -163,11 +163,7 @@ class CustomCharacter(_Character):
     def _override_build(self, **kwargs):
         pass
 class SimpleBiped(_Character):
-    """Class for character component of a simple character
-
-    Args:
-        CustomCharacter (_type_): _description_
-    """
+    """Class for character component of a simple character"""
     @classmethod
     def create(cls, instance_name = None, parent = None, num_twist_xforms:int=3, counter_rot_root:bool=True, **kwargs):
         cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
@@ -189,7 +185,9 @@ class SimpleBiped(_Character):
                 component_data.Xform(xform_name="waist", init_matrix=utils.Matrix.translate_matrix(0, 8, 0)),
                 component_data.Xform(xform_name="mid_spine", init_matrix=utils.Matrix.translate_matrix(0, 11.5, 0)),
                 component_data.Xform(xform_name="chest", init_matrix=utils.Matrix.translate_matrix(0, 15, 0)),],
-            add_settings_cntrl=False,)
+            add_settings_cntrl=False,
+            primary_axis=component_enum_data.AxisEnum.y,
+            secondary_axis=component_enum_data.AxisEnum.z,)
 
         # leg
         l_leg = anim.SimpleLimb.create(
@@ -224,12 +222,13 @@ class SimpleBiped(_Character):
         r_arm = l_arm.mirror(control_color=r_char_shader, setup_color=setup_color)
 
         # hooking
-        l_leg.hook(spine.container_node[spine.HIER_DATA.INPUT_XFORM][0], hook_mirror_component=True)
-        l_arm.hook(spine.container_node[spine.HIER_DATA.INPUT_XFORM][2], hook_mirror_component=True)
+        l_leg.hook(spine.container_node[spine.HIER_DATA.IN_XFORM][0], hook_mirror_component=True)
+        l_arm.hook(spine.container_node[spine.HIER_DATA.IN_XFORM][2], hook_mirror_component=True)
         spine.hook(self.root_component)
 
         # adding root as default ik space
-        l_leg.add_ik_space(space_name="root", space_src_data=self.root_component)
-        r_leg.add_ik_space(space_name="root", space_src_data=self.root_component)
-        l_arm.add_ik_space(space_name="root", space_src_data=self.root_component)
-        r_arm.add_ik_space(space_name="root", space_src_data=self.root_component)
+        import component.misc as misc
+
+        for name, anim_inst in zip(["l_leg", "r_leg", "l_arm", "r_arm"], [l_leg, r_leg, l_arm, r_arm]):
+            anim_inst.add_ik_space(space_name="root", space_src_data=self.root_component)
+            misc.VisualizeHier.create(instance_name=name, source_component=anim_inst, parent=self)
