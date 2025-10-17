@@ -146,14 +146,14 @@ class _Anim(base_comp._Hierarchy):
     @classmethod
     def create(cls, 
                instance_name:Union[str, nw.Attr]=None, 
-               parent:base_comp.Component=None, 
+               parent:base_comp._Component=None, 
                input_xforms:Union[int, tuple]=0, 
                primary_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x,
                secondary_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.y,
                add_settings_cntrl:bool=True,
                mirror_source:"_Anim"=None,
                mirror_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x,
-               source_component:base_comp.Component=None, 
+               source_component:base_comp._Hierarchy=None, 
                connect_parent_hier:bool=True, 
                connect_axis_vecs:bool=True, 
                control_color=None,
@@ -163,7 +163,7 @@ class _Anim(base_comp._Hierarchy):
 
     def _pre_build(self, 
                    instance_name:Union[str, nw.Attr]=None, 
-                   parent:base_comp.Component=None, 
+                   parent:base_comp._Component=None, 
                    input_xforms:Union[int, tuple]=0, 
                    hier_side:component_enum_data.CharacterSide=component_enum_data.CharacterSide.none, 
                    primary_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x,
@@ -173,7 +173,7 @@ class _Anim(base_comp._Hierarchy):
                    mirror_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x,
                    setup_color=None,
                    control_color=None,
-                   source_component:base_comp.Component=None, 
+                   source_component:base_comp._Hierarchy=None, 
                    connect_parent_hier:bool=None, 
                    connect_axis_vecs:bool=True,
                    **kwargs):
@@ -506,14 +506,14 @@ class SimpleLimb(_Anim):
     @classmethod
     def create(cls, 
                instance_name:Union[str, nw.Attr]=None, 
-               parent:base_comp.Component=None, 
+               parent:base_comp._Component=None, 
                input_xforms:Union[int, tuple]=0, 
                primary_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x,
                secondary_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.y,
                add_settings_cntrl:bool=True,
                mirror_source:"_Anim"=None,
                mirror_axis:component_enum_data.AxisEnum=component_enum_data.AxisEnum.x,
-               source_component:base_comp.Component=None, 
+               source_component:base_comp._Hierarchy=None, 
                connect_parent_hier:bool=True, 
                connect_axis_vecs:bool=True, 
                control_color=None,
@@ -533,7 +533,7 @@ class SimpleLimb(_Anim):
             container_message_name="anim_container", 
             container=self.container_node)
 
-        merge_hier_inst = misc.MergeHier.create(source_components=[fk_inst, ik_inst], parent=self._motion_component)
+        merge_hier_inst = motion.Merge.create(source_components=[fk_inst, ik_inst], parent=self._motion_component)
 
         twist_hier_inst = motion.TwistHier.create(source_component=merge_hier_inst, parent=self._motion_component, num_twist_xforms=num_twist_xforms, counter_rot_root=counter_rot_root)
         for index, output_xform in twist_hier_inst.get_xform_attrs(xform_type=self.IO_ENUM.output).items():

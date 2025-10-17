@@ -25,7 +25,7 @@ def axis_vec_choice_node(choice_node_name, enum_attr:nw.Attr=None):
 
     return choice_node
 
-class _Singleton(base_comp.Component):
+class _Singleton(base_comp._Component):
     """Has instance method. only one of each singleton component exists in a character.
     usually used for enum conversion data (enum->vec)
 

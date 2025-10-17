@@ -7,7 +7,7 @@ import utils.node_wrapper as nw
 from typing import Union
 from component.enum_manager import Color
 
-class _Control(base_comp.Component):
+class _Control(base_comp._Component):
     """A Base class for all control autorigging components. Derived from Component
 
     Attributes:
@@ -30,7 +30,7 @@ class _Control(base_comp.Component):
     @classmethod
     def create(cls,
                instance_name:Union[str, nw.Attr]=None,
-               parent:Union[base_comp.Component, nw.Container]=None,
+               parent:Union[base_comp._Component, nw.Container]=None,
                axis_vec:component_enum_data.AxisEnum=None,
                build_t=[0.0, 0.0, 0.0],
                build_r=[0.0, 0.0, 0.0],

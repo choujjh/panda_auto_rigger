@@ -171,13 +171,14 @@ class ComponentType(MayaEnumAttr):
     """Enum of different component types in the autorigger"""
     anim = 0
     character = 1
-    component = 2
-    control = 3
-    hier = 4
-    manager = 5
-    matrix = 6
-    motion = 7
-    setup = 8
+    cluster = 2
+    component = 3
+    control = 4
+    hier = 5
+    manager = 6
+    matrix = 7
+    motion = 8
+    setup = 9
 class Color(MayaEnumAttr):
     """Enum of colors in the autorigger"""
     none = -1

@@ -8,7 +8,7 @@ import maya.cmds as cmds
 
 from inspect import signature
 
-def get_component(container_node:nw.Container) -> "Component":
+def get_component(container_node:nw.Container) -> "_Component":
     """Gets component from a container
 
     Args:
@@ -23,7 +23,7 @@ def get_component(container_node:nw.Container) -> "Component":
         component_class = utils.string_to_class(container_node["componentClass"].value)
         return component_class(container_node)
 
-class Component():
+class _Component():
     """A Base class for all autorigging components
 
     Attributes:
@@ -148,7 +148,7 @@ class Component():
         if type(self).root_transform_name is not None:
             return self.input_node
     
-    def child_components(self, component_type:component_enum_data.ComponentType=None)->list["Component"]:
+    def child_components(self, component_type:component_enum_data.ComponentType=None)->list["_Component"]:
         """gets child components
 
         Args:
@@ -164,7 +164,7 @@ class Component():
             components = [get_component(container) for container in containers]
 
         return components
-    def get_all_descendants(self, component_type:component_enum_data.ComponentType=None)->list["Component"]:
+    def get_all_descendants(self, component_type:component_enum_data.ComponentType=None)->list["_Component"]:
         """Gets all descendent components
 
         Args:
@@ -266,7 +266,7 @@ class Component():
         )
 
     @classmethod
-    def create(cls, instance_name:Union[str, nw.Attr]=None, parent:Union["Component", nw.Container]=None, **kwargs):
+    def create(cls, instance_name:Union[str, nw.Attr]=None, parent:Union["_Component", nw.Container]=None, **kwargs):
         """Class method to create component
 
         Args:
@@ -319,7 +319,7 @@ class Component():
 
         return component_inst
     
-    def _pre_build(self, instance_name:Union[str, nw.Attr]=None, parent:Union["Component", nw.Container]=None, **kwargs):
+    def _pre_build(self, instance_name:Union[str, nw.Attr]=None, parent:Union["_Component", nw.Container]=None, **kwargs):
         """handles creation and connection of initial nodes and 
 
         Args:
@@ -455,7 +455,7 @@ class Component():
         for child_comp in self.child_components():
             child_comp.rename_nodes()
 
-    def get_parent_type_component(self, parent_type:component_enum_data.ComponentType, disable_warning=False)->"Component":
+    def get_parent_type_component(self, parent_type:component_enum_data.ComponentType, disable_warning=False)->"_Component":
         """given a type gets the closest parent component of that type
 
         Args:
@@ -474,7 +474,7 @@ class Component():
             if not disable_warning:
                 cmds.warning(f"parent component of type {parent_type.name} not found")
             return None
-    def get_mirror_component(self, container:nw.Container=None)->"Component":
+    def get_mirror_component(self, container:nw.Container=None)->"_Component":
         """Gets mirror component. Returns None if none found
         
         Returns:
@@ -561,7 +561,7 @@ class Component():
             return None
         else:
             return get_component(mirror_container)
-class _Hierarchy(Component):
+class _Hierarchy(_Component):
     """A Class meant to be inherited for all hierarchy classes. hierarchy in this
     case is defined as a chain of matricies 
 
@@ -592,38 +592,6 @@ class _Hierarchy(Component):
     _TER_VEC_X = "tertiaryVecX"
     _TER_VEC_Y = "tertiaryVecY"
     _TER_VEC_Z = "tertiaryVecZ"
-
-    @classmethod
-    def create(cls, 
-               instance_name:Union[str, nw.Attr]=None, 
-               parent:Component=None, 
-               input_xforms:Union[list[component_data.Xform], int]=None, 
-               source_component:Component=None, 
-               connect_parent_hier:bool=True, 
-               connect_axis_vecs:bool=True, 
-               control_color=None):        
-        return cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
-    def _pre_build(self, instance_name:Union[str, nw.Attr]=None, parent:Component=None, input_xforms:Union[list[component_data.Xform], int]=None,  source_component:Component=None, connect_parent_hier:bool=None, connect_axis_vecs:bool=True, **kwargs):
-        super()._pre_build(instance_name, parent)            
-
-        source_xforms = None
-        if source_component is not None and hasattr(source_component, "get_as_source_xforms"):
-            source_xforms = source_component.get_as_source_xforms(is_parent_component=utils.if_container_is_ancestor(child=self.container_node, ancestor=source_component.container_node))
-        
-        self._initialize_input_xform(input_xforms=input_xforms, source_xforms=source_xforms)
-        
-        #connect source component
-        if source_xforms is not None:
-            self._connect_source_component(source_component=source_component, source_xforms=source_xforms, connect_hierarchy=connect_parent_hier, connect_axis_vec=connect_axis_vecs)
-    def _override_build(self, control_color=None, **kwargs):
-        return super()._override_build(**kwargs)
-    def _post_build(self, **kwargs):
-        super()._post_build()
-        if type(self)._populate_output:
-            self._populate_output_xforms()
-        self.rename_nodes()
-        if type(self)._check_output:
-            self._check_output_xforms()
     
     def _input_attr_build_data(self):
         node_data = super()._input_attr_build_data()
@@ -648,6 +616,39 @@ class _Hierarchy(Component):
             component_data.AttrData(self._TER_VEC_Z, type_="double", parent=self._TER_VEC),
         )
         return node_data
+    
+    @classmethod
+    def create(cls, 
+               instance_name:Union[str, nw.Attr]=None, 
+               parent:_Component=None, 
+               input_xforms:Union[list[component_data.Xform], int]=None, 
+               source_component:"_Hierarchy"=None, 
+               connect_parent_hier:bool=True, 
+               connect_axis_vecs:bool=True, 
+               control_color=None):        
+        return cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
+    def _pre_build(self, instance_name:Union[str, nw.Attr]=None, parent:_Component=None, input_xforms:Union[list[component_data.Xform], int]=None,  source_component:"_Hierarchy"=None, connect_parent_hier:bool=None, connect_axis_vecs:bool=True, **kwargs):
+        super()._pre_build(instance_name, parent)            
+
+        source_xforms = None
+        if source_component is not None and hasattr(source_component, "get_as_source_xforms"):
+            source_xforms = source_component.get_as_source_xforms(is_parent_component=utils.if_container_is_ancestor(child=self.container_node, ancestor=source_component.container_node))
+        
+        self._initialize_input_xform(input_xforms=input_xforms, source_xforms=source_xforms)
+        
+        #connect source component
+        if source_xforms is not None:
+            self._connect_source_component(source_component=source_component, source_xforms=source_xforms, connect_parent_hier=connect_parent_hier, connect_axis_vec=connect_axis_vecs)
+    def _override_build(self, control_color=None, **kwargs):
+        return super()._override_build(**kwargs)
+    def _post_build(self, **kwargs):
+        super()._post_build()
+        if type(self)._populate_output:
+            self._populate_output_xforms()
+        self.rename_nodes()
+        if type(self)._check_output:
+            self._check_output_xforms()
+    
     #pre build
     def _initialize_input_xform(self, input_xforms:Union[list[component_data.Xform], int]=None, source_xforms:list=None):
         """initializes input xform
@@ -822,7 +823,7 @@ class _Hierarchy(Component):
             
         # add nodes to container
         self.container_node.add_nodes(*added_nodes)
-    def _connect_source_component(self, source_component:Component, source_xforms:list[component_data.Xform], connect_hierarchy:bool=True, connect_axis_vec:bool=True):
+    def _connect_source_component(self, source_component:"_Hierarchy", source_xforms:list[component_data.Xform], connect_parent_hier:bool=True, connect_axis_vec:bool=True):
         """Given a source Hier component connects it's hier output to this component's hier input
         
         Args:
@@ -845,9 +846,8 @@ class _Hierarchy(Component):
             )
 
         # if connect_hierarchy
-        if connect_hierarchy:
-            if hasattr(source_component, "get_hier_parent_attrs"):
-                self._set_hier_parent_attrs(source_component.get_hier_parent_attrs())
+        if connect_parent_hier:
+            self._set_hier_parent_attrs(source_component.get_hier_parent_attrs())
 
         # connecting axis vectors
         if connect_axis_vec:
@@ -937,6 +937,7 @@ class _Hierarchy(Component):
         Returns:
             component_data.HierParent:
         """
+
         return self.HIER_PARENT(self.container_node[self.HIER_DATA.HIER_PAR])
     def _set_hier_parent_attrs(self, hier_parent:component_data.HierParent, set_when_data_is_attr:bool=False):
         """Sets HierParent
@@ -1101,7 +1102,7 @@ class _Hierarchy(Component):
 
         Args:
             xform (nw.Attr): 
-
+            ancestor_hier_comp (_Hierarchy): ancestor to look for if its in xform_attr's ancestors
         Raises:
             RuntimeError: not an xform attribute
             RuntimeError: xform not part of a hierarchy component
@@ -1167,7 +1168,7 @@ class _Hierarchy(Component):
         
         return self.XFORM(xform_attr)
     def __get_hierarchy_ancestors(self, container:nw.Container):
-        """Gets highest ancestor that's of Hierarchy class/subclass
+        """Gets all ancestors that's of Hierarchy class/subclass
 
         Returns:
             list[nw.Container]:

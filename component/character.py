@@ -1,12 +1,13 @@
 import system.base_component as base_comp
 import component.anim as anim
+import component.motion as motion
 import system.component_enum_data as component_enum_data
 import utils.node_wrapper as nw
 import system.component_data as component_data
 import utils.utils as utils
 from typing import Union
 
-class _Character(base_comp.Component):
+class _Character(base_comp._Component):
     """Base class for character"""
     component_type = component_enum_data.ComponentType.character
     class_namespace = "char"
@@ -231,4 +232,4 @@ class SimpleBiped(_Character):
 
         for name, anim_inst in zip(["l_leg", "r_leg", "l_arm", "r_arm"], [l_leg, r_leg, l_arm, r_arm]):
             anim_inst.add_ik_space(space_name="root", space_src_data=self.root_component)
-            misc.VisualizeHier.create(instance_name=name, source_component=anim_inst, parent=self)
+            motion.Visualize.create(instance_name=name, source_component=anim_inst, parent=self)

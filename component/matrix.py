@@ -4,7 +4,7 @@ import system.component_enum_data as component_enum_data
 import utils.node_wrapper as nw
 import utils.utils as utils
 
-class _Matrix(base_comp.Component):
+class _Matrix(base_comp._Component):
     component_type = component_enum_data.ComponentType.matrix
     class_namespace = "matrix"
 
