@@ -3,7 +3,8 @@ import system.component_enum_data as component_enum_data
 from typing import Union
 import utils.utils as utils
 
-class NodeData():
+
+class NodeData:
     """Class to encapsulate node data to add attributes, publish attributes etc
 
     Attributes:
@@ -22,19 +23,18 @@ class NodeData():
 
     def extend_attr_data(self, *args):
         """Takes args and adds them to node_attr_dict checking for AttrData
-        
+
         Args:
             args (): list to add to node_attr_dict
         """
         if len(args) > 0 and isinstance(args[0], NodeData):
             args_dict = {key: data for key, data in args[0].node_attr_dict.items()}
         else:
-            
-            args_dict = {data.name:data for data in args if isinstance(data, AttrData)}
+            args_dict = {data.name: data for data in args if isinstance(data, AttrData)}
         self.node_attr_dict.update(args_dict)
 
-    def add_attrs_to_node(self, node:nw.Node):
-        """Takes node_attr_list AttrData and processes data to add, set value, 
+    def add_attrs_to_node(self, node: nw.Node):
+        """Takes node_attr_list AttrData and processes data to add, set value,
         and locked
 
         Args:
@@ -47,7 +47,10 @@ class NodeData():
         for data in self.node_attr_dict.values():
             data_added = False
             for index, saved_data in enumerate(data_list):
-                if "parent" in saved_data.add_attr_kwargs.keys() and saved_data.add_attr_kwargs["parent"] == data.name:
+                if (
+                    "parent" in saved_data.add_attr_kwargs.keys()
+                    and saved_data.add_attr_kwargs["parent"] == data.name
+                ):
                     data_list.insert(index, data)
                     data_added = True
                     break
@@ -56,14 +59,20 @@ class NodeData():
 
         for data in data_list:
             if data.do_add_attr:
-
                 if data.name in num_children_dict.keys():
-                    data.add_attr_kwargs["numberOfChildren"] = num_children_dict[data.name]
+                    data.add_attr_kwargs["numberOfChildren"] = num_children_dict[
+                        data.name
+                    ]
 
-                if data.type_ == "compound" and not data.name in num_children_dict.keys():
+                if (
+                    data.type_ == "compound"
+                    and data.name not in num_children_dict.keys()
+                ):
                     continue
 
-                node.add_attr(long_name=data.name, type=data.type_, **data.add_attr_kwargs)
+                node.add_attr(
+                    long_name=data.name, type=data.type_, **data.add_attr_kwargs
+                )
 
         # setting attrs and locking
         for data in data_list:
@@ -78,7 +87,7 @@ class NodeData():
             if data.keyable:
                 node[data.name].set_keyable(True)
 
-    def remove(self, *keys:str):
+    def remove(self, *keys: str):
         """Given keys removes attrData
 
         Args:
@@ -92,7 +101,7 @@ class NodeData():
                 raise KeyError(f"{key} not in node_attr_dict")
             self.node_attr_dict.pop(key)
 
-    def modify_add_attr_kwargs(self, key:str, **add_attr_kwargs):
+    def modify_add_attr_kwargs(self, key: str, **add_attr_kwargs):
         """given a key modifies the add_attr_kwargs
 
         Args:
@@ -114,7 +123,7 @@ class NodeData():
 
         self.node_attr_dict[key].add_attr_kwargs.update(add_attr_kwargs)
 
-    def publish_attr_data_attributes(self, node:nw.Node):
+    def publish_attr_data_attributes(self, node: nw.Node):
         """Takes node_attr_list AttrData and publishes attributes to it's parent
         container
 
@@ -126,12 +135,14 @@ class NodeData():
         if container_node is None:
             return
         for data in self.node_attr_dict.values():
-            if data.publish != False:
-                if node.has_attr(data.name):
-                    if isinstance(data.publish, str):
-                        container_node.publish_attr(node[data.name], data.publish)
-                    else:
-                        container_node.publish_attr(node[data.name], data.name)
+            if not data.publish:
+                continue
+            if not node.has_attr(data.name):
+                continue
+            if isinstance(data.publish, str):
+                container_node.publish_attr(node[data.name], data.publish)
+            else:
+                container_node.publish_attr(node[data.name], data.name)
 
     def __get_num_children_dict(self):
         """Takes the attribute data and adds up how many children each attribute
@@ -160,7 +171,7 @@ class NodeData():
             str:
         """
         return "\n".join([str(x) for x in self.node_attr_dict.values()])
-    
+
     def __iter__(self):
         """Iterates through AttrData
 
@@ -169,6 +180,7 @@ class NodeData():
         """
         for x in self.node_attr_dict:
             yield x
+
 
 class AttrData:
     """Class to define attributes
@@ -184,7 +196,18 @@ class AttrData:
         add_attr_kwargs (): kwarg of all addAttr fields
         do_add_attr(bool): variable to see if attr should be added
     """
-    def __init__(self, name:str, type_:str=None, value=None, publish=False, locked:bool=False, keyable:bool=False, alias:str=None, **add_attr_kwargs):
+
+    def __init__(
+        self,
+        name: str,
+        type_: str = None,
+        value=None,
+        publish=False,
+        locked: bool = False,
+        keyable: bool = False,
+        alias: str = None,
+        **add_attr_kwargs,
+    ):
         """Initializes AttrData
 
         Args:
@@ -206,7 +229,7 @@ class AttrData:
         self.do_add_attr = self.type_ is not None
 
         self.add_attr_kwargs = add_attr_kwargs
-        
+
         if not isinstance(self.type_, str) and self.type_ is not None:
             enum_class = component_enum_data.get_enum_item_class(self.type_)
             if enum_class is not None:
@@ -218,18 +241,19 @@ class AttrData:
                 index = component_enum_data.get_index_of_item(enum_data)
                 if index is not None:
                     self.value = index
-            
+
     def __str__(self):
         """Str of all the data and their values
 
         Returns:
             str:
         """
-        return f"name-\"{self.name}\" | type-{self.type_} | publish-{self.publish} | value-{self.value} | locked-{self.locked} | keyable-{self.keyable} | alias-{self.alias} | attr_kwargs-{self.add_attr_kwargs}"
+        return f'name-"{self.name}" | type-{self.type_} | publish-{self.publish} | value-{self.value} | locked-{self.locked} | keyable-{self.keyable} | alias-{self.alias} | attr_kwargs-{self.add_attr_kwargs}'
+
 
 class HierData:
     """Class with constants and checks for Hierarchy in Autorigger
-    
+
     Attributes:
         HIER_PARENT_MATRIX (str):
         HIER_PARENT_MATRIX (str):
@@ -252,15 +276,15 @@ class HierData:
         HIER_DATA_NAMES (list(str)):
         INPUT_DATA_NAMES (list(str)):
         OUTPUT_DATA_NAMES (list(str)):
-        """
+    """
 
     HIER_PAR = "hierParent"
-    HIER_PAR_MAT = "hierParentMatrix" 
-    HIER_PAR_INV_MAT = "hierParentInvMatrix" 
+    HIER_PAR_MAT = "hierParentMatrix"
+    HIER_PAR_INV_MAT = "hierParentInvMatrix"
     HIER_PAR_INIT_INV_MAT = "hierParentInitInvMatrix"
 
     IN_XFORM = "inXform"
-    IN_XFORM_NAME = "inXformName" 
+    IN_XFORM_NAME = "inXformName"
     IN_INIT_MAT = "inInitMatrix"
     IN_INIT_INV_MAT = "inInitInvMatrix"
     IN_WORLD_MAT = "inWorldMatrix"
@@ -275,18 +299,14 @@ class HierData:
     OUT_WORLD_INV_MAT = "outWorldInvMatrix"
     OUT_LOC_MAT = "outLocMatrix"
 
-    HIER_PAR_DATA_NAMES = [
-        HIER_PAR_MAT,
-        HIER_PAR_INV_MAT,
-        HIER_PAR_INIT_INV_MAT
-    ]
+    HIER_PAR_DATA_NAMES = [HIER_PAR_MAT, HIER_PAR_INV_MAT, HIER_PAR_INIT_INV_MAT]
     IN_DATA_NAMES = [
         IN_XFORM_NAME,
         IN_INIT_MAT,
         IN_INIT_INV_MAT,
         IN_WORLD_MAT,
         IN_WORLD_INV_MAT,
-        IN_LOC_MAT
+        IN_LOC_MAT,
     ]
     OUT_DATA_NAMES = [
         OUT_XFORM_NAME,
@@ -294,11 +314,11 @@ class HierData:
         OUT_INIT_INV_MAT,
         OUT_WORLD_MAT,
         OUT_WORLD_INV_MAT,
-        OUT_LOC_MAT
+        OUT_LOC_MAT,
     ]
 
     @classmethod
-    def is_input_enum(cls, enum:component_enum_data.IO):
+    def is_input_enum(cls, enum: component_enum_data.IO):
         """checks to see if it's input io
 
         Args:
@@ -307,11 +327,15 @@ class HierData:
         Returns:
             bool:
         """
-        if enum.value == component_enum_data.IO.input.value and enum.name == component_enum_data.IO.input.name:
+        if (
+            enum.value == component_enum_data.IO.input.value
+            and enum.name == component_enum_data.IO.input.name
+        ):
             return True
         return False
+
     @classmethod
-    def get_xform_names(cls, xform_type:component_enum_data.IO):
+    def get_xform_names(cls, xform_type: component_enum_data.IO):
         """Gets xform name given the type (input or output)
 
         Args:
@@ -324,8 +348,9 @@ class HierData:
             return cls.IN_DATA_NAMES
         else:
             return cls.OUT_DATA_NAMES
+
     @classmethod
-    def get_xform_parent_name(cls, xform_type:component_enum_data.IO):
+    def get_xform_parent_name(cls, xform_type: component_enum_data.IO):
         """Gets xform parent name given the type (input or output)
 
         Args:
@@ -340,7 +365,7 @@ class HierData:
             return cls.OUT_XFORM
 
     @classmethod
-    def is_hier_parent_attr(cls, attr:nw.Attr):
+    def is_hier_parent_attr(cls, attr: nw.Attr):
         """Checks if attribute is a hier attribute
 
         Args:
@@ -354,8 +379,9 @@ class HierData:
             if not attr.has_attr(attr_name):
                 return False
         return True
+
     @classmethod
-    def is_input_xform_attr(cls, attr:nw.Attr):
+    def is_input_xform_attr(cls, attr: nw.Attr):
         """Checks to see if attribute is an input xform attribute
 
         Args:
@@ -370,8 +396,9 @@ class HierData:
                 return False
 
         return True
+
     @classmethod
-    def is_output_xform_attr(cls, attr:nw.Attr):
+    def is_output_xform_attr(cls, attr: nw.Attr):
         """Checks to see if attribute is an output xform attribute
 
         Args:
@@ -386,10 +413,11 @@ class HierData:
                 return False
 
         return True
+
     @classmethod
-    def __gen_hier_node_data(cls, parent_name:str, attr_names, multi=True):
+    def __gen_hier_node_data(cls, parent_name: str, attr_names, multi=True):
         """Given a parent name and attribute names generates the Node Data to build
-        it. only sets attributes to string or matrix. (string if "Name" is in the 
+        it. only sets attributes to string or matrix. (string if "Name" is in the
         name)
 
         Args:
@@ -403,10 +431,11 @@ class HierData:
         for attr_name in attr_names:
             attr_type = "matrix"
             if attr_name.find("Name") >= 0:
-                attr_type ="string"
+                attr_type = "string"
             attr_data.append(AttrData(attr_name, type_=attr_type, parent=parent_name))
 
         return NodeData(*attr_data)
+
     @classmethod
     def get_hier_parent_data(cls):
         """Returns NodeData for hier
@@ -414,9 +443,12 @@ class HierData:
         Returns:
             NodeData:
         """
-        return cls.__gen_hier_node_data(cls.HIER_PAR, cls.HIER_PAR_DATA_NAMES, multi=False)
+        return cls.__gen_hier_node_data(
+            cls.HIER_PAR, cls.HIER_PAR_DATA_NAMES, multi=False
+        )
+
     @classmethod
-    def get_xform_data(cls, xform_type:component_enum_data.IO):
+    def get_xform_data(cls, xform_type: component_enum_data.IO):
         """Returns NodeData for an input xform
 
         Args:
@@ -428,26 +460,37 @@ class HierData:
         if cls.is_input_enum(xform_type):
             return cls.__gen_hier_node_data(cls.IN_XFORM, cls.IN_DATA_NAMES, multi=True)
         else:
-            return cls.__gen_hier_node_data(cls.OUT_XFORM, cls.OUT_DATA_NAMES, multi=True)
+            return cls.__gen_hier_node_data(
+                cls.OUT_XFORM, cls.OUT_DATA_NAMES, multi=True
+            )
 
-def xform_to_hier_parent(xform:"Xform"):
-        """Converts xform to hier_parent
 
-        Args:
-            xform (component_data.Xform): _description_
+def xform_to_hier_parent(xform: "Xform"):
+    """Converts xform to hier_parent
 
-        Returns:
-            _type_: _description_
-        """
-        return HierParent(matrix=xform.world_matrix, inv_matrix=xform.world_inv_matrix, init_inv_matrix=xform.init_inv_matrix)
+    Args:
+        xform (component_data.Xform): _description_
 
-class HierParent():
+    Returns:
+        _type_: _description_
+    """
+    return HierParent(
+        matrix=xform.world_matrix,
+        inv_matrix=xform.world_inv_matrix,
+        init_inv_matrix=xform.init_inv_matrix,
+    )
+
+
+class HierParent:
     """Encapsulates HierParent attribute"""
-    def __init__(self, 
-                 hier_parent_attr:nw.Attr=None, 
-                 matrix:Union[utils.Matrix, nw.Attr]=None, 
-                 inv_matrix:Union[utils.Matrix, nw.Attr]=None, 
-                 init_inv_matrix:Union[utils.Matrix, nw.Attr]=None):
+
+    def __init__(
+        self,
+        hier_parent_attr: nw.Attr = None,
+        matrix: Union[utils.Matrix, nw.Attr] = None,
+        inv_matrix: Union[utils.Matrix, nw.Attr] = None,
+        init_inv_matrix: Union[utils.Matrix, nw.Attr] = None,
+    ):
         """initializes hier parent. uses hier_parent first. otherwise uses given attributes
 
         Args:
@@ -471,7 +514,6 @@ class HierParent():
             if len(not_none_list) == 0:
                 raise RuntimeError(f"{self.__repr__()} not all fields can be None")
 
-
     @property
     def attrs(self):
         """list of all attributes
@@ -484,17 +526,22 @@ class HierParent():
     def __iter__(self):
         for attr in self.attrs:
             yield attr
-class Xform():
+
+
+class Xform:
     """Encapsulates Xform attribute"""
-    def __init__(self, 
-                    xform_attr:nw.Attr=None, 
-                    xform_type:component_enum_data.IO=component_enum_data.IO.input,
-                    xform_name:Union[str, nw.Attr]=None, 
-                    init_matrix:Union[utils.Matrix, nw.Attr]=None, 
-                    init_inv_matrix:Union[utils.Matrix, nw.Attr]=None, 
-                    world_matrix:Union[utils.Matrix, nw.Attr]=None, 
-                    world_inv_matrix:Union[utils.Matrix, nw.Attr]=None, 
-                    loc_matrix:Union[utils.Matrix, nw.Attr]=None):
+
+    def __init__(
+        self,
+        xform_attr: nw.Attr = None,
+        xform_type: component_enum_data.IO = component_enum_data.IO.input,
+        xform_name: Union[str, nw.Attr] = None,
+        init_matrix: Union[utils.Matrix, nw.Attr] = None,
+        init_inv_matrix: Union[utils.Matrix, nw.Attr] = None,
+        world_matrix: Union[utils.Matrix, nw.Attr] = None,
+        world_inv_matrix: Union[utils.Matrix, nw.Attr] = None,
+        loc_matrix: Union[utils.Matrix, nw.Attr] = None,
+    ):
         """Initializes Xform. tries to populate from xform_attr first, otherwise uses given attributes
 
         Args:
@@ -518,7 +565,7 @@ class Xform():
                 self.xform_type = component_enum_data.IO.output
             else:
                 raise RuntimeError(f"{xform_attr} is not an xform attribute")
-            
+
             if HierData.is_input_enum(self.xform_type):
                 self.xform_name = xform_attr[HierData.IN_XFORM_NAME]
                 self.init_matrix = xform_attr[HierData.IN_INIT_MAT]
@@ -546,6 +593,7 @@ class Xform():
             not_none_list = [x for x in self.attrs if x is not None]
             if len(not_none_list) == 0:
                 raise RuntimeError(f"{self.__repr__()} not all fields can be None")
+
     @property
     def attrs(self):
         """list of all attributes
@@ -553,7 +601,14 @@ class Xform():
         Returns:
             list:
         """
-        return [self.xform_name, self.init_matrix, self.init_inv_matrix, self.world_matrix, self.world_inv_matrix, self.loc_matrix]
+        return [
+            self.xform_name,
+            self.init_matrix,
+            self.init_inv_matrix,
+            self.world_matrix,
+            self.world_inv_matrix,
+            self.loc_matrix,
+        ]
 
     def __iter__(self):
         for attr in self.attrs:

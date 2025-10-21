@@ -7,12 +7,13 @@ from typing import Union
 import utils.node_wrapper as nw
 import utils.apiundo as apiundo
 
+
 def get_dep_node(node: Union[om2.MObject, om2.MPlug, str]):
-    """Converts to dependency node using input. if none found None 
+    """Converts to dependency node using input. if none found None
     will be returned
 
     Args:
-        node (Union[om2.MObject, om2.MPlug, str]): input to convert 
+        node (Union[om2.MObject, om2.MPlug, str]): input to convert
         to dependency node
 
     Returns:
@@ -23,7 +24,7 @@ def get_dep_node(node: Union[om2.MObject, om2.MPlug, str]):
     if isinstance(node, om2.MObject):
         if node.hasFn(om2.MFn.kDependencyNode):
             return om2.MFnDependencyNode(node)
-    
+
     # if can be added to a MSelectionList
     m_sel_list = om2.MSelectionList()
     if isinstance(node, str):
@@ -35,17 +36,18 @@ def get_dep_node(node: Union[om2.MObject, om2.MPlug, str]):
         return get_dep_node(node.node())
     elif isinstance(node, nw.Node):
         return node.get_dep_node()
-    
+
     # if not string or mplug
     else:
         return None
-    
+
     m_sel_list.add(node)
     dep_node = m_sel_list.getDependNode(0)
     return om2.MFnDependencyNode(dep_node)
 
+
 def get_child_plug(plug: om2.MPlug, attr: str):
-    """Returns the child plug of "plug" given a child attribute. 
+    """Returns the child plug of "plug" given a child attribute.
     returns all child plugs in a dict{attribute:plug} if "attr" is None
 
     Args:
@@ -57,26 +59,29 @@ def get_child_plug(plug: om2.MPlug, attr: str):
     """
     child_plugs = [plug.child(index) for index in range(plug.numChildren())]
     child_plugs = {x.name().rsplit(".", 1)[1]: x for x in child_plugs}
-    if attr == None:
+    if attr is None:
         return child_plugs
     if attr in child_plugs.keys():
         return child_plugs[attr]
     return None
 
-def get_plug(attr_parent: Union[om2.MPlug, om2.MFnDependencyNode, str],
-             attr: Union[om2.MPlug, str]): 
-    """Returns the given attribute as a plug. If attr_parent is 
-    provided it finds the attribute under that parent (either a 
+
+def get_plug(
+    attr_parent: Union[om2.MPlug, om2.MFnDependencyNode, str],
+    attr: Union[om2.MPlug, str],
+):
+    """Returns the given attribute as a plug. If attr_parent is
+    provided it finds the attribute under that parent (either a
     dependency node or another plug) as a plug
 
     Args:
         attr (Union[om2.MPlug, str]):
-        attr_parent (Union[om2.MPlug, om2.MFnDependencyNode, str], 
-        optional): parent of attribute. Defaults to None. When none 
+        attr_parent (Union[om2.MPlug, om2.MFnDependencyNode, str],
+        optional): parent of attribute. Defaults to None. When none
         find"s dependency node of attr
 
     Returns:
-        om2.MPlug: 
+        om2.MPlug:
     """
     if isinstance(attr, om2.MPlug):
         return attr
@@ -96,7 +101,7 @@ def get_plug(attr_parent: Union[om2.MPlug, om2.MFnDependencyNode, str],
             else:
                 return None
         return curr_plug
-    elif attr_parent == None:
+    elif attr_parent is None:
         attr_parent = get_dep_node(attr)
         attr_str = attr.split(".", 1)[1]
         return get_plug(attr_parent, attr_str)
@@ -109,7 +114,8 @@ def get_plug(attr_parent: Union[om2.MPlug, om2.MFnDependencyNode, str],
         if len(split_attr) == 1:
             return plug
         return get_plug(plug, split_attr[1])
-    
+
+
 def connect_plugs(src_plug: om2.MPlug, dest_plug: om2.MPlug):
     """Connects source plug to destination plug
 
@@ -117,19 +123,25 @@ def connect_plugs(src_plug: om2.MPlug, dest_plug: om2.MPlug):
         src_plug (om2.MPlug):
         dest_plug (om2.MPlug):
     """
+
     def redo(src_plug, dest_plug):
         dgMod = om2.MDGModifier()
         dgMod.connect(src_plug, dest_plug)
         dgMod.doIt()
+
     def undo(src_plug, dest_plug):
         dgMod = om2.MDGModifier()
         dgMod.disconnect(src_plug, dest_plug)
         dgMod.doIt()
+
+    use_connect_attr = False
     try:
         redo(src_plug, dest_plug)
         apiundo.commit(
-            redo = lambda: redo(src_plug, dest_plug),
-            undo = lambda: undo(src_plug, dest_plug)
+            redo=lambda: redo(src_plug, dest_plug),
+            undo=lambda: undo(src_plug, dest_plug),
         )
-    except:
+    except RuntimeError:
+        use_connect_attr = True
+    if use_connect_attr:
         cmds.connectAttr(str(src_plug), str(dest_plug), force=True)

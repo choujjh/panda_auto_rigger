@@ -5,6 +5,7 @@ import utils.om as utils_om
 import utils.apiundo as apiundo
 import re as re
 
+
 def wrap_node(node):
     """Gets the most specific node type ie. Node, Container
 
@@ -26,7 +27,9 @@ def wrap_node(node):
         elif cmds.nodeType(node) == "transform":
             node_class = Transform
     return node_class(node)
-def create_node(node_type:str, name:str=None):
+
+
+def create_node(node_type: str, name: str = None):
     """Creates node with given name
 
     Args:
@@ -39,6 +42,8 @@ def create_node(node_type:str, name:str=None):
     if name is None:
         return wrap_node(cmds.createNode(node_type))
     return wrap_node(cmds.createNode(node_type, name=name))
+
+
 def exists(node):
     """Checks to see if node still exists in the scene
 
@@ -49,6 +54,8 @@ def exists(node):
         bool: if node still exists
     """
     return cmds.objExists(str(node))
+
+
 def _snake_to_camel(snake_str):
     """Snake case to camel case
 
@@ -60,16 +67,18 @@ def _snake_to_camel(snake_str):
     """
     # Split the string by underscores
     if snake_str.find("fk") > 0:
-        snake_str = snake_str.replace("fk","FK")
+        snake_str = snake_str.replace("fk", "FK")
     if snake_str.find("ik") > 0:
-        snake_str = snake_str.replace("ik","IK")
-    components = snake_str.split('_')
+        snake_str = snake_str.replace("ik", "IK")
+    components = snake_str.split("_")
     # Capitalize the first letter of each component except the first one, and join them
-    camel_case_str = components[0] + ''.join(x.title() for x in components[1:])
+    camel_case_str = components[0] + "".join(x.title() for x in components[1:])
     return camel_case_str
-class Node():
-    """A class to wrap around OpenMaya objects (MObject, MFnDependencyNode) and 
-    provides useful functionality such as getting attributes, and other 
+
+
+class Node:
+    """A class to wrap around OpenMaya objects (MObject, MFnDependencyNode) and
+    provides useful functionality such as getting attributes, and other
     data not simply extracted from said OpenMaya objects
 
     Attributes:
@@ -78,6 +87,7 @@ class Node():
         type_ (str): node type
         mobject (maya.api.OpenMaya.MObject): MObject
     """
+
     def __init__(self, node):
         """Initializes wrapped node getting the MFnDependencyNode
 
@@ -85,7 +95,7 @@ class Node():
             Node (Node, str, OpenMaya.MObject, OpenMaya.MPlug): input to get MFnDependencyNode
 
         Returns:
-            Node: built node 
+            Node: built node
         """
         if isinstance(node, str):
             if not exists(node):
@@ -94,9 +104,9 @@ class Node():
         self._dep_node = utils_om.get_dep_node(node)
         self.__attr_cache = {}
         self.__full_attr_list = None
-    
+
     # properties
-    @property 
+    @property
     def full_name(self):
         """Full name of node including all parents with |
 
@@ -105,33 +115,36 @@ class Node():
         """
         # return self._dep_node_.absoluteName()
         return self._dep_node.uniqueName()
-    @property 
+
+    @property
     def name(self):
         """Returns full name of node with no parent names included
 
         Returns:
-            str: name of node    
+            str: name of node
         """
         if self.full_name.find("|") != -1:
             return self.full_name.rsplit("|", 1)[1]
         return self.full_name
+
     @property
     def type_(self):
         """Returns type of node
 
         Returns:
-            str: node type    
+            str: node type
         """
         return self._dep_node.typeName
+
     @property
     def mobject(self):
         """Returns MObject of this node using the MFnDependencyNode
 
         Returns:
-            maya.api.OpenMaya.MObject: 
+            maya.api.OpenMaya.MObject:
         """
         return self._dep_node.object()
-    
+
     def has_attr(self, attr_name):
         """Checks if node has attribute
 
@@ -141,7 +154,7 @@ class Node():
         try:
             self.__getitem__(attr_name)
             return True
-        except:
+        except RuntimeError:
             return False
 
     def add_attr(self, long_name="", **kwargs):
@@ -153,7 +166,7 @@ class Node():
             kwarg: added cmds.addAttr arguments
 
         Returns:
-            Node: built node 
+            Node: built node
         """
         if "parent" in kwargs.keys():
             if isinstance(kwargs["parent"], Attr):
@@ -161,19 +174,28 @@ class Node():
             else:
                 kwargs["parent"] = str(kwargs["parent"])
 
-        attr_type=""
+        attr_type = ""
         if "type" in kwargs.keys():
-            attr_type=kwargs["type"]
+            attr_type = kwargs["type"]
             kwargs.pop("type")
         if "longName" in kwargs.keys():
             kwargs.pop("longName")
-        
+
         # dataType attribute
         if attr_type in ["string", "nurbsCurve", "nurbsSurface", "mesh", "matrix"]:
             kwargs["dataType"] = attr_type
 
         # attributeType attribute
-        elif attr_type in ["compound", "message", "double", "long", "bool", "enum", "double3", "double2"]:
+        elif attr_type in [
+            "compound",
+            "message",
+            "double",
+            "long",
+            "bool",
+            "enum",
+            "double3",
+            "double2",
+        ]:
             kwargs["attributeType"] = attr_type
 
         new_kwargs = {}
@@ -202,21 +224,40 @@ class Node():
         """
         connections = set()
         if as_src:
-            connection_list = cmds.listConnections(str(self), connections=True, source=True, destination=False, plugs=True)
+            connection_list = cmds.listConnections(
+                str(self), connections=True, source=True, destination=False, plugs=True
+            )
             if connection_list is not None:
-                connection_list = [(Attr(x), Attr(y, self)) for x, y in zip(connection_list[1::2], connection_list[::2])]
+                connection_list = [
+                    (Attr(x), Attr(y, self))
+                    for x, y in zip(connection_list[1::2], connection_list[::2])
+                ]
                 connections.update(connection_list)
         if as_dest:
-            connection_list = cmds.listConnections(str(self), connections=True, source=False, destination=True, plugs=True)
+            connection_list = cmds.listConnections(
+                str(self), connections=True, source=False, destination=True, plugs=True
+            )
             if connection_list is not None:
-                connection_list = [(Attr(x, self), Attr(y)) for x, y in zip(connection_list[::2], connection_list[1::2])]
+                connection_list = [
+                    (Attr(x, self), Attr(y))
+                    for x, y in zip(connection_list[::2], connection_list[1::2])
+                ]
                 connections.update(connection_list)
         if self.type_ == "container":
             self_container = Container(self)
             published_attrs = self_container.get_published_attrs()
 
-            connections = [x for x in connections if x[0] not in published_attrs and x[1] not in published_attrs]
-        connections = [x for x in connections if x[0].node.node_type != "hyperLayout" and x[1].node.node_type != "hyperLayout"]
+            connections = [
+                x
+                for x in connections
+                if x[0] not in published_attrs and x[1] not in published_attrs
+            ]
+        connections = [
+            x
+            for x in connections
+            if x[0].node.node_type != "hyperLayout"
+            and x[1].node.node_type != "hyperLayout"
+        ]
         return connections
 
     def _check_node_in_attr_list(self, attribute_list):
@@ -287,7 +328,7 @@ class Node():
         if container is not None:
             return Container(container)
         return container
-    
+
     def get_top_level_attribute_list(self, re_cache=False):
         """Gets a list of top level attr for the node (no child attributes included)
 
@@ -298,37 +339,40 @@ class Node():
             list(Attr): the list of attributes that are the top level
         """
 
-        
         if self.__full_attr_list is None or re_cache:
             attr_count = self._dep_node.attributeCount()
             attributes = [self._dep_node.attribute(x) for x in range(attr_count)]
-            self.__full_attr_list = [Attr(self._dep_node.findPlug(x, False), self) for x in attributes]
+            self.__full_attr_list = [
+                Attr(self._dep_node.findPlug(x, False), self) for x in attributes
+            ]
 
             for attr in self.__full_attr_list:
                 attr_name = attr.attr_name
                 self.__attr_cache[attr_name] = attr
 
-        self.__full_attr_list = [attr for attr in self.__full_attr_list if attr.parent is None]
+        self.__full_attr_list = [
+            attr for attr in self.__full_attr_list if attr.parent is None
+        ]
 
         return self.__full_attr_list
-    
+
     def get_dep_node(self):
         """Returns Dependency Node
 
         Returns:
-            OpenMaya.MFnDependencyNode: 
+            OpenMaya.MFnDependencyNode:
         """
         return self._dep_node
-    
+
     def get_attr_cache(self):
         """Returns attribute cache
 
         Returns:
-            dict: 
+            dict:
         """
         return self.__attr_cache
 
-    def rename(self, new_name:str):
+    def rename(self, new_name: str):
         """Renames wrapped node
 
         Args:
@@ -338,7 +382,7 @@ class Node():
         self._dep_node.setName(new_name)
         apiundo.commit(
             undo=lambda: self._dep_node.setName(curr_name),
-            redo=lambda: self._dep_node.setName(new_name)
+            redo=lambda: self._dep_node.setName(new_name),
         )
 
     # operator overloads
@@ -349,6 +393,7 @@ class Node():
             str:
         """
         return self.full_name
+
     def __getitem__(self, attr: str):
         """Gets the attr of a node wrapped in the Attr class
 
@@ -359,17 +404,19 @@ class Node():
             Attr: returns Attr class of node's attribute
         """
         attr_instance = None
-        
+
         error = False
         try:
             attr_instance = self._get_cached_attr(attr)
-        except:
-            error=True
+
+        except RuntimeError:
+            error = True
+
         if error:
-            error_str = f"{self.name} does not have attribute \"{attr}\""
-            raise RuntimeError(error_str)
+            raise AttributeError(f'{self.name} does not have attribute "{attr}"')
 
         return attr_instance
+
     def __setitem__(self, attr: str, new_value):
         """Sets the attribute"s value of a given node
 
@@ -390,33 +437,36 @@ class Node():
             Attr: returns Attr class of nodes attribute
         """
         if attr not in self.__attr_cache.keys():
-            self.__attr_cache[attr] = Attr(utils_om.get_plug(
-                self._dep_node, attr), self)
+            self.__attr_cache[attr] = Attr(
+                utils_om.get_plug(self._dep_node, attr), self
+            )
         return self.__attr_cache[attr]
-    
+
     def __eq__(self, other):
-        """Returns True if the other object is of type Node and the 
+        """Returns True if the other object is of type Node and the
         other's plug matches self's plug
 
         Args:
-            other (Any): 
+            other (Any):
 
         Returns:
-            bool: 
+            bool:
         """
         if isinstance(other, Node):
             if str(self) == str(other):
                 return True
-            
+
         return False
+
     def __hash__(self):
-        """Hash value using objects full name
-        """
+        """Hash value using objects full name"""
         return hash(self.full_name)
+
+
 class Container(Node):
-    """A class to wrap around OpenMaya objects (MObject, MFnDependencyNode) 
-    specifically for container objects and provides useful functionality 
-    such as getting attributes, and other data not simply extracted from 
+    """A class to wrap around OpenMaya objects (MObject, MFnDependencyNode)
+    specifically for container objects and provides useful functionality
+    such as getting attributes, and other data not simply extracted from
     said OpenMaya objects. Derived from Node
 
     Attributes:
@@ -425,6 +475,7 @@ class Container(Node):
         type (str): node type
         mobject (maya.api.OpenMaya.MObject): MObject
     """
+
     def __init__(self, node):
         """Initializes wrapped node getting the MFnDependencyNode
 
@@ -432,7 +483,7 @@ class Container(Node):
             Node (Node, str, OpenMaya.MObject, OpenMaya.MPlug): input to get MFnDependencyNode
 
         Returns:
-            Node: built container node 
+            Node: built container node
         """
         super(Container, self).__init__(node)
 
@@ -488,8 +539,7 @@ class Container(Node):
             cmds.lockNode(str(container), lock=False, lockUnpublished=False)
 
     def __enter__(self):
-        """Unlocks when keyword with is used
-        """
+        """Unlocks when keyword with is used"""
         self.unlock()
         return self
 
@@ -497,7 +547,14 @@ class Container(Node):
         """Locked when exited"""
         self.lock()
 
-    def add_nodes(self, *args, include_network=False, include_hierarchy_above=False, include_hierarchy_below=False, force=False):
+    def add_nodes(
+        self,
+        *args,
+        include_network=False,
+        include_hierarchy_above=False,
+        include_hierarchy_below=False,
+        force=False,
+    ):
         """Adds nodes to container
 
         Args:
@@ -510,11 +567,23 @@ class Container(Node):
         args = [str(x) for x in args]
         conversionNodes = []
         for node in args:
-            node_conversionNodes = cmds.listConnections(node, source=True, destination=True)
-            node_conversionNodes = cmds.ls(node_conversionNodes, type='unitConversion', long=True)
+            node_conversionNodes = cmds.listConnections(
+                node, source=True, destination=True
+            )
+            node_conversionNodes = cmds.ls(
+                node_conversionNodes, type="unitConversion", long=True
+            )
             conversionNodes.extend(node_conversionNodes)
         args.extend(conversionNodes)
-        cmds.container(str(self), addNode=args, edit=True, iha=include_hierarchy_above, ihb=include_hierarchy_below, inc=include_network, force=force)
+        cmds.container(
+            str(self),
+            addNode=args,
+            edit=True,
+            iha=include_hierarchy_above,
+            ihb=include_hierarchy_below,
+            inc=include_network,
+            force=force,
+        )
 
     def get_container_node(self):
         """Overidden get container command
@@ -522,7 +591,7 @@ class Container(Node):
         Returns:
             Node: parent Container. None if no container found
         """
-        containers = cmds.container(str(self),  query=True, parentContainer=True)
+        containers = cmds.container(str(self), query=True, parentContainer=True)
         if containers is not None:
             return Container(containers[0])
         return containers
@@ -540,12 +609,14 @@ class Container(Node):
 
         remove_list = args.copy()
         for node in args:
-            curr_remove_nodes = cmds.listRelatives(node, allDescendents=all_descendents, fullPath=True)
+            curr_remove_nodes = cmds.listRelatives(
+                node, allDescendents=all_descendents, fullPath=True
+            )
             if curr_remove_nodes is not None:
                 remove_list.extend(curr_remove_nodes)
         cmds.container(str(self), edit=True, removeNode=remove_list, force=True)
 
-    def publish_attr(self, attr:Union["Attr", str], attr_bind_name:str):
+    def publish_attr(self, attr: Union["Attr", str], attr_bind_name: str):
         """Publish attributes to container
 
         Args:
@@ -558,9 +629,10 @@ class Container(Node):
         else:
             node = wrap_node(attr.split(".", 1)[0])
 
-        
         if node in self.get_nodes():
-            cmds.container(str(self), edit=True, publishAndBind=[str(attr), attr_bind_name])
+            cmds.container(
+                str(self), edit=True, publishAndBind=[str(attr), attr_bind_name]
+            )
         else:
             raise RuntimeError(f"{node} is not a node of container {str(self)}")
 
@@ -573,7 +645,7 @@ class Container(Node):
         cmds.container(str(self), edit=True, unbindAndUnpublish=str(attr))
 
     def get_published_attr_map(self):
-        """Get published attributes in a map with the key being the attribute name 
+        """Get published attributes in a map with the key being the attribute name
         and value being the Attrs
 
         Returns:
@@ -584,7 +656,7 @@ class Container(Node):
         if m_object.hasFn(om2.MFn.kContainer):
             mfn_container = om2.MFnContainerNode(m_object)
             plug_list, attr_list = mfn_container.getPublishedPlugs()
-            return {x:Attr(y, None) for x, y in zip(attr_list, plug_list)}
+            return {x: Attr(y, None) for x, y in zip(attr_list, plug_list)}
         return {}
 
     def get_published_attrs(self):
@@ -609,13 +681,18 @@ class Container(Node):
         container_nodes = self.get_nodes()
         connection_list = []
 
-        external_connection_list = cmds.container(str(self), query=True, connectionList=True)
+        external_connection_list = cmds.container(
+            str(self), query=True, connectionList=True
+        )
         if external_connection_list is None:
             external_connection_list = []
         for attr in external_connection_list:
             curr_attr = Attr(attr)
 
-            if curr_attr.type_ not in ["compound", "double3", "double2"] and curr_attr.__len__() is not None:
+            if (
+                curr_attr.type_ not in ["compound", "double3", "double2"]
+                and curr_attr.__len__() is not None
+            ):
                 curr_attr = curr_attr[0]
 
             input_connections = curr_attr.get_src_connections()
@@ -687,6 +764,8 @@ class Container(Node):
                 if parent_attr in publish_attr_map.keys():
                     return publish_attr_map[parent_attr][back_attrs]
         return super().__getitem__(attr)
+
+
 class Transform(Node):
     def get_shapes(self):
         """Get object shapes
@@ -698,6 +777,7 @@ class Transform(Node):
         if shapes is None:
             return []
         return [wrap_node(shape) for shape in shapes]
+
     def freeze_transforms(self):
         """Freezes the transforms of the given node"""
         transform_locked_attrs = self.get_transform_locked_attrs()
@@ -705,11 +785,14 @@ class Transform(Node):
         for locked_attrs in transform_locked_attrs:
             locked_attrs.set_locked(False)
         scale = self["scale"].value
-        
+
         cmds.makeIdentity(str(self), apply=True)
 
         if scale[0] * scale[1] * scale[2] < 0:
-            shapes = [wrap_node(x) for x in cmds.listRelatives(str(self), shapes=True, fullPath=True)]
+            shapes = [
+                wrap_node(x)
+                for x in cmds.listRelatives(str(self), shapes=True, fullPath=True)
+            ]
             for x in shapes:
                 if x.type_ == "nurbsSurface":
                     cmds.reverseSurface(str(x))
@@ -723,21 +806,35 @@ class Transform(Node):
 
         # self["rotatePivot"] = [0.0, 0.0, 0.0]
         # self["scalePivot"] = [0.0, 0.0, 0.0]
+
     def get_transform_locked_attrs(self):
-        """Get's the transforms important attributes. Filtered by if the attribute 
+        """Get's the transforms important attributes. Filtered by if the attribute
         is locked
 
         Returns:
             list(Attr): Returns list of all attrs that are locked
         """
-        transform_attrs = ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "visibility"]
+        transform_attrs = [
+            "tx",
+            "ty",
+            "tz",
+            "rx",
+            "ry",
+            "rz",
+            "sx",
+            "sy",
+            "sz",
+            "visibility",
+        ]
 
         return [self[attr] for attr in transform_attrs if self[attr].is_locked()]
-class Attr():
-    """A class to wrap around MPlug object and 
-    provides useful functionality such as getting child attributes, and other 
+
+
+class Attr:
+    """A class to wrap around MPlug object and
+    provides useful functionality such as getting child attributes, and other
     data not simply extracted from said OpenMaya objects
-    
+
     Attributes:
         __attr_data_map__ (dict): map to get or set the attribute
         dep_node (Node): node that"s the node of this plug
@@ -747,24 +844,32 @@ class Attr():
         short_name(str): short name of attribute
         type_(str): plug"s attribute type
         value(Any): value that is stored in attribute
-        index(int): the index of the attribute. returns -1 if not a child of 
+        index(int): the index of the attribute. returns -1 if not a child of
         another attribute
         parent(Attr): returns the parent of the attribute. returns None if
         not a child of another attribute
     """
-    
 
     __attr_data_map = {
-        "kDoubleAngleAttribute":    {"get": lambda x: x.asMAngle().asDegrees(),     "set": lambda x, y: x.setDouble(om2.MAngle(y, 2).asRadians())},
-        "kDoubleLinearAttribute":   {"get": lambda x: x.asDouble(),                 "set": lambda x, y: x.setDouble(y)},
-        "kEnumAttribute":           {"get": lambda x: x.asInt(),                    "set": lambda x, y: x.setInt(y)},
-        #"kMatrixAttribute":         {"get": None,                                   "set": None},
-        #"kMessageAttribute":        {"get": None,                                   "set": None},
-        "kNumericAttribute":        {"get": lambda x: x.asDouble(),                 "set": lambda x, y: x.setDouble(y)},
-        #"kTypedAttribute":          {"get": None,                                   "set": None},
+        "kDoubleAngleAttribute": {
+            "get": lambda x: x.asMAngle().asDegrees(),
+            "set": lambda x, y: x.setDouble(om2.MAngle(y, 2).asRadians()),
+        },
+        "kDoubleLinearAttribute": {
+            "get": lambda x: x.asDouble(),
+            "set": lambda x, y: x.setDouble(y),
+        },
+        "kEnumAttribute": {"get": lambda x: x.asInt(), "set": lambda x, y: x.setInt(y)},
+        # "kMatrixAttribute":         {"get": None,                                   "set": None},
+        # "kMessageAttribute":        {"get": None,                                   "set": None},
+        "kNumericAttribute": {
+            "get": lambda x: x.asDouble(),
+            "set": lambda x, y: x.setDouble(y),
+        },
+        # "kTypedAttribute":          {"get": None,                                   "set": None},
     }
-    
-    def __init__(self, attr: Union[om2.MPlug, str], node:Node = None):
+
+    def __init__(self, attr: Union[om2.MPlug, str], node: Node = None):
         """Initializes Attr data by getting MPlug and setting it's Node
 
         Args:
@@ -774,12 +879,12 @@ class Attr():
         self.node = None
         if node is not None:
             self.node = wrap_node(node)
-        
+
         self.plug = utils_om.get_plug(None, attr)
         if self.plug is None:
-            cmds.error(f"{attr} attribute\"s plug not found")
+            cmds.error(f'{attr} attribute"s plug not found')
 
-        if self.node == None:
+        if self.node is None:
             self.node = wrap_node(Node(self.plug))
 
     @property
@@ -790,6 +895,7 @@ class Attr():
             str:
         """
         return f"{self.node.full_name}.{self.attr_name}"
+
     @property
     def attr_name(self):
         """Name of the attribute without its node name ie. {attr}
@@ -798,6 +904,7 @@ class Attr():
             str:
         """
         return str(self.plug).split(".", 1)[1]
+
     @property
     def short_name(self):
         """Attribute's short name
@@ -806,6 +913,7 @@ class Attr():
             str:
         """
         return str(self.plug.partialName())
+
     @property
     def type_(self):
         """Returns attribute type name
@@ -816,6 +924,7 @@ class Attr():
         if cmds.getAttr(str(self), type=True) == "TdataCompound":
             return "compound"
         return cmds.getAttr(str(self), type=True)
+
     @property
     def value(self):
         """Gets value stored in attribute
@@ -824,6 +933,7 @@ class Attr():
             Any:
         """
         return self._get_value(self.plug)
+
     @property
     def index(self):
         """Returns index of attribute. -1 if not a child attribute
@@ -835,18 +945,21 @@ class Attr():
             return self.plug.logicalIndex()
         elif self.plug.isChild:
             parent_plug = self.plug.parent()
-            child_plug_list = [parent_plug.child(x) for x in 
-                               range(parent_plug.numChildren())]
-            child_attr_dict = {x.name().split(".", 1)[1]: i for i, x in 
-                               enumerate(child_plug_list)}
+            child_plug_list = [
+                parent_plug.child(x) for x in range(parent_plug.numChildren())
+            ]
+            child_attr_dict = {
+                x.name().split(".", 1)[1]: i for i, x in enumerate(child_plug_list)
+            }
             return child_attr_dict[self.attr_name]
         return -1
+
     @property
     def parent(self):
         """Gets parent attribute. None if no parent found
 
         Returns:
-            Attr: 
+            Attr:
         """
         if self.plug.isElement:
             return Attr(self.plug.array(), self.node)
@@ -854,7 +967,7 @@ class Attr():
             return Attr(self.plug.parent(), self.node)
         else:
             return None
-        
+
     # helper functions
     @staticmethod
     def _plug_attr_type(plug: om2.MPlug):
@@ -867,7 +980,10 @@ class Attr():
             str:
         """
         return plug.attribute().apiTypeStr
-    def disconnect(self, children:bool=False, as_src:bool=False, as_dest:bool=True):
+
+    def disconnect(
+        self, children: bool = False, as_src: bool = False, as_dest: bool = True
+    ):
         """Disconnects attributes
 
         Args:
@@ -875,17 +991,19 @@ class Attr():
             asSource (bool, optional): if true disconnects everything it's connected to. Defaults to False.
             asDestination (bool, optional): if true disconnects everything connected to it. Defaults to True.
         """
+
         def redo(connection_pairs):
             dgMod = om2.MDGModifier()
             for connection in connection_pairs:
                 dgMod.disconnect(connection[0], connection[1])
             dgMod.doIt()
+
         def undo(connection_pairs):
             dgMod = om2.MDGModifier()
             for connection in connection_pairs:
                 dgMod.connect(connection[0], connection[1])
             dgMod.doIt()
-        
+
         connection_pairs = []
         if children and self.has_children():
             for child_attr in self:
@@ -901,7 +1019,7 @@ class Attr():
         if as_dest:
             for attr in self.get_connections(False, True):
                 connection_pairs.append((attr.plug, self.plug))
-        
+
         if connection_pairs == []:
             cmds.warning(f"nothing to disconnect from {str(self.plug)}")
             return
@@ -910,12 +1028,11 @@ class Attr():
             self.set_locked(False)
         redo(connection_pairs)
         apiundo.commit(
-            redo = lambda: redo(connection_pairs),
-            undo = lambda: undo(connection_pairs)
+            redo=lambda: redo(connection_pairs), undo=lambda: undo(connection_pairs)
         )
         if locked:
             self.set_locked(True)
-    
+
     def has_src_connection(self):
         """Returns if attribute has source connection
 
@@ -933,7 +1050,7 @@ class Attr():
             OpenMaya.MPlug:
         """
         return self.plug
-    
+
     def get_connections(self, as_src: bool, as_dest: bool):
         """Get connections of attr
 
@@ -945,59 +1062,64 @@ class Attr():
             om2.MPlug:
         """
         return [Attr(x, None) for x in self.plug.connectedTo(as_dest, as_src)]
+
     def get_src_connection(self):
         """Gets a list of all the Attr that are connected to this Attr
 
         Returns:
-            list(Attr): 
+            list(Attr):
         """
         connection_list = self.get_connections(False, True)
         if connection_list == []:
             return None
         else:
             return connection_list[0]
+
     def get_dest_connections(self):
-        """Gets a list of all the Attr that this Attr is connected to (this 
+        """Gets a list of all the Attr that this Attr is connected to (this
         Attr being the source)
 
         Returns:
-            list(Attr): 
+            list(Attr):
         """
         return self.get_connections(True, False)
+
     # functions
     def set(self, value):
-        """Tries to set value of plug but resets to previous values if 
+        """Tries to set value of plug but resets to previous values if
         unsuccessful
 
         Args:
             value ():
         """
         orig_val = self.value
+
         def do(plug, value):
             if isinstance(value, Attr):
                 value = value.value
             self._set_value(plug, value)
-        
+
         try:
             do(self.plug, value)
         except ValueError:
             self._set_value(self.plug, orig_val)
             cmds.warning(f"set info, mismatch {str(self.plug)} was not changed")
-        except:
-            self._set_value(self.plug, orig_val)
-            cmds.warning(f"error occured when setting {str(self.plug)} was not changed")
-        
+        # except:
+        #     self._set_value(self.plug, orig_val)
+        #     cmds.warning(f"error occured when setting {str(self.plug)} was not changed")
+
         apiundo.commit(
-            redo = lambda: do(self.plug, value),
-            undo = lambda: do(self.plug, orig_val)
+            redo=lambda: do(self.plug, value), undo=lambda: do(self.plug, orig_val)
         )
+
     def set_locked(self, lock):
         """Sets attribute lock
 
         Args:
-            lock (bool): 
+            lock (bool):
         """
         cmds.setAttr(str(self), lock=lock)
+
     def is_locked(self):
         """Returns if attribute is locked
 
@@ -1006,6 +1128,7 @@ class Attr():
         """
 
         return cmds.getAttr(str(self), lock=True)
+
     def set_keyable(self, keyable):
         """Sets attribute's keyable
 
@@ -1013,6 +1136,7 @@ class Attr():
             keyable (bool):
         """
         cmds.setAttr(str(self), edit=True, keyable=keyable)
+
     def is_keyable(self):
         """Returns if attribute is keyable
 
@@ -1020,14 +1144,16 @@ class Attr():
             bool:
         """
         return cmds.getAttr(str(self), keyable=True)
-    def set_alias(self, alias:str):
+
+    def set_alias(self, alias: str):
         """Sets attribute's alias
 
         Args:
             alias (str): new alias for the attribute
         """
         cmds.aliasAttr(alias, self.name)
-    def has_attr(self, child_attr:str):
+
+    def has_attr(self, child_attr: str):
         """Returns if it has attribute
 
         Args:
@@ -1039,11 +1165,12 @@ class Attr():
         try:
             self[child_attr]
             return True
-        except:
+        except AttributeError:
             return False
+
     def _set_value(self, plug: om2.MPlug, value):
         """Sets value on plug. is recurrsive when plug is has children or
-        elements. 
+        elements.
         Limitation if a list if given that's smaller than the
         number of values in the node's array then it won't be resized and
         the old values stay
@@ -1074,11 +1201,13 @@ class Attr():
         elif attr_type == "string":
             cmds.setAttr(str(self), value, type="string")
         elif attr_type == "matrix":
-            cmds.setAttr(str(self), value, type='matrix')
+            cmds.setAttr(str(self), value, type="matrix")
         elif attr_type == "enum":
             if isinstance(value, str):
                 if not hasattr(self, "enum_list"):
-                    self.enum_list = cmds.attributeQuery(self.short_name, node=str(self.node), listEnum=True)[0].split(":")
+                    self.enum_list = cmds.attributeQuery(
+                        self.short_name, node=str(self.node), listEnum=True
+                    )[0].split(":")
                 index = self.enum_list.index(value)
                 if index != -1:
                     value = index
@@ -1102,10 +1231,13 @@ class Attr():
         Returns:
         """
         from utils.utils import Vector, Matrix
+
         # try:
         return_value = None
         if plug.isArray:
-            plug_list = [plug.elementByLogicalIndex(i) for i in range(plug.numElements())]
+            plug_list = [
+                plug.elementByLogicalIndex(i) for i in range(plug.numElements())
+            ]
             return_value = [self._get_value(x) for x in plug_list]
         elif plug.isCompound:
             plug_list = [plug.child(i) for i in range(plug.numChildren())]
@@ -1121,20 +1253,21 @@ class Attr():
             return_value = Matrix(return_value)
 
         return return_value
+
     def __eq__(self, other):
-        """Returns True if the other object is of type Attr and the 
+        """Returns True if the other object is of type Attr and the
         other's plug matches self's plug
 
         Args:
-            other (Any): 
+            other (Any):
 
         Returns:
-            bool: 
+            bool:
         """
         if isinstance(other, Attr):
             return str(self) == str(other)
         return False
-    
+
     def __hash__(self):
         """Hash of attribute
 
@@ -1142,7 +1275,7 @@ class Attr():
             str:
         """
         return hash(str(self))
-    
+
     # Operator overloads connections and disconnections as well as get item
     def __str__(self):
         """Return self.name
@@ -1151,7 +1284,7 @@ class Attr():
             str:
         """
         return self.name
-    
+
     def __rshift__(self, other):
         """Tries to connect this attr to the other. connects to locked attributes
 
@@ -1174,6 +1307,7 @@ class Attr():
                 other.set_locked(True)
         else:
             cmds.error("{other} not of type Attr")
+
     def __lshift__(self, other):
         """Tries to connect the other attr to this attr. connects to locked attributes
 
@@ -1196,6 +1330,7 @@ class Attr():
                 self.set_locked(True)
         else:
             cmds.error(f"{other} not of type Attr")
+
     def __invert__(self):
         """Disconnects anything to this attribute with this attribute
         as the destination
@@ -1205,6 +1340,7 @@ class Attr():
         """
         self.disconnect()
         return self
+
     def __getitem__(self, attr):
         """Get a child attribute of this attr
 
@@ -1215,6 +1351,8 @@ class Attr():
             Attr:
         """
         full_attr_name = self.attr_name
+        error_str = None
+        error_type = None
         try:
             if self.plug.isArray:
                 full_attr_name = f"{full_attr_name}[{attr}]"
@@ -1226,10 +1364,15 @@ class Attr():
 
             plug = utils_om.get_plug(self.plug, attr)
             return Attr(plug, self.node)
-        except:
-            error_str = f"{self.node} does not have attribute \"{self.short_name}.{attr}\""
-            raise RuntimeError(error_str)
-    
+        except AttributeError:
+            error_str = (
+                f'{self.node} does not have attribute "{self.short_name}.{attr}"'
+            )
+            error_type = AttributeError
+
+        if error_str is not None:
+            raise error_type(error_str)
+
     def __setitem__(self, attr: str, new_value):
         """Gets the new attribute and sets a child attribute"s value to new value
 
@@ -1243,8 +1386,7 @@ class Attr():
         attr.set(new_value)
 
     def has_children(self):
-        """Returns if attribute has children
-        """
+        """Returns if attribute has children"""
         return self.plug.isArray or self.plug.isCompound
 
     def __len__(self):
@@ -1261,6 +1403,7 @@ class Attr():
             # return self.plug.numElements()
         elif self.plug.isCompound:
             return self.plug.numChildren()
+
     # Iterator overloads
     def __iter__(self):
         """Gets the iterator object
@@ -1269,16 +1412,16 @@ class Attr():
             TypeError: if attribute is not a compound or array
 
         Returns:
-            AttrIter: 
+            AttrIter:
         """
         if not self.has_children():
             raise TypeError("attribute is not of type compound or array")
         for index in range(self.__len__()):
             yield self.__getitem__(index)
-            
+
     # Math Operator Overloads
     def _base_math_operators(self, x, y, function):
-        """Takes 2 inputs, extracts the values and preforms the given 
+        """Takes 2 inputs, extracts the values and preforms the given
         function on those 2 values
 
         Args:
@@ -1287,13 +1430,14 @@ class Attr():
             function (func): function to compute value
 
         Returns:
-            Any: 
+            Any:
         """
         if isinstance(x, Attr):
             x = x.value
         if isinstance(y, Attr):
             y = y.value
         return function(x, y)
+
     def __add__(self, other):
         """Add the value of the object with the object on the right
         side of the operator
@@ -1302,6 +1446,7 @@ class Attr():
             value: calculated value
         """
         return self._base_math_operators(self, other, lambda x, y: x + y)
+
     def __radd__(self, other):
         """Add the value of the object with the object on the left
         side of the operator
@@ -1310,6 +1455,7 @@ class Attr():
             value: calculated value
         """
         return self._base_math_operators(self, other, lambda x, y: y + x)
+
     def __sub__(self, other):
         """Subtract the value of the object with the object on the right
         side of the operator
@@ -1318,6 +1464,7 @@ class Attr():
             value: calculated value
         """
         return self._base_math_operators(self, other, lambda x, y: x - y)
+
     def __rsub__(self, other):
         """Subtract the value of the object with the object on the left
         side of the operator
@@ -1326,6 +1473,7 @@ class Attr():
             value: calculated value
         """
         return self._base_math_operators(self, other, lambda x, y: y - x)
+
     def __mul__(self, other):
         """Multiply the value of the object with the object on the right
         side of the operator
@@ -1334,6 +1482,7 @@ class Attr():
             value: calculated value
         """
         return self._base_math_operators(self, other, lambda x, y: x * y)
+
     def __rmul__(self, other):
         """Multiply the value of the object with the object on the left
         side of the operator
@@ -1342,6 +1491,7 @@ class Attr():
             value: calculated value
         """
         return self._base_math_operators(self, other, lambda x, y: y * x)
+
     def __truediv__(self, other):
         """Divides the value of the object with the object on the left
         side of the operator
@@ -1350,6 +1500,7 @@ class Attr():
             value: calculated value
         """
         return self._base_math_operators(self, other, lambda x, y: x / y)
+
     def __rtruediv__(self, other):
         """Divides the value of the object with the object on the right
         side of the operator
@@ -1359,20 +1510,18 @@ class Attr():
         """
         return self._base_math_operators(self, other, lambda x, y: y / x)
 
-    # TODO: 
-        # node
-            # get_children ----------------
-            # get_parent ----------------
-            # has_attr ----------------
-            
-            # get non default value
-        
-            # node functions
-        
-        # skin cluster
+    # TODO:
+    # node
+    # get_children ----------------
+    # get_parent ----------------
+    # has_attr ----------------
+
+    # get non default value
+
+    # node functions
+
+    # skin cluster
     # TODO
-        # nodes
-            # set attr should be easier
-            # error check __getItem__
-
-
+    # nodes
+    # set attr should be easier
+    # error check __getItem__

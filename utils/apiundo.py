@@ -77,7 +77,7 @@ def install():
 
     """
 
-    cmds.loadPlugin(__file__.replace('.pyc', '.py'), quiet=True)
+    cmds.loadPlugin(__file__.replace(".pyc", ".py"), quiet=True)
 
 
 def uninstall():
@@ -91,7 +91,7 @@ def uninstall():
     # therefore cannot be unloaded until flushed.
     cmds.flushUndo()
 
-    cmds.unloadPlugin(os.path.basename(__file__.replace('.pyc', '.py')))
+    cmds.unloadPlugin(os.path.basename(__file__.replace(".pyc", ".py")))
 
 
 def reinstall():
@@ -105,7 +105,7 @@ def reinstall():
 
     uninstall()
     sys.modules.pop(__name__)
-    module = __import__(__name__, globals(), locals(), ['*'], -1)
+    module = __import__(__name__, globals(), locals(), ["*"], -1)
     module.install()
     return module
 
@@ -132,10 +132,7 @@ class _apiUndo(om.MPxCommand):
 
 def initializePlugin(plugin):
     """Plug-in boilerplate"""
-    om.MFnPlugin(plugin).registerCommand(
-        command,
-        _apiUndo
-    )
+    om.MFnPlugin(plugin).registerCommand(command, _apiUndo)
 
 
 def uninitializePlugin(plugin):
