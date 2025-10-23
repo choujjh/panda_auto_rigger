@@ -13,6 +13,15 @@ class _Control(base_comp._Component):
 
     Attributes:
         can_set_color (bool): can set color of component
+        lock_transform (bool): locks transform of control
+
+        _IN_OFF_MAT (str): str constant "offsetMatrix"
+        _IN_HAS_CLR (str): str constant "hasColor"
+        _IN_CLR (str): str constant "color"
+        _OUT_WS_MAT (str): str constant "worldMatrix"
+        _OUT_LOC_MAT (str): str constant "localMatrix"
+        _OUT_WS_INV_MAT (str): str constant "worldInverseMatrix"
+        _CNTNR_CNTRL_MAP (str): str constant "controlMap"
     """
 
     component_type = component_enum_data.ComponentType.control
@@ -35,15 +44,38 @@ class _Control(base_comp._Component):
         instance_name: Union[str, nw.Attr] = None,
         parent: Union[base_comp._Component, nw.Container] = None,
         axis_vec: component_enum_data.AxisEnum = None,
-        build_t=[0.0, 0.0, 0.0],
-        build_r=[0.0, 0.0, 0.0],
-        build_s=[1.0, 1.0, 1.0],
-        color=None,
+        build_t: Union[list, utils.Vector, float] = [0.0, 0.0, 0.0],
+        build_r: Union[list, utils.Vector, float] = [0.0, 0.0, 0.0],
+        build_s: Union[list, utils.Vector, float] = [1.0, 1.0, 1.0],
+        color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
         xform_map_index: int = None,
     ):
-        return cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
+        """Class method to create component
+
+        Args:
+            instance_name (Union[str, nw.Attr], optional): name of component. Defaults to None.
+            parent (Union[base_comp._Component, nw.Container], optional): Defaults to None.
+            axis_vec (component_enum_data.AxisEnum, optional): vector by which the control will be pointed. Defaults to None.
+            build_t (Union[list, utils.Vector, float], optional): build translate will have freeze applied to it. Defaults to [0.0, 0.0, 0.0].
+            build_r (Union[list, utils.Vector, float], optional): build translate will have freeze applied to it. Defaults to [0.0, 0.0, 0.0].
+            build_s (Union[list, utils.Vector, float], optional): build translate will have freeze applied to it. Defaults to [1.0, 1.0, 1.0].
+            color (Union[ list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node ], optional): Defaults to None.
+            xform_map_index (int, optional): map index connected to parent container. Defaults to None.
+
+        Returns:
+            _Control:
+        """
+        return cls._kwarg_create(**cls._process_locals(kwarg_dict=locals()))
 
     def _input_attr_build_data(self) -> component_data.NodeData:
+        """Defines all the added, published, or modified attributes for the
+        input node. inherits all input node data from _Component.
+
+        Returns:
+            comp_data.NodeData:
+        """
         node_data = super()._input_attr_build_data()
 
         node_data.extend_attr_data(
@@ -70,25 +102,41 @@ class _Control(base_comp._Component):
         return node_data
 
     def _container_attr_build_data(self):
+        """Defines all the added, or modified attributes for the
+        container node. inherits all container node data from _Component.
+
+        Returns:
+            comp_data.NodeData:
+        """
         node_data = super()._container_attr_build_data()
         node_data.extend_attr_data(
             component_data.AttrData(name=self._CNTNR_CNTRL_MAP, type_="message"),
         )
         return node_data
 
-    def _pre_build(self, instance_name=None, parent=None, **kwargs):
-        super()._pre_build(instance_name, parent, **kwargs)
-
     def _override_build(
         self,
         axis_vec: component_enum_data.AxisEnum = None,
-        color=None,
-        build_t=[0.0, 0.0, 0.0],
-        build_r=[0.0, 0.0, 0.0],
-        build_s=[1.0, 1.0, 1.0],
+        color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
+        build_t: Union[list, utils.Vector, float] = [0.0, 0.0, 0.0],
+        build_r: Union[list, utils.Vector, float] = [0.0, 0.0, 0.0],
+        build_s: Union[list, utils.Vector, float] = [1.0, 1.0, 1.0],
         xform_map_index: int = None,
         **kwargs,
     ):
+        """Creates control, shapes for control, and applies the build t r s then
+        freezes control. maps it to parent container using xform_map_index
+
+        Args:
+            axis_vec (component_enum_data.AxisEnum, optional): _description_. Defaults to None.
+            color (Union[ list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node ], optional): Defaults to None.
+            build_t (Union[list, utils.Vector, float], optional): Defaults to [0.0, 0.0, 0.0].
+            build_r (Union[list, utils.Vector, float], optional): Defaults to [0.0, 0.0, 0.0].
+            build_s (Union[list, utils.Vector, float], optional): Defaults to [1.0, 1.0, 1.0].
+            xform_map_index (int, optional): _description_. Defaults to None.
+        """
         # set visibility to hidden in channel box
         self.transform_node["visibility"].set_keyable(False)
 
@@ -126,15 +174,12 @@ class _Control(base_comp._Component):
         if color is not None:
             self.apply_color(color)
 
-    def _create_shapes(self) -> list:
+    def _create_shapes(self) -> list[nw.Transform]:
         """Creates shapes and returns a list of the shapes transforms. these
         shapes will be parented to the transform node later
 
-        Args:
-            axis_vec(vector, component_enum_data.AxisEnum):
-
         Returns:
-            list(nw.Node):
+            list[nw.Transform]:
         """
         raise NotImplementedError
 
@@ -240,7 +285,7 @@ class _Control(base_comp._Component):
             else:
                 utils.apply_display_color(nodes=[self.transform_node], color=rgb)
 
-    def promote_attr_to_keyable(self, attr: nw.Attr, name=None, **kwargs):
+    def promote_attr_to_keyable(self, attr: nw.Attr, name: str = None, **kwargs):
         """Turns attribute given into a controllable attribute by the control
 
         Args:
@@ -250,6 +295,14 @@ class _Control(base_comp._Component):
         """
 
         def get_num_min_max_kwargs(attr: nw.Attr):
+            """get min and max kwargs
+
+            Args:
+                attr (nw.Attr): _description_
+
+            Returns:
+                _type_: _description_
+            """
             # has max and mins
             kwargs = {}
             if attr_type in ["double", "long"]:
@@ -331,9 +384,9 @@ class _Control(base_comp._Component):
                 "mesh",
                 "message",
             ]:
-                utils.set_connect_attr_data(attr=transform_node[name], data=attr)
+                utils.set_connect_attr_data(attr=attr, data=transform_node[name])
             else:
-                attr_connection[0] >> transform_node[name]
+                attr_connection[0] << transform_node[name]
                 transform_node[name] >> ~attr
 
         # has add attr kwargs
@@ -354,13 +407,15 @@ class _Control(base_comp._Component):
         """This code is ran after the control is swapped. meant to be overriden"""
 
     def replace_control(
-        self, replace_component: Union[type, "_Control", nw.Transform], color=None
+        self,
+        replace_component: Union[type, "_Control", nw.Transform],
+        color: Union[component_enum_data.Color, list, nw.Node] = None,
     ):
         """Replaces control with replace_component. could be component type, control, and transform
 
         Args:
             replace_component (Union[type, Control, nw.Transform]): _description_
-            color (any, optional): Defaults to None.
+            color ( Union[component_enum_data.Color, list, nw.Node], optional): Defaults to None.
 
         Raises:
             RuntimeError: no replacement transform found
@@ -430,6 +485,11 @@ class Circle(_Control):
     """A circle nurbs curve control"""
 
     def _create_shapes(self):
+        """Creates circle wire shape
+
+        Returns:
+            list[mw.Transform]:
+        """
         return [cmds.circle(normal=component_enum_data.AxisEnum.y.value)[0]]
 
 
@@ -439,6 +499,11 @@ class Axis(_Control):
     can_set_color = False
 
     def _create_shapes(self):
+        """Creates axis wire shapes
+
+        Returns:
+            list[nw.Transform]:
+        """
         x_axis = nw.wrap_node(
             cmds.curve(degree=1, point=[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
         )
@@ -469,6 +534,11 @@ class Box(_Control):
     """A box nurbs curve control"""
 
     def _create_shapes(self):
+        """Creates box wire shapes
+
+        Returns:
+            list[nw.Transform]:
+        """
         x = 1.0
         y = 1.0
         z = 1.0
@@ -501,6 +571,11 @@ class Diamond(_Control):
     """A diamond nurbs surface control"""
 
     def _create_shapes(self):
+        """Creates diamond nurbs surface shape
+
+        Returns:
+            list[nw.Transform]:
+        """
         diamond = cmds.sphere(sections=4, spans=2, degree=1)[0]
         return [diamond]
 
@@ -509,6 +584,11 @@ class DiamondWire(_Control):
     """A diamond nurbs curve control"""
 
     def _create_shapes(self):
+        """Creates diamond wire shape
+
+        Returns:
+            list[nw.Transform]:
+        """
         diamond = cmds.curve(
             degree=1,
             point=[
@@ -534,6 +614,11 @@ class Gear(_Control):
     """A gear nurbs curve control"""
 
     def _create_shapes(self):
+        """Creates gear wire shapes
+
+        Returns:
+            list[nw.Transform]:
+        """
         outer_shape = cmds.curve(
             degree=3,
             point=[
@@ -662,6 +747,11 @@ class Gimbal(_Control):
     can_set_color = False
 
     def _create_shapes(self):
+        """Creates gimbal wire shapes
+
+        Returns:
+            list[nw.Transform]:
+        """
         circle1 = nw.wrap_node(cmds.circle(normal=[1.0, 0.0, 0.0])[0])
         circle2 = nw.wrap_node(cmds.circle(normal=[0.0, 1.0, 0.0])[0])
         circle3 = nw.wrap_node(cmds.circle(normal=[0.0, 0.0, 1.0])[0])
@@ -686,6 +776,11 @@ class Pyramid4(_Control):
     """A pyramid nurbs curve control"""
 
     def _create_shapes(self):
+        """Creates pyramid wire shape
+
+        Returns:
+            list[nw.Transform]:
+        """
         pyramid = cmds.curve(
             degree=1,
             point=[
@@ -708,6 +803,11 @@ class Sphere(_Control):
     """A sphere nurbs surface control"""
 
     def _create_shapes(self):
+        """Creates sphere nurbs surface shape
+
+        Returns:
+            list[nw.Transform]:
+        """
         sphere = cmds.sphere(axis=component_enum_data.AxisEnum.y.value)[0]
         return [sphere]
 
@@ -727,18 +827,36 @@ class Locator(_Control):
         xform_map_index=None,
         **kwargs,
     ):
+        """Creates control, shapes for control, and applies the build t r s then
+        freezes control. maps it to parent container using xform_map_index. also calls post_swap_cleanup to setup scaling
+
+        Args:
+            axis_vec (component_enum_data.AxisEnum, optional): _description_. Defaults to None.
+            color (Union[ list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node ], optional): Defaults to None.
+            build_t (Union[list, utils.Vector, float], optional): Defaults to [0.0, 0.0, 0.0].
+            build_r (Union[list, utils.Vector, float], optional): Defaults to [0.0, 0.0, 0.0].
+            build_s (Union[list, utils.Vector, float], optional): Defaults to [1.0, 1.0, 1.0].
+            xform_map_index (int, optional): _description_. Defaults to None.
+        """
         super()._override_build(
             axis_vec, color, build_t, build_r, build_s, xform_map_index, **kwargs
         )
         self.post_swap_cleanup()
 
     def _create_shapes(self):
+        """Creates locator shape
+
+        Returns:
+            list[nw.Transform]:
+        """
         return [cmds.spaceLocator()[0]]
 
     def pre_swap_cleanup(self):
+        """unpublishes local scale attribute"""
         self.container_node.unpublish_attr(self.container_node[self._LOC_SCALE])
 
     def post_swap_cleanup(self):
+        """publishes locator.localScaleX attribute and connects it to y and z"""
         loc_shape = self.transform_node.get_shapes()[0]
         loc_shape["localScaleX"] >> loc_shape["localScaleY"]
         loc_shape["localScaleX"] >> loc_shape["localScaleZ"]
@@ -748,7 +866,14 @@ class Locator(_Control):
 
 
 class DebugMirror(_Control):
+    """Debugging used to check mirroring of controls"""
+
     def _create_shapes(self):
+        """Creates debug wire shape
+
+        Returns:
+            list[nw.Transform]:
+        """
         shape = cmds.curve(
             degree=1, point=[[0, 0, 0], [1, 0, 0], [2, 1, 1], [0, 0, 1], [0, 0, 0]]
         )

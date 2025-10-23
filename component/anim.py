@@ -13,7 +13,31 @@ import maya.cmds as cmds
 
 
 class _Anim(base_comp._Hierarchy):
-    """Base class for anim autorigging components. Derived from Hierarchy"""
+    """Base class for anim autorigging components. Derived from Hierarchy. creates setup component in pre build
+
+
+    Attributes:
+        __setup_component_type (component.setup.Setup):
+        _setup_component_type (component.setup.Setup): setup component type that will be used to be created. gets __setup_component_type from inherited class
+        _setup_component (component.setup.Setup): setup component instance
+        _motion_component (component.motion.MotionWrapper): motion component that contains all other motion components
+        _cluster_component (component.misc.Cluster):
+        _settings_component (component.control._Control):
+        _settings_guide_component (component.control._Control):
+        _mirror_dest_component (component.anim._Anim): mirror destination component
+        _mirror_src_component (component.anim._Anim): mirror source component
+
+        _IN_PRM_AXIS (str): str constant "primaryAxis"
+        _IN_SEC_AXIS (str): str constant "secondaryAxis"
+        _HIER_SIDE (str): str constant "hierSide"
+        _IN_SET_XFORM_FOLLOW_INDEX (str): str constant "settingXformFollowIndex"
+        _IN_SET_CNTRL_LOC_MAT (str): str constant "inputSettingCntrlLocMatrix"
+        _IN_HAS_PARENT_HIER (str): str constant "hasHierParent"
+        _IN_MOT_VIS (str): str constant "motionVisibility"
+        _IN_SETUP_VIS (str): str constant "setupVisibility"
+        _OUT_SET_CNTRL_LOC_MAT (str): str constant "outputSettingCntrlLocMatrix"
+        _MIRROR_AXIS (str): str constant "mirrorAxis"
+    """
 
     component_type = component_enum_data.ComponentType.anim
     __setup_component_type = utils.string_to_class("component.setup.Setup")
@@ -30,15 +54,6 @@ class _Anim(base_comp._Hierarchy):
     _IN_SETUP_VIS = "setupVisibility"
     _OUT_SET_CNTRL_LOC_MAT = "outputSettingCntrlLocMatrix"
     _MIRROR_AXIS = "mirrorAxis"
-
-    @property
-    def _output_buffer_node(self):
-        """Returns setup component
-
-        Returns:
-            setup.Setup:
-        """
-        return self._get_node_from_key("output_buffer_node", as_component=True)
 
     @property
     def _setup_component_type(self):
@@ -128,6 +143,12 @@ class _Anim(base_comp._Hierarchy):
             return node
 
     def _input_attr_build_data(self):
+        """Defines all the added, published, or modified attributes for the
+        input node. inherits all input node data from _Hierarchy
+
+        Returns:
+            comp_data.NodeData:
+        """
         node_data = super()._input_attr_build_data()
         node_data.extend_attr_data(
             component_data.AttrData(
@@ -171,6 +192,12 @@ class _Anim(base_comp._Hierarchy):
         return node_data
 
     def _output_attr_build_data(self):
+        """Defines all the added, published, or modified attributes for the
+        output node. inherits all output node data from _Hierarchy
+
+        Returns:
+            comp_data.NodeData:
+        """
         node_data = super()._output_attr_build_data()
         node_data.extend_attr_data(
             component_data.AttrData(
@@ -179,7 +206,16 @@ class _Anim(base_comp._Hierarchy):
         )
         return node_data
 
-    def get_short_namespace(self, instance_name=None):
+    def get_short_namespace(self, instance_name: str = None):
+        """Generates namespace without parentent namespace attached. takes into
+        account hier side as well as instance name this time
+
+        Args:
+            instance_name (str, optional): generates with new instance name. used to generate namespaces to check. Defaults to None
+
+        Returns:
+            str:
+        """
         format_str = self.container_node[self._BLD_INST_FORM].value
 
         # instance_name
@@ -207,7 +243,7 @@ class _Anim(base_comp._Hierarchy):
     def create(
         cls,
         instance_name: Union[str, nw.Attr] = None,
-        parent: base_comp._Component = None,
+        parent: Union[base_comp._Component, nw.Container] = None,
         input_xforms: Union[int, tuple] = 0,
         primary_axis: component_enum_data.AxisEnum = component_enum_data.AxisEnum.x,
         secondary_axis: component_enum_data.AxisEnum = component_enum_data.AxisEnum.y,
@@ -217,16 +253,43 @@ class _Anim(base_comp._Hierarchy):
         source_component: base_comp._Hierarchy = None,
         connect_parent_hier: bool = True,
         connect_axis_vecs: bool = True,
-        control_color=None,
-        setup_color=None,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
+        setup_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
         hier_side: component_enum_data.CharacterSide = component_enum_data.CharacterSide.none,
+        **kwargs,
     ):
-        return cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
+        """Class method to create component
+
+
+        Args:
+            instance_name (Union[str, nw.Attr], optional): name of component.. Defaults to None.
+            parent (Union[base_comp._Component, nw.Container], optional): Defaults to None.
+            input_xforms (Union[int, tuple], optional): input xforms to initialize component with.. Defaults to 0.
+            primary_axis (component_enum_data.AxisEnum, optional): Defaults to component_enum_data.AxisEnum.x.
+            secondary_axis (component_enum_data.AxisEnum, optional): Defaults to component_enum_data.AxisEnum.y.
+            add_settings_cntrl (bool, optional): Defaults to True.
+            mirror_source (_Anim, optional): mirror source component. Defaults to None.
+            mirror_axis (component_enum_data.AxisEnum, optional): Defaults to component_enum_data.AxisEnum.x.
+            source_component (base_comp._Hierarchy, optional):  source component to connect hierarchy from. Defaults to None.
+            connect_parent_hier (bool, optional): Defaults to True.
+            connect_axis_vecs (bool, optional): Defaults to True.
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
+            setup_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
+            hier_side (component_enum_data.CharacterSide, optional): Defaults to component_enum_data.CharacterSide.none.
+
+        Returns:
+            _Anim:
+        """
+        return cls._kwarg_create(**cls._process_locals(kwarg_dict=locals()))
 
     def _pre_build(
         self,
         instance_name: Union[str, nw.Attr] = None,
-        parent: base_comp._Component = None,
+        parent: Union[base_comp._Component, nw.Container] = None,
         input_xforms: Union[int, tuple] = 0,
         hier_side: component_enum_data.CharacterSide = component_enum_data.CharacterSide.none,
         primary_axis: component_enum_data.AxisEnum = component_enum_data.AxisEnum.x,
@@ -234,13 +297,35 @@ class _Anim(base_comp._Hierarchy):
         add_settings_cntrl: bool = True,
         mirror_source: "_Anim" = None,
         mirror_axis: component_enum_data.AxisEnum = component_enum_data.AxisEnum.x,
-        setup_color=None,
-        control_color=None,
+        setup_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
         source_component: base_comp._Hierarchy = None,
         connect_parent_hier: bool = None,
         connect_axis_vecs: bool = True,
         **kwargs,
     ):
+        """Handles creation and connection of initial nodes. adds setup, motion, and cluster component
+
+        Args:
+            instance_name (Union[str, nw.Attr], optional): name of component.. Defaults to None.
+            parent (Union[base_comp._Component, nw.Container], optional): Defaults to None.
+            input_xforms (Union[int, tuple], optional): input xforms to initialize component with.. Defaults to 0.
+            hier_side (component_enum_data.CharacterSide, optional): Defaults to component_enum_data.CharacterSide.none.
+            primary_axis (component_enum_data.AxisEnum, optional): Defaults to component_enum_data.AxisEnum.x.
+            secondary_axis (component_enum_data.AxisEnum, optional): Defaults to component_enum_data.AxisEnum.y.
+            add_settings_cntrl (bool, optional): Defaults to True.
+            mirror_source (_Anim, optional): mirror source component. Defaults to None.
+            mirror_axis (component_enum_data.AxisEnum, optional): Defaults to component_enum_data.AxisEnum.x.
+            setup_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.x
+            source_component (base_comp._Hierarchy, optional):  source component to connect hierarchy from. Defaults to None.
+            connect_parent_hier (bool, optional): Defaults to True.
+            connect_axis_vecs (bool, optional): Defaults to True.
+        """
         # calling super
         super()._pre_build(
             instance_name=instance_name,
@@ -316,6 +401,9 @@ class _Anim(base_comp._Hierarchy):
         self.rename_nodes()
 
     def _post_build(self, **kwargs):
+        """Build cleanup. sets build to true renames nodes, also tries to connect
+        xform matricies and names. then raises warnings for any xform attribute not connected
+        """
         for index, mot_xform in self._motion_component.get_xform_attrs(
             xform_type=self.IO_ENUM.output
         ).items():
@@ -353,7 +441,7 @@ class _Anim(base_comp._Hierarchy):
                 color=setup_color,
             )
             settings_init.promote_attr_to_keyable(
-                self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX]
+                self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX],
             )
             settings_init.transform_node["translate"] = [1, 1, 1]
             utils.map_to_container(
@@ -600,11 +688,25 @@ class _Anim(base_comp._Hierarchy):
 
     # hooking
     def hook(self, hook_src_data, hook_mirror_component: bool = True):
+        """hooks xform to hier_parent. finds appropriate output xform and source hier parent
+
+        Args:
+            hook_src_data (any):
+            hook_mirror_component (bool, optional): hooks mirror component. Defaults to True.
+        """
         super().hook(hook_src_data, hook_mirror_component)
         if not self.container_node[self._IN_HAS_PARENT_HIER].has_src_connection():
             self.container_node[self._IN_HAS_PARENT_HIER] = True
 
     def unhook(self, unhook_mirror_component: bool = True):
+        """unhook source hier parent.
+
+        Args:
+            unhook_mirror_component (bool, optional): Defaults to True.
+
+        Returns:
+            component_data.HierParent:
+        """
         hier_parent = super().unhook(unhook_mirror_component)
         if not self.container_node[self._IN_HAS_PARENT_HIER].has_src_connection():
             self.container_node[self._IN_HAS_PARENT_HIER] = False
@@ -616,9 +718,6 @@ class _Anim(base_comp._Hierarchy):
 
         Args:
             mirror_source (Anim, optional): Defaults to None.
-
-        Raises:
-            NotImplementedError: mirror not currently implemented
         """
         char_component = self.get_parent_type_component(
             component_enum_data.ComponentType.character, disable_warning=True
@@ -705,12 +804,14 @@ class _Anim(base_comp._Hierarchy):
             )
 
     def __create_motion_component(self):
+        """Creates motion component and maps it to anim container"""
         motion_inst = motion.MotionWrapper.create(
             source_component=self._setup_component, parent=self
         )
         utils.map_to_container(motion_inst.container_node, "motion_container")
 
     def __create_clust_component(self):
+        """creates cluster component and maps it to anim container"""
         clust_inst = misc.Cluster.create(
             source_component=self._setup_component, parent=self
         )
@@ -718,7 +819,11 @@ class _Anim(base_comp._Hierarchy):
 
 
 class SimpleLimb(_Anim):
-    """Simple Limb Anim component (has a merged fk, ik, and a settings control). used in conjunction with simpleLimb setup"""
+    """Simple Limb Anim component (has a merged fk, ik, and a settings control). used in conjunction with simpleLimb setup
+
+    Attributes:
+        _ik_component (component.motion.SimpleIK): ik component
+    """
 
     _setup_component_type = setup.SimpleLimb
     _max_num_xforms = (3, 3)
@@ -736,7 +841,7 @@ class SimpleLimb(_Anim):
     def create(
         cls,
         instance_name: Union[str, nw.Attr] = None,
-        parent: base_comp._Component = None,
+        parent: Union[base_comp._Component, nw.Container] = None,
         input_xforms: Union[int, tuple] = 0,
         primary_axis: component_enum_data.AxisEnum = component_enum_data.AxisEnum.x,
         secondary_axis: component_enum_data.AxisEnum = component_enum_data.AxisEnum.y,
@@ -746,22 +851,59 @@ class SimpleLimb(_Anim):
         source_component: base_comp._Hierarchy = None,
         connect_parent_hier: bool = True,
         connect_axis_vecs: bool = True,
-        control_color=None,
-        setup_color=None,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
+        setup_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
         hier_side: component_enum_data.CharacterSide = component_enum_data.CharacterSide.none,
         num_twist_xforms: int = 3,
         counter_rot_root: bool = True,
         **kwargs,
     ):
-        return cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
+        """Class method to create component
+
+        Args:
+            instance_name (Union[str, nw.Attr], optional): name of component.. Defaults to None.
+            parent (Union[base_comp._Component, nw.Container], optional): Defaults to None.
+            input_xforms (Union[int, tuple], optional): input xforms to initialize component with.. Defaults to 0.
+            primary_axis (component_enum_data.AxisEnum, optional): Defaults to component_enum_data.AxisEnum.x.
+            secondary_axis (component_enum_data.AxisEnum, optional): Defaults to component_enum_data.AxisEnum.y.
+            add_settings_cntrl (bool, optional): Defaults to True.
+            mirror_source (_Anim, optional): mirror source component. Defaults to None.
+            mirror_axis (component_enum_data.AxisEnum, optional): Defaults to component_enum_data.AxisEnum.x.
+            source_component (base_comp._Hierarchy, optional):  source component to connect hierarchy from. Defaults to None.
+            connect_parent_hier (bool, optional): Defaults to True.
+            connect_axis_vecs (bool, optional): Defaults to True.
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
+            setup_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
+            hier_side (component_enum_data.CharacterSide, optional): Defaults to component_enum_data.CharacterSide.none.
+            num_twist_xforms (int, optional): Defaults to 3.
+            counter_rot_root (bool, optional): arg to counter rotate root xform. Defaults to True.
+
+        Returns:
+            SimpleLimb:
+        """
+        return cls._kwarg_create(**cls._process_locals(kwarg_dict=locals()))
 
     def _override_build(
         self,
-        control_color=None,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
         num_twist_xforms: int = 3,
         counter_rot_root: bool = True,
         **kwargs,
     ):
+        """Creates different motion components that go in motionWrapper component.
+        also sets settings control to correct position
+
+        Args:
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
+            num_twist_xforms (int, optional): Defaults to 3.
+            counter_rot_root (bool, optional): arg to counter rotate root. Defaults to True.
+        """
         ik_inst = motion.SimpleIK.create(
             source_component=self._motion_component,
             control_color=control_color,
@@ -846,11 +988,26 @@ class SimpleLimb(_Anim):
 
     def mirror(
         self,
-        control_color=None,
-        setup_color=None,
-        mirror_axis=component_enum_data.AxisEnum.x,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
+        setup_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
+        mirror_axis: component_enum_data.AxisEnum = component_enum_data.AxisEnum.x,
         **kwargs,
     ):
+        """Overriding mirror functionality adding in num_twist_xform and counter_rot_root
+        to add into mirror function
+
+        Args:
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
+            setup_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
+            mirror_axis (component_enum_data.AxisEnum, optional): Defaults to component_enum_data.AxisEnum.x.
+
+        Returns:
+            _type_: _description_
+        """
         num_twist_xforms = int(
             ((len(self.get_xform_attrs(self.IO_ENUM.output)) - 1) / 2) - 1
         )
@@ -867,6 +1024,12 @@ class SimpleLimb(_Anim):
         )
 
     def add_ik_space(self, space_name: str, space_src_data):
+        """adds space to ik end control
+
+        Args:
+            space_name (str):
+            space_src_data (any): this data gets converted to xform
+        """
         self._ik_component.add_ik_space(
             space_name=space_name, space_src_data=space_src_data
         )
@@ -877,7 +1040,18 @@ class SingleXform(_Anim):
 
     _max_num_xforms = (1, 1)
 
-    def _override_build(self, control_color=None, **kwargs):
+    def _override_build(
+        self,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
+        **kwargs,
+    ):
+        """Overrides build for anim component. creates controls for single xform component
+
+        Args:
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
+        """
         setup_out_xform0 = self._setup_component.get_xform_attrs(
             xform_type=self.IO_ENUM.output, index=0
         )
@@ -905,9 +1079,20 @@ class SingleXform(_Anim):
 
 
 class FK(_Anim):
-    """Anim FK"""
+    """Anim FK. creates an FK Anim component. motion component is only an fk chain"""
 
-    def _override_build(self, control_color=None, **kwargs):
+    def _override_build(
+        self,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
+        **kwargs,
+    ):
+        """Overrides build for anim component. creates controls for FK component
+
+        Args:
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node]=None, optional): _description_. Defaults to None.
+        """
         fk_inst = motion.FK.create(
             source_component=self._motion_component,
             parent=self._motion_component,

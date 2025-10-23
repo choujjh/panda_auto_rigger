@@ -9,7 +9,17 @@ from typing import Union
 
 
 class _Character(base_comp._Component):
-    """Base class for character"""
+    """Base class for character
+
+    Attributes
+        root_component (component.anim.SingleXform):
+
+        _IN_COLOR_CONST (str): str constant "colorConst"
+        _IN_AXIS_VEC_CONST (str): str constant "axisVecConst"
+        _SETUP_CLR (str): str constant "setupColor"
+        _IN_MOT_VIS (str): str constant "motionVisibility"
+        _IN_SETUP_VIS (str): str constant "setupVisibility"
+    """
 
     component_type = component_enum_data.ComponentType.character
     class_namespace = "char"
@@ -22,6 +32,12 @@ class _Character(base_comp._Component):
     _IN_SETUP_VIS = "setupVisibility"
 
     def _input_attr_build_data(self):
+        """Defines all the added, published, or modified attributes for the
+        input node. inherits all input node data from _Component
+
+        Returns:
+            comp_data.NodeData:
+        """
         node_data = super()._input_attr_build_data()
 
         for enum_parent, enum_item in zip(
@@ -153,7 +169,18 @@ class _Character(base_comp._Component):
         """
         return self.child_components()[0]
 
-    def _pre_build(self, instance_name=None, parent=None, **kwargs):
+    def _pre_build(
+        self,
+        instance_name: Union[str, nw.Attr] = None,
+        parent: Union[base_comp._Component, nw.Container] = None,
+        **kwargs,
+    ):
+        """Handles creation and connection of initial nodes
+
+        Args:
+            instance_name (str, nw.Attr, optional): component instance name. Defaults to None.
+            parent (nw.Container, Component, optional): Defaults to None.
+        """
         super()._pre_build(instance_name, parent)
 
         m_color = component_enum_data.Color.yellow
@@ -174,11 +201,9 @@ class _Character(base_comp._Component):
         )
 
         # change root transform
-        transform_shape = (
-            root_component.child_components()[-1]
-            .child_components()[1]
-            .transform_node.get_shapes()[0]
-        )
+        transform_shape = root_component._motion_component.child_components()[
+            1
+        ].transform_node.get_shapes()[0]
         self.root_component._settings_guide_component.transform_node["tz"] = -9
         cntrl_pnt_len = len(transform_shape["controlPoints"])
         for control_point in [attr for attr in transform_shape["controlPoints"]][
@@ -189,20 +214,22 @@ class _Character(base_comp._Component):
         self.rename_nodes()
 
     def _post_build(self, **kwargs):
+        """Inherited from _Component. in addition to _Component functionality, connects all child components that have motion and setup
+        visibility to character's motion and setup visibility
+        """
         child_components = self.child_components()
         for child_component in child_components:
             motion_vis = self.container_node[self._IN_MOT_VIS]
             setup_vis = self.container_node[self._IN_SETUP_VIS]
-            transform_node = child_component.transform_node
-            if transform_node is not None:
-                if transform_node.has_attr(self._IN_MOT_VIS):
-                    transform_node[self._IN_MOT_VIS] << motion_vis
-                if transform_node.has_attr(self._IN_SETUP_VIS):
-                    transform_node[child_component._IN_SETUP_VIS] << setup_vis
+
+            if child_component.container_node.has_attr(self._IN_MOT_VIS):
+                child_component.container_node[self._IN_MOT_VIS] << motion_vis
+            if child_component.container_node.has_attr(self._IN_SETUP_VIS):
+                child_component.container_node[self._IN_SETUP_VIS] << setup_vis
         super()._post_build(**kwargs)
 
-    def axis_vec_choice_node(self, choice_node_name, enum_attr: nw.Attr = None):
-        """creates a choice node for axis vectors. allows enum to generate a vector
+    def axis_vec_choice_node(self, choice_node_name: str, enum_attr: nw.Attr = None):
+        """Creates a choice node for axis vectors. allows enum to generate a vector
 
         Args:
             choice_node_name (str):
@@ -224,6 +251,8 @@ class _Character(base_comp._Component):
 
 
 class CustomCharacter(_Character):
+    """Custom Character where Anim components can be added in. used as a base to add components into"""
+
     def _override_build(self, **kwargs):
         pass
 
@@ -240,9 +269,23 @@ class SimpleBiped(_Character):
         counter_rot_root: bool = True,
         **kwargs,
     ):
-        cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
+        """Class method to create component
+
+        Args:
+            instance_name (str, nw.Attr, optional): name of component. Defaults to None.
+            parent (nw.Container, Component, optional): Defaults to None.
+            num_twist_xforms (int, optional): arg for num twist xform in between limb components. Defaults to 3.
+            counter_rot_root (bool, optional):  arg for limb component counter rotating root. Defaults to True.
+        """
+        cls._kwarg_create(**cls._process_locals(kwarg_dict=locals()))
 
     def _override_build(self, num_twist_xforms=3, counter_rot_root=True, **kwargs):
+        """Creates all anim components of simple biped
+
+        Args:
+            num_twist_xforms (int, optional): arg for num twist xform in between limb components. Defaults to 3.
+            counter_rot_root (bool, optional): arg for limb component counter rotating root.  Defaults to True.
+        """
         # color
         setup_color = self.get_color_shader(
             char_side=self._SETUP_CLR, set_color=component_enum_data.Color.purple

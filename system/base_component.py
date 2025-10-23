@@ -35,20 +35,25 @@ class _Component:
         root_transform_name (str): name of root transform. Defaults to None.
         if true, the input node is a transform node instead of a network node
         class_namespace (str): gives the classes namespace
+        lock_transform (bool): locks transform on root transform
         container_node (nw.Node): Container node that contains all component nodes
         input_node (nw.Node): Node that all incoming connections come through this node
         output_node (nw.Node): Node that all outgoing connections go through this node
         transform_node (nw.Node): Transform node (also input node). if no transform node
         is created returns None
 
-        _IN (str): str constant for input
-        _BLD_DATA (str): str constant for buildData
-        _BLD_COMP_CLASS (str): str constant for componentClass
-        _BLD_COMP_TYPE (str): str constant for componentType
-        _BLD_INST_NAME (str): str constant for instanceName
-        _OUT (str): str constant for output
-        _CNTNR_PAR_COMP (str): str constant for parentComponent
-        _CNTNR_CHLD_COMP (str): str constant for childComponents
+        _IN (str): str constant "input"
+        _BLD_DATA (str): str constant "buildData"
+        _BLD_COMP_CLASS (str): str constant "componentClass"
+        _BLD_COMP_TYPE (str): str constant "componentType"
+        _BLD_INST_NAME (str): str constant "instanceName"
+        _BLD_INST_FORM (str): str constant "instanceFormat"
+        _OUT (str): str constant "output"
+        _CNTNR_PAR_COMP (str): str constant "parentComponent"
+        _CNTNR_CHLD_COMP (str): str constant "childComponents"
+        _CNTNR_CNTRL_CHLDRN (str): str constant "controlChildren"
+        _MIRROR_SRC (str): str constant "mirrorSource"
+        _MIRROR_DEST (str): str constant "mirrorDest"
     """
 
     component_type = component_enum_data.ComponentType.component
@@ -163,7 +168,7 @@ class _Component:
     def child_components(
         self, component_type: component_enum_data.ComponentType = None
     ) -> list["_Component"]:
-        """gets child components
+        """Gets child components
 
         Args:
             component_type (component_enum_data.ComponentType): defaults to None
@@ -342,12 +347,26 @@ class _Component:
         Returns:
             cls: returns created
         """
-        return cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
+        return cls._kwarg_create(**cls._process_locals(kwarg_dict=locals()))
 
     @classmethod
-    def _local_kwargs(cls, kwarg_property_name="kwargs", kwarg_dict={}):
-        if kwarg_property_name in kwarg_dict.keys():
-            back_kwargs = kwarg_dict.pop(kwarg_property_name)
+    def _process_locals(cls, kwarg_dict_name="kwargs", kwarg_dict={}):
+        """Takes a kwarg dict and makes sure that the kwarg_dict (kwarg_dict_name)
+        is not a nested dictionary. also removes cls and self from dictionary.
+        used to sort local() function
+
+        Args:
+            kwarg_dict_name (str, optional): Defaults to "kwargs".
+            kwarg_dict (dict, optional): Defaults to {}.
+
+        Returns:
+            dict:
+
+        Example:
+            >>> cls._process_locals(kwarg_dict_name="kwargs", kwarg_dict=locals())
+        """
+        if kwarg_dict_name in kwarg_dict.keys():
+            back_kwargs = kwarg_dict.pop(kwarg_dict_name)
             kwarg_dict.update(back_kwargs)
         for key in ["cls", "self"]:
             if key in kwarg_dict.keys():
@@ -357,7 +376,7 @@ class _Component:
 
     @classmethod
     def _kwarg_create(cls, **kwargs):
-        """Creates with kwarg arguments
+        """Creates with kwarg arguments. also takes the signatures to make sure all kwargs are used
 
         Args:
             kwargs_dict (dict):
@@ -395,7 +414,7 @@ class _Component:
         parent: Union["_Component", nw.Container] = None,
         **kwargs,
     ):
-        """handles creation and connection of initial nodes and
+        """Handles creation and connection of initial nodes
 
         Args:
             instance_name (str, nw.Attr, optional): component instance name. Defaults to None.
@@ -450,6 +469,9 @@ class _Component:
     def __create_base_nodes(self, parent_container: nw.Container = None):
         """Creates the base node (input, output, container) in the initialization
         phase
+
+        Args:
+            parent_container (nw.Container, optional): Defaults to None.
         """
         # input node
         if type(self).root_transform_name is not None:
@@ -560,7 +582,7 @@ class _Component:
     def get_parent_type_component(
         self, parent_type: component_enum_data.ComponentType, disable_warning=False
     ) -> "_Component":
-        """given a type gets the closest parent component of that type
+        """Given a type gets the closest parent component of that type
 
         Args:
             parent_type (component_enum_data.ComponentType):
@@ -582,7 +604,7 @@ class _Component:
             return None
 
     def get_mirror_component(self, container: nw.Container = None) -> "_Component":
-        """Gets mirror component. Returns None if none found
+        """Gets mirror component. Returns None if not found
 
         Returns:
             Component:
@@ -688,9 +710,26 @@ class _Hierarchy(_Component):
     case is defined as a chain of matricies
 
     Attributes:
-        HIER_DATA (component_data.HierData): stores all Hier names and hier check
-        functions
-        IO_ENUM (component_enum_data.IO): stores input output enum
+        HIER_DATA (component_data.HierData): constant for HierData class. easier for in class use
+        IO_ENUM (component_enum_data.IO): constant for component_enum_data.IO class. easier for in class use
+        XFORM (component_data.Xform): constant for xform class. easier for in class use
+        HIER_PARENT (component_data.hierParent) constant for HierParent class. easier for in class use
+        _max_num_xforms (tuple(int)): sets length of input and output xforms for initialization. -1 for no length
+        _populate_output (bool): setting to populate output xforms in post_build
+        _check_output (bool): setting to see if output xforms are checked
+
+        _PRM_VEC (str): str constant "primaryVec"
+        _PRM_VEC_X (str): str constant "primaryVecX"
+        _PRM_VEC_Y (str): str constant "primaryVecY"
+        _PRM_VEC_Z (str): str constant "primaryVecZ"
+        _SEC_VEC (str): str constant "secondaryVec"
+        _SEC_VEC_X (str): str constant "secondaryVecX"
+        _SEC_VEC_Y (str): str constant "secondaryVecY"
+        _SEC_VEC_Z (str): str constant "secondaryVecZ"
+        _TER_VEC (str): str constant "tertiaryVec"
+        _TER_VEC_X (str): str constant "tertiaryVecX"
+        _TER_VEC_Y (str): str constant "tertiaryVecY"
+        _TER_VEC_Z (str): str constant "tertiaryVecZ"
     """
 
     class_namespace = "hier"
@@ -717,12 +756,24 @@ class _Hierarchy(_Component):
     _TER_VEC_Z = "tertiaryVecZ"
 
     def _input_attr_build_data(self):
+        """Defines all the added, published, or modified attributes for the
+        input node. inherits all input node data from _Component
+
+        Returns:
+            comp_data.NodeData:
+        """
         node_data = super()._input_attr_build_data()
         node_data.extend_attr_data(self.HIER_DATA.get_hier_parent_data())
         node_data.extend_attr_data(self.HIER_DATA.get_xform_data(self.IO_ENUM.input))
         return node_data
 
     def _output_attr_build_data(self):
+        """Defines all the added, published, or modified attributes for the
+        output node. inherits all output node data from _Component
+
+        Returns:
+            comp_data.NodeData:
+        """
         node_data = super()._output_attr_build_data()
         node_data.extend_attr_data(self.HIER_DATA.get_xform_data(self.IO_ENUM.output))
         node_data.extend_attr_data(
@@ -769,25 +820,51 @@ class _Hierarchy(_Component):
     def create(
         cls,
         instance_name: Union[str, nw.Attr] = None,
-        parent: _Component = None,
+        parent: Union[_Component, nw.Container] = None,
         input_xforms: Union[list[component_data.Xform], int] = None,
         source_component: "_Hierarchy" = None,
         connect_parent_hier: bool = True,
         connect_axis_vecs: bool = True,
-        control_color=None,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
     ):
-        return cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
+        """Class method to create component
+
+        Args:
+            instance_name (Union[str, nw.Attr], optional): name of component. Defaults to None.
+            parent (Union[_Component, nw.Container], optional): Defaults to None.
+            input_xforms (Union[list[component_data.Xform], int], optional): input xforms to initialize component with. Defaults to None.
+            source_component (_Hierarchy, optional): source component to connect hierarchy from. Defaults to None.
+            connect_parent_hier (bool, optional): Defaults to True.
+            connect_axis_vecs (bool, optional): Defaults to True.
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
+
+        Returns:
+            _Hierarchy:
+        """
+        return cls._kwarg_create(**cls._process_locals(kwarg_dict=locals()))
 
     def _pre_build(
         self,
         instance_name: Union[str, nw.Attr] = None,
-        parent: _Component = None,
+        parent: Union[_Component, nw.Container] = None,
         input_xforms: Union[list[component_data.Xform], int] = None,
         source_component: "_Hierarchy" = None,
-        connect_parent_hier: bool = None,
+        connect_parent_hier: bool = True,
         connect_axis_vecs: bool = True,
         **kwargs,
     ):
+        """Handles creation and connection of initial nodes
+
+        Args:
+            instance_name (Union[str, nw.Attr], optional): name of component. Defaults to None.
+            parent (Union[_Component, nw.Container], optional): Defaults to None.
+            input_xforms (Union[list[component_data.Xform], int], optional): input xforms to initialize component with. Defaults to None.
+            source_component (_Hierarchy, optional):  source component to connect hierarchy from. Defaults to None.
+            connect_parent_hier (bool, optional): Defaults to None.
+            connect_axis_vecs (bool, optional): Defaults to True.
+        """
         super()._pre_build(instance_name, parent)
 
         source_xforms = None
@@ -813,10 +890,24 @@ class _Hierarchy(_Component):
                 connect_axis_vec=connect_axis_vecs,
             )
 
-    def _override_build(self, control_color=None, **kwargs):
-        return super()._override_build(**kwargs)
+    def _override_build(
+        self,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
+        **kwargs,
+    ):
+        """Takes care of derived component creation. must be implemented by child class
+
+        Args:
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): color for controls. Defaults to None.
+        """
+        super()._override_build(**kwargs)
 
     def _post_build(self, **kwargs):
+        """Build cleanup. sets build to true renames nodes, also tries to connect
+        xform matricies and names. then raises warnings for any xform attribute not connected
+        """
         super()._post_build()
         if type(self)._populate_output:
             self._populate_output_xforms()
@@ -830,7 +921,7 @@ class _Hierarchy(_Component):
         input_xforms: Union[list[component_data.Xform], int] = None,
         source_xforms: list = None,
     ):
-        """initializes input xform
+        """Initializes input xform
 
         Args:
             input_xforms (Union[list[component_data.Xform], int], optional): Defaults to [].
@@ -1106,7 +1197,7 @@ class _Hierarchy(_Component):
         """When it is the source component returns xforms to be plugged in
 
         Args:
-            is_parent_component (bool, optional): _description_. Defaults to True.
+            is_parent_component (bool, optional): if parent component gives different xform. Defaults to True.
 
         Returns:
             list(component_data.Xform):
@@ -1230,8 +1321,8 @@ class _Hierarchy(_Component):
     def unhook(self, unhook_mirror_component: bool = True):
         """Unhooks Hierarchy
 
-        Returns:
-            component_data.HierParent:
+        Args:
+            unhook_mirror_component (bool, optional): unhooks mirror component. Defaults to True.
         """
         hier_parent = self.get_hook_hier_parent()
 

@@ -156,6 +156,8 @@ class Node:
             return True
         except RuntimeError:
             return False
+        except AttributeError:
+            return False
 
     def add_attr(self, long_name="", **kwargs):
         """Adds attribute to node with given kwargs (kwargs from cmds.addAttr).
@@ -767,6 +769,8 @@ class Container(Node):
 
 
 class Transform(Node):
+    """Node wrapper for transform node. has some functions only used by transform"""
+
     def get_shapes(self):
         """Get object shapes
 
@@ -860,13 +864,10 @@ class Attr:
             "set": lambda x, y: x.setDouble(y),
         },
         "kEnumAttribute": {"get": lambda x: x.asInt(), "set": lambda x, y: x.setInt(y)},
-        # "kMatrixAttribute":         {"get": None,                                   "set": None},
-        # "kMessageAttribute":        {"get": None,                                   "set": None},
         "kNumericAttribute": {
             "get": lambda x: x.asDouble(),
             "set": lambda x, y: x.setDouble(y),
         },
-        # "kTypedAttribute":          {"get": None,                                   "set": None},
     }
 
     def __init__(self, attr: Union[om2.MPlug, str], node: Node = None):
@@ -1090,7 +1091,7 @@ class Attr:
         unsuccessful
 
         Args:
-            value ():
+            value (any):
         """
         orig_val = self.value
 
@@ -1099,14 +1100,20 @@ class Attr:
                 value = value.value
             self._set_value(plug, value)
 
+        if self.has_src_connection():
+            cmds.warning(
+                f"{self.plug} is connected to {self.get_src_connection().plug}. cannot be set"
+            )
+            return
+
         try:
             do(self.plug, value)
         except ValueError:
             self._set_value(self.plug, orig_val)
             cmds.warning(f"set info, mismatch {str(self.plug)} was not changed")
-        # except:
-        #     self._set_value(self.plug, orig_val)
-        #     cmds.warning(f"error occured when setting {str(self.plug)} was not changed")
+        except RuntimeError:
+            self._set_value(self.plug, orig_val)
+            cmds.warning(f"set info, mismatch {str(self.plug)} was not changed")
 
         apiundo.commit(
             redo=lambda: do(self.plug, value), undo=lambda: do(self.plug, orig_val)
@@ -1166,6 +1173,8 @@ class Attr:
             self[child_attr]
             return True
         except AttributeError:
+            return False
+        except ValueError:
             return False
 
     def _set_value(self, plug: om2.MPlug, value):
@@ -1512,9 +1521,6 @@ class Attr:
 
     # TODO:
     # node
-    # get_children ----------------
-    # get_parent ----------------
-    # has_attr ----------------
 
     # get non default value
 

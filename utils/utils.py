@@ -424,13 +424,20 @@ def apply_shader_group(shapes: list, shader: nw.Node):
 
 
 def apply_display_color(
-    nodes: list, color: Union[list, component_enum_data.Color, nw.Attr, nw.Node]
+    nodes: list[nw.Node],
+    color: Union[list, "Vector", component_enum_data.Color, nw.Attr, nw.Node],
 ):
+    """Apply display color
+
+    Args:
+        nodes (list[nw.Node]):
+        color (Union[list, "Vector", component_enum_data.Color, nw.Attr, nw.Node]):
+
+    Raises:
+        ValueError: node should be of type node
+    """
     display_attrs = ["overrideEnabled", "overrideRGBColors", "overrideColorRGB"]
     for node in nodes:
-        if not issubclass(type(node), nw.Node):
-            raise ValueError(f"{node} should is not of type Node")
-
         has_all_attrs = True
         for attr in display_attrs:
             if not node.has_attr(attr):
@@ -661,6 +668,12 @@ class Namespace:
 
     @classmethod
     def rename(cls, old_name: str, new_name: str):
+        """renames namespace
+
+        Args:
+            old_name (str):
+            new_name (str):
+        """
         new_name_parent = cls.get_namespace(new_name)
         if not cls.exists(new_name_parent):
             cls.add_namespace(new_name_parent)
@@ -798,7 +811,12 @@ class Matrix(om2.MMatrix):
         return om2.QuaternionOrPoint().setValue(self)
 
     def set_transform(self, transform: nw.Transform, world_space: bool = False):
-        """Sets tranform with it's contained matrix"""
+        """Sets tranform with it's contained matrix
+
+        Args:
+            transform (nw.Transform):
+            world_space (bool, optional): Defaults to False.
+        """
         cmds.xform(str(transform), worldSpace=world_space, matrix=list(self))
 
     @classmethod
@@ -910,6 +928,14 @@ class Vector(om2.MVector):
         return Vector(super().__rtruediv__(other))
 
     def __rxor__(self, other):
+        """crosses the vector with another
+
+        Args:
+            other (any):
+
+        Returns:
+            Vector:
+        """
         return Vector(super().__rxor__(other))
 
     def __sub__(self, other):
@@ -919,4 +945,12 @@ class Vector(om2.MVector):
         return Vector(super().__truediv__(other))
 
     def __xor__(self, other):
+        """crosses the vector with another
+
+        Args:
+            other (any):
+
+        Returns:
+            Vector:
+        """
         return Vector(super().__xor__(other))

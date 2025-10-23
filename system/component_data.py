@@ -255,27 +255,27 @@ class HierData:
     """Class with constants and checks for Hierarchy in Autorigger
 
     Attributes:
-        HIER_PARENT_MATRIX (str):
-        HIER_PARENT_MATRIX (str):
-        HIER_PARENT_INV_MATRIX (str):
-        HIER_PARENT_INIT_INV_MATRIX (str):
-        INPUT_XFORM (str):
-        INPUT_XFORM_NAME (str):
-        INPUT_INIT_MATRIX (str):
-        INPUT_INIT_INV_MATRIX (str):
-        INPUT_WORLD_MATRIX (str):
-        INPUT_WORLD_INV_MATRIX (str)
-        INPUT_LOC_MATRIX (str):
-        OUTPUT_XFORM (str):
-        OUTPUT_XFORM_NAME (str):
-        OUTPUT_INIT_MATRIX (str):
-        OUTPUT_INIT_INV_MATRIX (str):
-        OUTPUT_WORLD_MATRIX (str):
-        OUTPUT_WORLD_INV_MATRIX (str):
-        OUTPUT_LOC_MATRIX (str):
-        HIER_DATA_NAMES (list(str)):
-        INPUT_DATA_NAMES (list(str)):
-        OUTPUT_DATA_NAMES (list(str)):
+        HIER_PAR (str):
+        HIER_PAR_MAT (str):
+        HIER_PAR_INV_MAT (str):
+        HIER_PAR_INIT_INV_MAT (str):
+        IN_XFORM (str):
+        IN_XFORM_NAME (str):
+        IN_INIT_MAT (str):
+        IN_INIT_INV_MAT (str):
+        IN_WORLD_MAT (str):
+        IN_WORLD_INV_MAT (str)
+        IN_LOC_MAT (str):
+        OUT_XFORM (str):
+        OUT_XFORM_NAME (str):
+        OUT_INIT_MAT (str):
+        OUT_INIT_INV_MAT (str):
+        OUT_WORLD_MAT (str):
+        OUT_WORLD_INV_MAT (str):
+        OUT_LOC_MAT (str):
+        HIER_PAR_DATA_NAMES (list(str)):
+        IN_DATA_NAMES (list(str)):
+        OUT_DATA_NAMES (list(str)):
     """
 
     HIER_PAR = "hierParent"
@@ -524,6 +524,11 @@ class HierParent:
         return [self.matrix, self.inv_matrix, self.init_inv_matrix]
 
     def __iter__(self):
+        """Puts all attr in a list
+
+        Yields:
+            nw.Attr:
+        """
         for attr in self.attrs:
             yield attr
 
@@ -611,5 +616,10 @@ class Xform:
         ]
 
     def __iter__(self):
+        """Puts all attr in a list
+
+        Yields:
+            nw.Attr:
+        """
         for attr in self.attrs:
             yield attr

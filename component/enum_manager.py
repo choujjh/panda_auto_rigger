@@ -54,16 +54,22 @@ class _Singleton(base_comp._Component):
 
 
 class AxisVector(_Singleton):
-    """Component of axis vectors that creates vectors from the enum"""
+    """Component of axis vectors that creates vectors from the enum
+
+    Attributes:
+        _OUT_AXIS (str): str constant "axis"
+    """
 
     class_namespace = "axis_vec_manager"
     _OUT_AXIS = "axis"
 
-    def __init__(self, container_node=None):
-        super().__init__(container_node)
-        self.self_component = None
-
     def _output_attr_build_data(self):
+        """Defines all the added, published, or modified attributes for the
+        output node. inherits all output node data from _Singleton
+
+        Returns:
+            comp_data.NodeData:
+        """
         node_data = super()._output_attr_build_data()
 
         attr_data = [
@@ -95,6 +101,7 @@ class AxisVector(_Singleton):
         return node_data
 
     def _override_build(self, **kwargs):
+        """writes all axis vectors to output node"""
         for item in component_enum_data.AxisEnum:
             self.output_node[self._OUT_AXIS][item.name] = item.value
 
@@ -102,13 +109,23 @@ class AxisVector(_Singleton):
 
 
 class Color(_Singleton):
-    """Component of colors that creates shaders from color enum"""
+    """Component of colors that creates shaders from color enum
+
+    Attributes:
+        _OUT_COLOR (str): str constant "color"
+    """
 
     class_namespace = "color_manager"
 
     _OUT_COLOR = "color"
 
     def _output_attr_build_data(self):
+        """Defines all the added, published, or modified attributes for the
+        output node. inherits all output node data from _Singleton
+
+        Returns:
+            comp_data.NodeData:
+        """
         node_data = super()._output_attr_build_data()
 
         attr_data = [
@@ -140,11 +157,12 @@ class Color(_Singleton):
         return node_data
 
     def _override_build(self, **kwargs):
+        """writes all axis vectors to output node"""
         for color_enum in component_enum_data.Color:
             index_color = utils.get_rgb_from_index(color_enum.value)
             self.output_node[self._OUT_COLOR][color_enum.name] = index_color
 
-        # self.output_node[self._OUT_COLOR].set_locked(True)
+        self.output_node[self._OUT_COLOR].set_locked(True)
 
     @classmethod
     def get_shader(cls, color: component_enum_data.Color):

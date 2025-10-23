@@ -7,6 +7,7 @@ import system.component_data as component_data
 import system.component_enum_data as component_enum_data
 import maya.cmds as cmds
 import utils.utils as utils
+from typing import Union
 
 
 class _Motion(base_comp._Hierarchy):
@@ -23,7 +24,13 @@ class MotionWrapper(_Motion):
     _populate_output = False
     _check_output = False
 
-    def _override_build(self, control_color=None, **kwargs):
+    def _override_build(
+        self,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
+        **kwargs,
+    ):
         pass
 
 
@@ -33,7 +40,18 @@ class FK(_Motion):
     class_namespace = "FK"
     root_transform_name = "grp"
 
-    def _override_build(self, control_color=None, **kwargs):
+    def _override_build(
+        self,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
+        **kwargs,
+    ):
+        """adds fk control to all xforms from source
+
+        Args:
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): _description_. Defaults to None.
+        """
         # qol variables
         added_nodes = []
 
@@ -80,7 +98,24 @@ class FK(_Motion):
 
 
 class SimpleIK(_Motion):
-    """Given the SimpleLimb creates a 2 chain IK chain"""
+    """Given the SimpleLimb creates a 2 chain IK chain
+
+    Attributes:
+        _ROOT_WORLD_MAT (str): str constant "rootWorldMatrix"
+        _ROOT_INIT_INV_MAT (str): str constant "rootInitInvMatrix"
+        _END_WORLD_MAT (str): str constant "endWorldMatrix"
+        _END_INIT_INV_MAT (str): str constant "endInitInvMatrix"
+        _SPACE_SWITCH (str): str constant "spaceSwitch"
+        _SPACE (str): str constant "space"
+        _SPACE_MAT (str): str constant "spaceMatrix"
+        _SPACE_INIT_INV_MAT (str): str constant "spaceInitInvMat"
+        _IK (str): str constant "IK"
+        _IK_STRETCH_ENAB (str): str constant "ikStretchEnabled"
+        _IK_SOFT_BLEND_START (str): str constant "softIKBlendStart"
+        _IK_SOFT_IK_ENAB (str): str constant "softIKEnabled"
+        _IK_BLEND_TYP (str): str constant "blendType"
+        _IK_BLEND_CRV (str): str constant "blendCurve"
+    """
 
     class_namespace = "simpleIK"
     root_transform_name = "grp"
@@ -102,6 +137,12 @@ class SimpleIK(_Motion):
     _IK_BLEND_CRV = "blendCurve"
 
     def _input_attr_build_data(self):
+        """Defines all the added, published, or modified attributes for the
+        input node. inherits all input node data from _Motion
+
+        Returns:
+            comp_data.NodeData:
+        """
         node_data = super()._input_attr_build_data()
         node_data.extend_attr_data(
             component_data.AttrData(
@@ -166,6 +207,16 @@ class SimpleIK(_Motion):
         connect_axis_vecs=True,
         **kwargs,
     ):
+        """Handles creation and connection of initial nodes
+
+        Args:
+            instance_name (Union[str, nw.Attr], optional): name of component. Defaults to None.
+            parent (Union[_Component, nw.Container], optional): Defaults to None.
+            input_xforms (Union[list[component_data.Xform], int], optional): input xforms to initialize component with. Defaults to None.
+            source_component (_Hierarchy, optional):  source component to connect hierarchy from. Defaults to None.
+            connect_parent_hier (bool, optional): Defaults to None.
+            connect_axis_vecs (bool, optional): Defaults to True.
+        """
         super()._pre_build(
             instance_name,
             parent,
@@ -222,7 +273,9 @@ class SimpleIK(_Motion):
         control_inv_matrix: nw.Attr,
         parent_init_inv_matrix: nw.Attr,
         parent_world_matrix: nw.Attr,
-        color=None,
+        color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
     ):
         """Creates the IK control. returns world matrix
 
@@ -233,7 +286,7 @@ class SimpleIK(_Motion):
             control_matrix (nw.Attr):
             parent_init_inv_matrix (nw.Attr):
             parent_world_matrix (nw.Attr):
-            color (Any):
+            color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node]):
 
         Returns
             nw.Attr:
@@ -774,7 +827,9 @@ class SimpleIK(_Motion):
         ik_build_data_node: nw.Node,
         root_cntrl_ws_mat: nw.Attr,
         end_cntrl_ws_mat: nw.Attr,
-        color=None,
+        color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
     ):
         """Creates all pole vector nodes
 
@@ -885,7 +940,18 @@ class SimpleIK(_Motion):
         )
         return pole_cntrl_inst
 
-    def _override_build(self, control_color=None, **kwargs):
+    def _override_build(
+        self,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
+        **kwargs,
+    ):
+        """creates 3 joint ik
+
+        Args:
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
+        """
         # space switch to plug into controls
         space_switch_choice, space_switch_init_inv_choice = (
             self.__create_space_switch_nodes()
@@ -988,6 +1054,12 @@ class SimpleIK(_Motion):
         self.container_node.add_nodes(ik_base_mat_aim, *xform_output_nodes)
 
     def add_ik_space(self, space_name: str, space_src_data):
+        """adds space to end control
+
+        Args:
+            space_name (str):
+            space_src_data (any):
+        """
         space_switch_attr = self.container_node[self._SPACE_SWITCH]
         space_init_inv_mat_node = (
             space_switch_attr[0][self._SPACE_INIT_INV_MAT]
@@ -1059,7 +1131,7 @@ class SimpleIK(_Motion):
 
 
 class TwistHier(_Motion):
-    """creates a hier with twist joints. inbetween twist joint number can be specified"""
+    """Creates a hier with twist joints. inbetween twist joint number can be specified"""
 
     class_namespace = "twist_hier"
     root_transform_name = None
@@ -1067,24 +1139,48 @@ class TwistHier(_Motion):
     @classmethod
     def create(
         cls,
-        instance_name=None,
-        parent=None,
-        input_xforms=None,
-        source_component=None,
-        connect_parent_hier=True,
-        connect_axis_vecs=True,
+        instance_name: Union[str, nw.Attr] = None,
+        parent: Union[base_comp._Component, nw.Container] = None,
+        input_xforms: Union[list[component_data.Xform], int] = None,
+        source_component: base_comp._Hierarchy = None,
+        connect_parent_hier: bool = True,
+        connect_axis_vecs: bool = True,
         num_twist_xforms: int = 3,
         counter_rot_root: bool = True,
     ):
-        return cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
+        """Class method to create component
+
+        Args:
+            instance_name (Union[str, nw.Attr], optional): name of component. Defaults to None.
+            parent (Union[_Component, nw.Container], optional): Defaults to None.
+            input_xforms (Union[list[component_data.Xform], int], optional): input xforms to initialize component with. Defaults to None.
+            source_component (_Hierarchy, optional): source component to connect hierarchy from. Defaults to None.
+            connect_parent_hier (bool, optional): Defaults to True.
+            connect_axis_vecs (bool, optional): Defaults to True.
+            num_twist_xforms (int, optional): Defaults to 3.
+            counter_rot_root (bool, optional): arg to counter rotate root xform. Defaults to True.
+
+        Returns:
+            TwistHier:
+        """
+        return cls._kwarg_create(**cls._process_locals(kwarg_dict=locals()))
 
     def _override_build(
         self,
-        control_color=None,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
         num_twist_xforms=3,
         counter_rot_root: bool = True,
         **kwargs,
     ):
+        """Creates and connects twist xforms
+
+        Args:
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
+            num_twist_xforms (int, optional): Defaults to 3.
+            counter_rot_root (bool, optional): arg to counter rotate root xform. Defaults to True.
+        """
         input_xforms = list(self.get_xform_attrs(xform_type=self.IO_ENUM.input).items())
         added_nodes = []
 
@@ -1278,7 +1374,18 @@ class Visualize(base_comp._Hierarchy):
     root_transform_name = "grp"
     class_namespace = "hier_vis"
 
-    def _override_build(self, control_color=None, **kwargs):
+    def _override_build(
+        self,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
+        **kwargs,
+    ):
+        """creates world and local visualize controls
+
+        Args:
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
+        """
         ws_grp = nw.create_node("transform", "worldSpace_grp")
         loc_grp = nw.create_node("transform", "localSpace_grp")
         cmds.parent(str(loc_grp), str(ws_grp), str(self.transform_node))
@@ -1347,6 +1454,12 @@ class Merge(base_comp._Hierarchy):
     _OUT_HIER_VIS = "hierVisibility"
 
     def _input_attr_build_data(self):
+        """Defines all the added, published, or modified attributes for the
+        input node. inherits all input node data from _Hierarchy
+
+        Returns:
+            comp_data.NodeData:
+        """
         node_data = super()._input_attr_build_data()
         node_data.extend_attr_data(
             component_data.AttrData(
@@ -1366,6 +1479,12 @@ class Merge(base_comp._Hierarchy):
         return node_data
 
     def _output_attr_build_data(self):
+        """Defines all the added, published, or modified attributes for the
+        output node. inherits all output node data from _Hierarchy
+
+        Returns:
+            comp_data.NodeData:
+        """
         node_data = super()._output_attr_build_data()
         node_data.extend_attr_data(
             component_data.AttrData(
@@ -1381,12 +1500,38 @@ class Merge(base_comp._Hierarchy):
         return node_data
 
     @classmethod
-    def create(cls, instance_name=None, parent=None, source_components=[]):
-        return cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
+    def create(
+        cls,
+        instance_name: Union[str, nw.Attr] = None,
+        parent: Union[base_comp._Component, nw.Container] = None,
+        source_components: list[base_comp._Hierarchy] = [],
+    ):
+        """Class method to create component
+
+        Args:
+            instance_name (Union[str, nw.Attr], optional): name of component. Defaults to None.
+            parent (Union[_Component, nw.Container], optional): Defaults to None.
+            source_components (list[base_comp._Hierarchy], optional): Defaults to [].
+
+        Returns:
+            _type_: _description_
+        """
+        return cls._kwarg_create(**cls._process_locals(kwarg_dict=locals()))
 
     def _pre_build(
-        self, instance_name=None, parent=None, source_components=[], **pre_build_kwargs
+        self,
+        instance_name: Union[str, nw.Attr] = None,
+        parent: Union[base_comp._Component, nw.Container] = None,
+        source_components: list[base_comp._Hierarchy] = [],
+        **pre_build_kwargs,
     ):
+        """Handles creation and connection of initial nodes and sources
+
+        Args:
+            instance_name (Union[str, nw.Attr], optional): name of component. Defaults to None.
+            parent (Union[_Component, nw.Container], optional): Defaults to None.
+            source_components (list[base_comp._Hierarchy], optional): Defaults to [].
+        """
         # get initial source_component
         source_component = None if len(source_components) < 1 else source_components[0]
         super()._pre_build(
@@ -1457,6 +1602,12 @@ class Merge(base_comp._Hierarchy):
             )
 
     def __connect_hier_parent(self, index: int, component: base_comp._Component):
+        """Connects hier parent of source component
+
+        Args:
+            index (int):
+            component (base_comp._Component):
+        """
         (
             component.container_node[self.HIER_DATA.HIER_PAR_MAT]
             >> self.container_node[self._IN_HIER_PAR_MAT][index]
@@ -1490,6 +1641,7 @@ class Merge(base_comp._Hierarchy):
             )
 
     def _override_build(self, **kwargs):
+        """Merges the components together"""
         num_hiers = len(self.container_node[self._IN_HIER_PAR_MAT])
         if num_hiers < 1:
             cmds.warning(

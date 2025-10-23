@@ -209,6 +209,14 @@ class Color(MayaEnumAttr):
 
     @classmethod
     def create_remap(cls, name):
+        """Create maya node that uses the enum to map to its values
+
+        Args:
+            node_name (str):
+
+        Returns:
+            nw.Node: remap node
+        """
         enum_dict = cls.get_enum_dict()
         out_min = 0
         out_max = 0
@@ -291,11 +299,21 @@ class CharacterSide(MayaEnumAttr):
 
     @classmethod
     def opposite_mapping(cls):
+        """creates map of opposite side
+
+        Returns:
+            dict[str: CharacterSide]: _description_
+        """
         enum_dict = {data.name: cls.index_of(cls.opposite(data)) for data in cls}
         return enum_dict
 
     @classmethod
     def maya_enum_str(cls):
+        """Creates maya string for adding it as an enum attribute
+
+        Returns:
+            str:
+        """
         maya_str = super().maya_enum_str()
         maya_str = maya_str.replace("_", "")
         return maya_str
@@ -374,6 +392,14 @@ class AxisEnum(MayaEnumAttr):
 
     @classmethod
     def create_remap(cls, node_name):
+        """Create maya node that uses the enum to map to its values
+
+        Args:
+            node_name (str):
+
+        Returns:
+            nw.Node: remap node
+        """
         enum_dict = {data.name: cls.index_of(cls.opposite(data)) for data in cls}
         return super().create_remap(node_name, enum_dict)
 

@@ -9,7 +9,15 @@ from typing import Union
 
 
 class _Setup(base_comp._Hierarchy):
-    """A Base class for setup autorigging components. Derived from Hierarchy"""
+    """A Base class for setup autorigging components. Derived from Hierarchy
+
+    Attribute:
+    _LOC_SCALE (str): str constant "locScale"
+    _IN_SET_XFORM_FOLLOW_INDEX (str): str constant "settingXformFollowIndex"
+    _IN_SET_CNTRL_LOC_MAT (str): str constant "inputSettingCntrlLocMatrix"
+    _IN_HAS_PARENT_HIER (str): str constant "hasHierParent"
+    _OUT_SET_CNTRL_LOC_MAT (str): str constant "outputSettingCntrlLocMatrix"
+    """
 
     root_transform_name = "grp"
     component_type = component_enum_data.ComponentType.setup
@@ -30,12 +38,35 @@ class _Setup(base_comp._Hierarchy):
         source_component: base_comp._Hierarchy = None,
         connect_parent_hier: bool = True,
         connect_axis_vecs: bool = True,
-        control_color=None,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
         build_wire: bool = True,
     ):
-        return cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
+        """Class method to create component
+
+        Args:
+            instance_name (Union[str, nw.Attr], optional): name of component. Defaults to None.
+            parent (Union[_Component, nw.Container], optional): Defaults to None.
+            input_xforms (Union[list[component_data.Xform], int], optional): input xforms to initialize component with. Defaults to None.
+            source_component (_Hierarchy, optional): source component to connect hierarchy from. Defaults to None.
+            connect_parent_hier (bool, optional): Defaults to True.
+            connect_axis_vecs (bool, optional): Defaults to True.
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
+            build_wire (bool, optional): builds visualization wire . Defaults to True.
+
+        Returns:
+            _Setup:
+        """
+        return cls._kwarg_create(**cls._process_locals(kwarg_dict=locals()))
 
     def _input_attr_build_data(self):
+        """Defines all the added, published, or modified attributes for the
+        input node. inherits all input node data from _Hierarchy
+
+        Returns:
+            comp_data.NodeData:
+        """
         node_data = super()._input_attr_build_data()
         node_data.extend_attr_data(
             component_data.AttrData(
@@ -54,6 +85,12 @@ class _Setup(base_comp._Hierarchy):
         return node_data
 
     def _output_attr_build_data(self):
+        """Defines all the added, published, or modified attributes for the
+        output node. inherits all output node data from _Hierarchy
+
+        Returns:
+            comp_data.NodeData:
+        """
         node_data = super()._output_attr_build_data()
         node_data.extend_attr_data(
             component_data.AttrData(
@@ -63,7 +100,20 @@ class _Setup(base_comp._Hierarchy):
 
         return node_data
 
-    def _post_build(self, control_color=None, build_wire: bool = True, **kwargs):
+    def _post_build(
+        self,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
+        build_wire: bool = True,
+        **kwargs,
+    ):
+        """builds wire if specified and connect out local matrix for settings control
+
+        Args:
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
+            build_wire (bool, optional): Defaults to True.
+        """
         if not self.container_node[self._OUT_SET_CNTRL_LOC_MAT].has_src_connection():
             (
                 self.container_node[self._IN_SET_CNTRL_LOC_MAT]
@@ -74,6 +124,14 @@ class _Setup(base_comp._Hierarchy):
             self.__setup_wire(control_color)
 
     def get_as_source_xforms(self, is_parent_component=True):
+        """When it is the source component returns xforms to be plugged in
+
+        Args:
+            is_parent_component (bool, optional): if parent component gives different xform. Defaults to True.
+
+        Returns:
+            list(component_data.Xform):
+        """
         xforms = super().get_as_source_xforms(is_parent_component)
         for xform in xforms:
             xform.init_matrix = xform.world_matrix
@@ -81,8 +139,17 @@ class _Setup(base_comp._Hierarchy):
         return xforms
 
     # post build
-    def __setup_wire(self, control_color):
-        """Creates wire visualize the xforms and hier parent"""
+    def __setup_wire(
+        self,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ],
+    ):
+        """Creates wire visualize the xforms and hier parent
+
+        Args:
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node]):
+        """
         output_xforms = self.get_xform_attrs(self.IO_ENUM.output)
         if len(output_xforms.keys()) <= 1:
             return
@@ -151,21 +218,43 @@ class _Setup(base_comp._Hierarchy):
 
     # hooking
     def hook(self, hook_src_data, hook_mirror_component: bool = True):
+        """Hooks xform to hier parent. unhides hier parent wire
+
+        Args:
+            hook_src_data (any): hook data that will be setting the hier parent
+            hook_mirror(bool): also hooks mirror to it's corresponding source
+
+        """
         super().hook(hook_src_data, hook_mirror_component)
         if not self.container_node[self._IN_HAS_PARENT_HIER].has_src_connection():
             self.container_node[self._IN_HAS_PARENT_HIER] = True
 
     def unhook(self, unhook_mirror_component: bool = True):
-        hier_parent = super().unhook(unhook_mirror_component)
+        """Unhooks Hierarchy. hides hier parent wire
+
+        Args:
+            unhook_mirror_component (bool, optional): unhooks mirror component. Defaults to True.
+        """
+        super().unhook(unhook_mirror_component)
         if not self.container_node[self._IN_HAS_PARENT_HIER].has_src_connection():
             self.container_node[self._IN_HAS_PARENT_HIER] = False
-        return hier_parent
 
 
 class Setup(_Setup):
     """Basic Setup component"""
 
-    def _override_build(self, control_color=None, **kwargs):
+    def _override_build(
+        self,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
+        **kwargs,
+    ):
+        """Creates setup controls
+
+        Args:
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): color for controls. Defaults to None.
+        """
         input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
         for index, input_xform in input_xforms.items():
             # creating control
@@ -204,7 +293,18 @@ class SimpleLimb(_Setup):
 
     _max_num_xforms = (3, 3)
 
-    def _override_build(self, control_color, **kwargs):
+    def _override_build(
+        self,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ],
+        **kwargs,
+    ):
+        """Creates setup controls and connects matricies to output xform
+
+        Args:
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): color for controls. Defaults to None.
+        """
         input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
 
         # creating controls
@@ -537,7 +637,14 @@ class SimpleLimb(_Setup):
 
 
 class Mirror(_Setup):
-    """Class that mirrors all xforms given"""
+    """Class that mirrors all xforms given
+
+    Attribute
+        _IN_MIRROR_AXIS (str): str constant "mirrorAxis"
+        _IN_AXIS_SCALAR (str): str constant "AxisScalar"
+        _IN_NEG_AXIS_SCALAR (str): str constant "negAxisScalar"
+        _IN_MIRROR_MAT (str): str constant "mirrorMatrix"
+    """
 
     _IN_MIRROR_AXIS = "mirrorAxis"
     _IN_AXIS_SCALAR = "AxisScalar"
@@ -545,6 +652,12 @@ class Mirror(_Setup):
     _IN_MIRROR_MAT = "mirrorMatrix"
 
     def _input_attr_build_data(self):
+        """Defines all the added, published, or modified attributes for the
+        input node. inherits all input node data from _Setup
+
+        Returns:
+            comp_data.NodeData:
+        """
         node_data = super()._input_attr_build_data()
         node_data.extend_attr_data(
             component_data.AttrData(
@@ -587,21 +700,49 @@ class Mirror(_Setup):
         control_color=None,
         build_wire: bool = True,
     ):
-        return cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
+        """Class method to create component
+
+        Args:
+            instance_name (Union[str, nw.Attr], optional): name of component. Defaults to None.
+            parent (Union[_Component, nw.Container], optional): Defaults to None.
+            input_xforms (Union[list[component_data.Xform], int], optional): input xforms to initialize component with. Defaults to None.
+            mirror_axis (Union[ component_enum_data.AxisEnum, nw.Attr ], optional): Defaults to component_enum_data.AxisEnum.x.
+            source_component (_Hierarchy, optional): source component to connect hierarchy from. Defaults to None.
+            connect_parent_hier (bool, optional): Defaults to True.
+            connect_axis_vecs (bool, optional): Defaults to True.
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
+            build_wire (bool, optional): builds visualization wire . Defaults to True.
+
+        Returns:
+            Mirror:
+        """
+        return cls._kwarg_create(**cls._process_locals(kwarg_dict=locals()))
 
     def _pre_build(
         self,
-        instance_name=None,
-        parent=None,
-        input_xforms=None,
+        instance_name: Union[str, nw.Attr] = None,
+        parent: base_comp._Component = None,
+        input_xforms: Union[list[component_data.Xform], int] = None,
         mirror_axis: Union[
             component_enum_data.AxisEnum, nw.Attr
         ] = component_enum_data.AxisEnum.x,
-        source_component=None,
-        connect_parent_hier=None,
-        connect_axis_vecs=True,
+        source_component: base_comp._Hierarchy = None,
+        connect_parent_hier: bool = None,
+        connect_axis_vecs: bool = True,
         **kwargs,
     ):
+        """Handles creation and connection of initial nodes. also sets/ connects
+        mirror axis
+
+        Args:
+            instance_name (Union[str, nw.Attr], optional): name of component. Defaults to None.
+            parent (Union[_Component, nw.Container], optional): Defaults to None.
+            input_xforms (Union[list[component_data.Xform], int], optional): input xforms to initialize component with. Defaults to None.
+            mirror_axis (Union[ component_enum_data.AxisEnum, nw.Attr ], optional): Defaults to component_enum_data.AxisEnum.x.
+            source_component (_Hierarchy, optional): source component to connect hierarchy from. Defaults to None.
+            connect_parent_hier (bool, optional): Defaults to True.
+            connect_axis_vecs (bool, optional): Defaults to True.
+        """
         super()._pre_build(
             instance_name,
             parent,
@@ -616,7 +757,18 @@ class Mirror(_Setup):
         else:
             self.container_node[self._IN_MIRROR_AXIS] = mirror_axis.name
 
-    def _override_build(self, control_color=None, **kwargs):
+    def _override_build(
+        self,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
+        **kwargs,
+    ):
+        """Creates node to mirror matrix
+
+        Args:
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): color for controls. Defaults to None.
+        """
         self.__create_mirror_scale_matrix()
 
         added_nodes = []

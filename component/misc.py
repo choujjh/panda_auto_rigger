@@ -8,9 +8,32 @@ from typing import Union
 
 
 class Cluster(base_comp._Component):
+    """A component to encapsulate a lot of individual xforms with no chains attached.
+    Inherits _Component
+
+    Attributes:
+        __Hier (base_comp.Hierarchy): component casted to _Hierarchy component
+        HIER_DATA (base_comp._Hierarchy.HIER_DATA): constant for HierData class. easier for in class use
+        IO_ENUM (base_comp._Hierarchy.IO_ENUM): constant for component_enum_data.IO class. easier for in class use
+        XFORM (base_comp._Hierarchy.XFORM): constant for xform class. easier for in class use
+        HIER_PARENT (base_comp._Hierarchy.HIER_PARENT): constant for HierParent class. easier for in class use
+        _PRM_VEC (str): str constant "primaryVec"
+        _PRM_VEC_X (str): str constant "primaryVecX"
+        _PRM_VEC_Y (str): str constant "primaryVecY"
+        _PRM_VEC_Z (str): str constant "primaryVecZ"
+        _SEC_VEC (str): str constant "secondaryVec"
+        _SEC_VEC_X (str): str constant "secondaryVecX"
+        _SEC_VEC_Y (str): str constant "secondaryVecY"
+        _SEC_VEC_Z (str): str constant "secondaryVecZ"
+        _TER_VEC (str): str constant "tertiaryVec"
+        _TER_VEC_X (str): str constant "tertiaryVecX"
+        _TER_VEC_Y (str): str constant "tertiaryVecY"
+        _TER_VEC_Z (str): str constant "tertiaryVecZ"
+
+    """
+
     class_namespace = "clust"
     component_type = component_enum_data.ComponentType.cluster
-    _max_num_xforms = (0, 0)
 
     HIER_DATA = base_comp._Hierarchy.HIER_DATA
     IO_ENUM = base_comp._Hierarchy.IO_ENUM
@@ -35,6 +58,11 @@ class Cluster(base_comp._Component):
 
     @property
     def __hier(self):
+        """component as _Hierarchy component
+
+        Returns:
+            base_comp._Hierarchy:
+        """
         if self.__hier_inst_var is not None:
             pass
         elif self.container_node is not None:
@@ -44,11 +72,23 @@ class Cluster(base_comp._Component):
         return self.__hier_inst_var
 
     def _input_attr_build_data(self):
+        """Defines all the added, published, or modified attributes for the
+        input node. inherits all input node data from _Component
+
+        Returns:
+            comp_data.NodeData:
+        """
         node_data = super()._input_attr_build_data()
         node_data.extend_attr_data(self.HIER_DATA.get_xform_data(self.IO_ENUM.input))
         return node_data
 
     def _output_attr_build_data(self):
+        """Defines all the added, published, or modified attributes for the
+        output node. inherits all output node data from _Component
+
+        Returns:
+            comp_data.NodeData:
+        """
         node_data = super()._output_attr_build_data()
         node_data.extend_attr_data(self.HIER_DATA.get_xform_data(self.IO_ENUM.output))
         node_data.extend_attr_data(
@@ -98,9 +138,23 @@ class Cluster(base_comp._Component):
         parent: base_comp._Component = None,
         source_component: base_comp._Hierarchy = None,
         connect_axis_vecs: bool = True,
-        control_color=None,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
     ):
-        return cls._kwarg_create(**cls._local_kwargs(kwarg_dict=locals()))
+        """Class method to create component
+
+        Args:
+            instance_name (Union[str, nw.Attr], optional): name of component. Defaults to None.
+            parent (base_comp._Component, optional): Defaults to None.
+            source_component (base_comp._Hierarchy, optional): source component to connect hierarchy from. Defaults to None.
+            connect_axis_vecs (bool, optional): Defaults to True.
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
+        return cls._kwarg_create(**cls._process_locals(kwarg_dict=locals()))
 
     def _pre_build(
         self,
@@ -110,6 +164,14 @@ class Cluster(base_comp._Component):
         connect_axis_vecs: bool = True,
         **kwargs,
     ):
+        """Handles creation and connection of initial nodes
+
+        Args:
+            instance_name (Union[str, nw.Attr], optional): name of component. Defaults to None.
+            parent (base_comp._Component, optional): Defaults to None.
+            source_component (base_comp._Hierarchy, optional): source component to connect hierarchy from. Defaults to None.
+            connect_axis_vecs (bool, optional): Defaults to True.
+        """
         # pre build
         super()._pre_build(instance_name=instance_name, parent=parent, **kwargs)
 
@@ -121,7 +183,18 @@ class Cluster(base_comp._Component):
             ]:
                 self.container_node[attr] << source_component.container_node[attr]
 
-    def _override_build(self, control_color=None, **kwargs):
+    def _override_build(
+        self,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ] = None,
+        **kwargs,
+    ):
+        """Implementation. overrides notImplementated
+
+        Args:
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): _description_. Defaults to None.
+        """
         pass
 
     # xform and hierarchy
