@@ -41,7 +41,8 @@ class _Anim(base_comp._Hierarchy):
 
     component_type = component_enum_data.ComponentType.anim
     __setup_component_type = utils.string_to_class("component.setup.Setup")
-    root_transform_name = "grp"
+    input_node_name = "grp"
+    input_node_type = "transform"
     class_namespace = "anim"
 
     _IN_PRM_AXIS = "primaryAxis"
@@ -227,7 +228,7 @@ class _Anim(base_comp._Hierarchy):
 
         # hier sode
         hier_side = component_enum_data.CharacterSide.get(
-            self.input_node["hierSide"].value
+            self.input_node[self._HIER_SIDE].value
         ).value
         if hier_side == f"{component_enum_data.CharacterSide.none.value}":
             hier_side = ""

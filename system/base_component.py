@@ -32,7 +32,8 @@ class _Component:
 
     Attributes:
         component_type (component_enum.ComponentTypes): the component type
-        root_transform_name (str): name of root transform. Defaults to None.
+        input_node_name (str): name of input node
+        input_node_type (str)L input node type
         if true, the input node is a transform node instead of a network node
         class_namespace (str): gives the classes namespace
         lock_transform (bool): locks transform on root transform
@@ -57,7 +58,8 @@ class _Component:
     """
 
     component_type = component_enum_data.ComponentType.component
-    root_transform_name = None
+    input_node_name = "input"
+    input_node_type = "network"
     class_namespace = "component"
     lock_transform = True
 
@@ -162,7 +164,7 @@ class _Component:
         Returns:
             nw.Node:
         """
-        if type(self).root_transform_name is not None:
+        if type(self).input_node_type == "transform":
             return self.input_node
 
     def child_components(
@@ -474,17 +476,17 @@ class _Component:
             parent_container (nw.Container, optional): Defaults to None.
         """
         # input node
-        if type(self).root_transform_name is not None:
-            input_node = nw.create_node("transform", type(self).root_transform_name)
+        input_node = nw.create_node(
+            type(self).input_node_type, type(self).input_node_name
+        )
 
-            # see if transform trs is locked
-            if type(self).lock_transform:
-                for attr in ["t", "r", "s"]:
-                    input_node[attr].set_locked(True)
-                    for axis in ["x", "y", "z"]:
-                        input_node[f"{attr}{axis}"].set_keyable(False)
-        else:
-            input_node = nw.create_node("network", "input")
+        # see if transform trs is locked
+        if type(self).input_node_type == "transform" and type(self).lock_transform:
+            for attr in ["t", "r", "s"]:
+                input_node[attr].set_locked(True)
+                for axis in ["x", "y", "z"]:
+                    input_node[f"{attr}{axis}"].set_keyable(False)
+
         input_node_attr_data = self._input_attr_build_data()
         input_node_attr_data.add_attrs_to_node(input_node)
 

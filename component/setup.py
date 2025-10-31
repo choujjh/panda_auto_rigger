@@ -19,7 +19,8 @@ class _Setup(base_comp._Hierarchy):
     _OUT_SET_CNTRL_LOC_MAT (str): str constant "outputSettingCntrlLocMatrix"
     """
 
-    root_transform_name = "grp"
+    input_node_name = "grp"
+    input_node_type = "transform"
     component_type = component_enum_data.ComponentType.setup
     class_namespace = "setup_"
 

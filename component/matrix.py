@@ -225,3 +225,96 @@ class Twist(_Matrix):
             loc_init_matrix_mult,
             pick_mat,
         )
+
+
+class Mirror(_Matrix):
+    class_namespace = "mirror_matrix"
+    input_node_type = "multMatrix"
+
+    _IN_MAT = "inputMatrix"
+    _IN_SCALE_MAT = "inputScaleMatrix"
+    _IN_WRD_MAT = "inputWorldMatrix"
+    _OUT_MAT = "outputMatrix"
+
+    @classmethod
+    def create(
+        cls,
+        instance_name: Union[str, nw.Attr] = None,
+        parent: Union[base_comp._Component, nw.Container] = None,
+        input_matrix: Union[utils.Matrix, nw.Attr] = None,
+        input_scale_matrix: Union[utils.Matrix, nw.Attr] = None,
+        input_world_matrix: Union[utils.Matrix, nw.Attr] = None,
+        mirror_behavior: bool = True,
+        **kwargs,
+    ):
+        """Class method to create component
+
+        Args:
+            instance_name (Union[str, nw.Attr], optional): Defaults to None.
+            parent (Union[base_comp._Component, nw.Container], optional): Defaults to None.
+            input_matrix (Union[utils.Matrix, nw.Attr], optional): Defaults to None.
+            scale_matrix (Union[utils.Matrix, nw.Attr], optional): Defaults to None.
+            input_world_matrix (Union[utils.Matrix, nw.Attr], optional): Defaults to None.
+            mirror_behavior (bool, optional): Defaults to True.
+
+        Returns:
+            _type_: _description_
+        """
+        return cls._kwarg_create(**cls._process_locals(kwarg_dict=locals()))
+
+    def _input_attr_build_data(self):
+        """Defines all the added, published, or modified attributes for the
+        input node. Can be added onto by inherited classes
+
+        Returns:
+            comp_data.NodeData:
+        """
+        node_data = super()._input_attr_build_data()
+        node_data.extend_attr_data(
+            component_data.AttrData("matrixIn[1]", publish=self._IN_MAT),
+            component_data.AttrData("matrixIn[2]", publish=self._IN_SCALE_MAT),
+            component_data.AttrData("matrixIn[3]", publish=self._IN_WRD_MAT),
+            component_data.AttrData("matrixSum", publish=self._OUT_MAT),
+        )
+        return node_data
+
+    def _pre_build(
+        self,
+        instance_name=None,
+        parent=None,
+        input_matrix=None,
+        input_scale_matrix=None,
+        input_world_matrix=None,
+        mirror_behavior: bool = True,
+        **kwargs,
+    ):
+        """Handles creation and connection of initial nodes
+
+        Args:
+            instance_name (_type_, optional): _description_. Defaults to None.
+            parent (_type_, optional): _description_. Defaults to None.
+            mirror_behavior (bool, optional): _description_. Defaults to True.
+        """
+        super()._pre_build(instance_name, parent, **kwargs)
+        self.set_mirror_behavior(mirror_behavior)
+        utils.set_connect_attr_data(self.container_node[self._IN_MAT], input_matrix)
+        utils.set_connect_attr_data(
+            self.container_node[self._IN_SCALE_MAT], input_scale_matrix
+        )
+        utils.set_connect_attr_data(
+            self.container_node[self._IN_WRD_MAT], input_world_matrix
+        )
+
+    def _override_build(self, **kwargs):
+        pass
+
+    def set_mirror_behavior(self, mirror_behavior: bool):
+        """Sets matrix to mirror behavior of input matrix simular to joint mirroring behaviors
+
+        Args:
+            mirror_behavior (bool):
+        """
+        if mirror_behavior:
+            self.input_node["matrixIn"][0] = utils.Matrix.scale_matrix(-1, -1, -1)
+        else:
+            self.input_node["matrixIn"][0] = utils.Matrix.identity_matrix()

@@ -23,7 +23,8 @@ class _Character(base_comp._Component):
 
     component_type = component_enum_data.ComponentType.character
     class_namespace = "char"
-    root_transform_name = "grp"
+    input_node_name = "grp"
+    input_node_type = "transform"
 
     _IN_COLOR_CONST = "colorConst"
     _IN_AXIS_VEC_CONST = "axisVecConst"

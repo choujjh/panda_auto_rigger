@@ -25,7 +25,8 @@ class _Control(base_comp._Component):
     """
 
     component_type = component_enum_data.ComponentType.control
-    root_transform_name = "cntrl"
+    input_node_name = "cntrl"
+    input_node_type = "transform"
     class_namespace = "cntrl"
     can_set_color = True
     lock_transform = False

@@ -14,7 +14,8 @@ class _Motion(base_comp._Hierarchy):
     """Base class for motion autorigging components. Derived from Hierarchy"""
 
     component_type = component_enum_data.ComponentType.motion
-    root_transform_name = "grp"
+    input_node_name = "grp"
+    input_node_type = "transform"
     class_namespace = "motion"
 
 
@@ -38,7 +39,6 @@ class FK(_Motion):
     """Given a hierarchy creates an FK chain to accompany it"""
 
     class_namespace = "FK"
-    root_transform_name = "grp"
 
     def _override_build(
         self,
@@ -118,7 +118,6 @@ class SimpleIK(_Motion):
     """
 
     class_namespace = "simpleIK"
-    root_transform_name = "grp"
     _max_num_xforms = (3, 3)
 
     _ROOT_WORLD_MAT = "rootWorldMatrix"
@@ -1134,7 +1133,8 @@ class TwistHier(_Motion):
     """Creates a hier with twist joints. inbetween twist joint number can be specified"""
 
     class_namespace = "twist_hier"
-    root_transform_name = None
+    input_node_name = "input"
+    input_node_type = "network"
 
     @classmethod
     def create(
@@ -1368,10 +1368,9 @@ class TwistHier(_Motion):
         return
 
 
-class Visualize(base_comp._Hierarchy):
+class Visualize(_Motion):
     """Helps visualize and debug hierarchies by creating chains for world space and local visualization"""
 
-    root_transform_name = "grp"
     class_namespace = "hier_vis"
 
     def _override_build(

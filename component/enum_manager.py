@@ -204,7 +204,9 @@ class Color(_Singleton):
         shader_sg = utils.get_shader_sg(shader)
         color_manager_inst = cls.instance()
 
+        color_manager_inst.output_node[cls._OUT_COLOR].set_locked(False)
         color_manager_inst.output_node[cls._OUT_COLOR][color.name] << shader["color"]
+        color_manager_inst.output_node[cls._OUT_COLOR].set_locked(True)
         color_manager_inst.container_node.add_nodes(shader, shader_sg)
         color_manager_inst.rename_nodes()
 
