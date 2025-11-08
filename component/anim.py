@@ -80,7 +80,7 @@ class _Anim(base_comp._Hierarchy):
         return self._get_node_from_key("motion_container", as_component=True)
 
     @property
-    def _cluster_component(self) -> misc.Cluster:
+    def cluster_component(self) -> misc.Cluster:
         """Returns cluster component
 
         Returns:
@@ -187,9 +187,6 @@ class _Anim(base_comp._Hierarchy):
                 value=True,
             ),
         )
-        node_data.modify_add_attr_kwargs(
-            self._BLD_INST_FORM, value=f"{{}}_{{}}_{type(self).class_namespace}"
-        )
         return node_data
 
     def _output_attr_build_data(self):
@@ -206,39 +203,6 @@ class _Anim(base_comp._Hierarchy):
             )
         )
         return node_data
-
-    def get_short_namespace(self, instance_name: str = None):
-        """Generates namespace without parentent namespace attached. takes into
-        account hier side as well as instance name this time
-
-        Args:
-            instance_name (str, optional): generates with new instance name. used to generate namespaces to check. Defaults to None
-
-        Returns:
-            str:
-        """
-        format_str = self.container_node[self._BLD_INST_FORM].value
-
-        # instance_name
-        if instance_name is None:
-            instance_name = self.container_node[self._BLD_INST_NAME].value
-
-        if instance_name is None:
-            instance_name = ""
-
-        # hier sode
-        hier_side = component_enum_data.CharacterSide.get(
-            self.input_node[self._HIER_SIDE].value
-        ).value
-        if hier_side == f"{component_enum_data.CharacterSide.none.value}":
-            hier_side = ""
-
-        return utils.strip_characters(
-            format_str.format(hier_side, instance_name),
-            "_",
-            leading=True,
-            trailing=False,
-        )
 
     @classmethod
     def create(
@@ -338,6 +302,12 @@ class _Anim(base_comp._Hierarchy):
             **kwargs,
         )
 
+        (
+            self.container_node[self._HIER_SIDE]
+            >> self.container_node[self._BLD_COMP_NAMESPC][2][self._BLD_COMP_MESS]
+        )
+        self.rename_nodes()
+
         # setting values
         self.container_node[self._HIER_SIDE] = hier_side.name
         self.container_node[self._IN_PRM_AXIS] = primary_axis.name
@@ -388,7 +358,9 @@ class _Anim(base_comp._Hierarchy):
             mirror_axis=mirror_axis,
         )
         self.__create_motion_component()
-        self.__create_clust_component()
+        self.__create_clust_component(
+            control_color=control_color, setup_color=setup_color
+        )
 
         # adding settings cntrl
         if add_settings_cntrl:
@@ -811,10 +783,26 @@ class _Anim(base_comp._Hierarchy):
         )
         utils.map_to_container(motion_inst.container_node, "motion_container")
 
-    def __create_clust_component(self):
-        """creates cluster component and maps it to anim container"""
+    def __create_clust_component(
+        self,
+        control_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ],
+        setup_color: Union[
+            list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
+        ],
+    ):
+        """creates cluster component and maps it to anim container
+
+        Args:
+            control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional):
+            setup_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional):
+        """
         clust_inst = misc.Cluster.create(
-            source_component=self._setup_component, parent=self
+            source_component=self._setup_component,
+            parent=self,
+            control_color=control_color,
+            setup_color=setup_color,
         )
         utils.map_to_container(clust_inst.container_node, "clust_container")
 

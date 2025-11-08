@@ -48,7 +48,9 @@ class _Component:
         _BLD_COMP_CLASS (str): str constant "componentClass"
         _BLD_COMP_TYPE (str): str constant "componentType"
         _BLD_INST_NAME (str): str constant "instanceName"
-        _BLD_INST_FORM (str): str constant "instanceFormat"
+        _BLD_COMP_NAMESPC (str): str constant "componentNamespace"
+        _BLD_COMP_NAME (str): str constant "componentName"
+        _BLD_COMP_MESS (str): str constant "componentMessage"
         _OUT (str): str constant "output"
         _CNTNR_PAR_COMP (str): str constant "parentComponent"
         _CNTNR_CHLD_COMP (str): str constant "childComponents"
@@ -68,7 +70,9 @@ class _Component:
     _BLD_COMP_CLASS = "componentClass"
     _BLD_COMP_TYPE = "componentType"
     _BLD_INST_NAME = "instanceName"
-    _BLD_INST_FORM = "instanceFormat"
+    _BLD_COMP_NAMESPC = "componentNamespace"
+    _BLD_COMP_NAME = "componentName"
+    _BLD_COMP_MESS = "componentMessage"
     _OUT = "output"
     _CNTNR_PAR_COMP = "parentComponent"
     _CNTNR_CHLD_COMP = "childComponents"
@@ -233,21 +237,112 @@ class _Component:
         return utils.class_type_to_str(cls)
 
     def get_short_namespace(self, instance_name: str = None):
-        """Generates namespace without parentent namespace attached
+        """Generates namespace without parented namespace attached
 
         Args:
             instance_name (str, optional): Defaults to None.
         """
-        format_str = self.container_node[self._BLD_INST_FORM].value
-        if instance_name is None:
-            instance_name = self.container_node[self._BLD_INST_NAME].value
 
-        if instance_name is None:
-            instance_name = ""
+        def __get_comp_name(attr: nw.Attr):
+            """Generates part of the namespace from attr. only used internally from get_short_namespace
 
-        return utils.strip_characters(
-            format_str.format(instance_name), "_", leading=True, trailing=False
+            Args:
+                attr (nw.Attr):
+
+            Returns:
+                str:
+            """
+            name_value = attr[self._BLD_COMP_NAME].value
+            if name_value is not None and name_value != "":
+                return name_value
+            mess_conn_attr = attr[self._BLD_COMP_MESS].get_src_connection()
+            if mess_conn_attr is None:
+                return None
+            if mess_conn_attr.type_ == "enum":
+                enum_names = utils.get_enum_names(mess_conn_attr)
+                enum_str = utils.get_enum_string(mess_conn_attr)
+
+                # checking within component enum data
+                _, packages = utils.get_classes_from_package(component_enum_data)
+                for package in packages:
+                    if hasattr(package, "maya_enum_str"):
+                        package_enum_names = getattr(package, "maya_enum_str")
+                        if package_enum_names() == enum_names:
+                            if hasattr(package, enum_str):
+                                enum_obj = getattr(package, enum_str)
+                                if isinstance(enum_obj.value, str):
+                                    return enum_obj.value
+                return enum_str
+
+            else:
+                return mess_conn_attr.value
+
+        namespace_list = [
+            __get_comp_name(name)
+            for name in self.container_node[self._BLD_COMP_NAMESPC]
+        ]
+        if instance_name is not None:
+            instance_name_indicies = [
+                attr.parent.index
+                for attr in self.container_node[
+                    self._BLD_INST_NAME
+                ].get_dest_connections()
+                if attr.parent is not None
+                and attr.parent.parent == self.container_node[self._BLD_COMP_NAMESPC]
+            ]
+
+            for index in instance_name_indicies:
+                namespace_list[index] = instance_name
+
+        namespace_list = [
+            name for name in namespace_list if name is not None and name != "none"
+        ]
+
+        return "_".join(namespace_list[::-1])
+
+    def insert_component_namespace_data(
+        self, index: int, name: str = None, message_connection: nw.Attr = None
+    ):
+        """Inserts and sets data in component namespace attribute
+
+        Args:
+            index (int, optional): Defaults to None.
+            name (str, optional): Defaults to None.
+            message_connection (nw.Attr, optional): Defaults to None.
+        """
+        if index == 0:
+            cmds.warning(
+                "component namespace cannot insert at 0. component class type must be last in component namespace"
+            )
+            return
+        comp_namespc_attr = self.container_node[self._BLD_COMP_NAMESPC]
+        attr_index = len(comp_namespc_attr) - 1
+        while attr_index >= index:
+            comp_index_attr = comp_namespc_attr[attr_index]
+            name_data = comp_index_attr[self._BLD_COMP_NAME].value
+            message_data = comp_index_attr[self._BLD_COMP_MESS].get_src_connection()
+
+            ~comp_index_attr[self._BLD_COMP_MESS]
+
+            # set for next index
+            utils.set_connect_attr_data(
+                comp_namespc_attr[attr_index + 1][self._BLD_COMP_NAME], name_data
+            )
+            utils.set_connect_attr_data(
+                comp_namespc_attr[attr_index + 1][self._BLD_COMP_MESS], message_data
+            )
+
+            if attr_index == index:
+                comp_index_attr[self._BLD_COMP_NAME] = ""
+
+            attr_index -= 1
+
+        utils.set_connect_attr_data(comp_namespc_attr[index][self._BLD_COMP_NAME], name)
+        utils.set_connect_attr_data(
+            comp_namespc_attr[index][self._BLD_COMP_MESS], message_connection
         )
+
+        self.rename_nodes()
 
     def get_namespace(self, instance_name: str = None):
         """Generates Namespace. instance_name used to check namespaces before adding them
@@ -296,10 +391,20 @@ class _Component:
                 name=self._BLD_INST_NAME, type_="string", parent=self._BLD_DATA
             ),
             component_data.AttrData(
-                name=self._BLD_INST_FORM,
-                type_="string",
+                name=self._BLD_COMP_NAMESPC,
+                type_="compound",
                 parent=self._BLD_DATA,
-                value=f"{{}}_{type(self).class_namespace}",
+                multi=True,
+            ),
+            component_data.AttrData(
+                name=self._BLD_COMP_NAME,
+                type_="string",
+                parent=self._BLD_COMP_NAMESPC,
+            ),
+            component_data.AttrData(
+                name=self._BLD_COMP_MESS,
+                type_="message",
+                parent=self._BLD_COMP_NAMESPC,
             ),
         )
         return node_data
@@ -490,6 +595,16 @@ class _Component:
         input_node_attr_data = self._input_attr_build_data()
         input_node_attr_data.add_attrs_to_node(input_node)
 
+        # connecting instance name
+        input_node[self._BLD_COMP_NAMESPC][0][self._BLD_COMP_NAME] = type(
+            self
+        ).class_namespace
+        input_node[self._BLD_COMP_NAMESPC][0].set_locked(True)
+        (
+            input_node[self._BLD_COMP_NAMESPC][1][self._BLD_COMP_MESS]
+            << input_node[self._BLD_INST_NAME]
+        )
+
         # output node
         output_node_attr_data = self._output_attr_build_data()
         has_output_node = len(output_node_attr_data.node_attr_dict) > 1
@@ -612,31 +727,6 @@ class _Component:
             Component:
         """
 
-        def get_container_namespace(container: nw.Container):
-            """gets short namespace from container
-
-            Args:
-                container (nw.Container):
-
-            Returns:
-                str:
-            """
-            format_str = container[self._BLD_INST_FORM].value
-            inst_name = container[self._BLD_INST_NAME].value
-            format_args = [inst_name if inst_name is not None else ""]
-
-            if format_str.count("{}") > 1:
-                hier_side = component_enum_data.CharacterSide.get(
-                    container["hierSide"].value
-                ).value
-                if hier_side == f"{component_enum_data.CharacterSide.none.value}":
-                    hier_side = ""
-                format_args.insert(0, hier_side)
-
-            return utils.strip_characters(
-                format_str.format(*format_args), "_", leading=True, trailing=False
-            )
-
         # stack data constants
         COMP_LEN = "comp_len"
         COMP_INDEX = "comp_index"
@@ -671,7 +761,7 @@ class _Component:
                     {
                         COMP_LEN: len(connection.parent),
                         COMP_INDEX: connection.index,
-                        COMP_NAMESPC: get_container_namespace(curr_container),
+                        COMP_NAMESPC: get_component(curr_container).get_short_namespace,
                     }
                 )
                 curr_container = curr_container.get_container_node()
@@ -694,7 +784,7 @@ class _Component:
                 mirror_container = None
                 for attr in child_attrs:
                     new_cntnr = attr.get_dest_connections()[0].node
-                    new_cntnr_namespace = get_container_namespace(new_cntnr)
+                    new_cntnr_namespace = get_component(new_cntnr).get_short_namespace
                     if new_cntnr_namespace == mirror_data[COMP_NAMESPC]:
                         mirror_container = new_cntnr
                         break

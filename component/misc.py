@@ -1,4 +1,5 @@
 import system.base_component as base_comp
+import component.enum_manager as enum_manager
 import system.component_data as component_data
 import system.component_enum_data as component_enum_data
 import utils.utils as utils
@@ -44,6 +45,8 @@ class Cluster(base_comp._Component):
 
     class_namespace = "clust"
     component_type = component_enum_data.ComponentType.cluster
+    input_node_type = "transform"
+    input_node_name = "grp"
 
     HIER_DATA = base_comp._Hierarchy.HIER_DATA
     IO_ENUM = base_comp._Hierarchy.IO_ENUM
@@ -59,6 +62,7 @@ class Cluster(base_comp._Component):
     _IN_SETUP_CLR_R = "setupColorR"
     _IN_SETUP_CLR_G = "setupColorG"
     _IN_SETUP_CLR_B = "setupColorB"
+
     _PRM_VEC = base_comp._Hierarchy._PRM_VEC
     _PRM_VEC_X = base_comp._Hierarchy._PRM_VEC_X
     _PRM_VEC_Y = base_comp._Hierarchy._PRM_VEC_Y
@@ -98,10 +102,18 @@ class Cluster(base_comp._Component):
         Returns:
             _type_: _description_
         """
-        return None
+        return self.__get_color(self.container_node[self._IN_SETUP_CLR])
+
     @property
     def __control_color(self):
-        return None
+        return self.__get_color(self.container_node[self._IN_CNTRL_CLR])
+
+    def __get_color(self, attr: nw.Attr):
+        connection = attr.get_src_connection()
+        if connection is not None:
+            if connection.node.type_ == "lambert":
+                return connection.node
+        return attr
 
     def _input_attr_build_data(self):
         """Defines all the added, published, or modified attributes for the
@@ -122,15 +134,27 @@ class Cluster(base_comp._Component):
             component_data.AttrData(
                 self._IN_CNTRL_CLR, type_="double3", parent=self._IN
             ),
-            component_data.AttrData(self._IN_CNTRL_CLR_R, type_="double", parent=self._IN_CNTRL_CLR),
-            component_data.AttrData(self._IN_CNTRL_CLR_G, type_="double", parent=self._IN_CNTRL_CLR),
-            component_data.AttrData(self._IN_CNTRL_CLR_B, type_="double", parent=self._IN_CNTRL_CLR),
+            component_data.AttrData(
+                self._IN_CNTRL_CLR_R, type_="double", parent=self._IN_CNTRL_CLR
+            ),
+            component_data.AttrData(
+                self._IN_CNTRL_CLR_G, type_="double", parent=self._IN_CNTRL_CLR
+            ),
+            component_data.AttrData(
+                self._IN_CNTRL_CLR_B, type_="double", parent=self._IN_CNTRL_CLR
+            ),
             component_data.AttrData(
                 self._IN_SETUP_CLR, type_="double3", parent=self._IN
             ),
-            component_data.AttrData(self._IN_SETUP_CLR_R, type_="double", parent=self._IN_SETUP_CLR),
-            component_data.AttrData(self._IN_SETUP_CLR_G, type_="double", parent=self._IN_SETUP_CLR),
-            component_data.AttrData(self._IN_SETUP_CLR_B, type_="double", parent=self._IN_SETUP_CLR),
+            component_data.AttrData(
+                self._IN_SETUP_CLR_R, type_="double", parent=self._IN_SETUP_CLR
+            ),
+            component_data.AttrData(
+                self._IN_SETUP_CLR_G, type_="double", parent=self._IN_SETUP_CLR
+            ),
+            component_data.AttrData(
+                self._IN_SETUP_CLR_B, type_="double", parent=self._IN_SETUP_CLR
+            ),
         )
         node_data.modify_add_attr_kwargs(self._IN_HIER_SIDE, value=None)
         return node_data
@@ -255,9 +279,23 @@ class Cluster(base_comp._Component):
             control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): _description_. Defaults to None.
             setup_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): _description_. Defaults to None.
         """
-        for color in zip([control_color, setup_color], [self._IN_CNTRL_CLR, self._IN_SETUP_CLR]):
-            pass
-        
+        for color, color_name in zip(
+            [control_color, setup_color], [self._IN_CNTRL_CLR, self._IN_SETUP_CLR]
+        ):
+            color_vec = None
+            if isinstance(color, component_enum_data.Color):
+                color_vec = enum_manager.Color.instance().get_shader(color=color)[
+                    "color"
+                ]
+            elif isinstance(color, nw.Node):
+                if color.type_ != "lambert":
+                    raise RuntimeError(f"{color} is not lambert node")
+                color_vec = color["color"]
+            else:
+                color_vec = color
+
+            if color_vec is not None:
+                utils.set_connect_attr_data(self.container_node[color_name], color_vec)
 
     # xform and hierarchy
     def get_xform_attrs(
@@ -302,17 +340,35 @@ class Cluster(base_comp._Component):
         Args:
             index (int):
         """
-        pass
+        input_xform = self.get_xform_attrs(index=index, xform_type=self.IO_ENUM.input)
+        connected_containers = [
+            attr.node.get_container_node()
+            for attr in input_xform.world_matrix.get_dest_connections()
+            if attr.node.get_container_node() is not None
+        ]
+        connected_components = [
+            base_comp.get_component(container) for container in connected_containers
+        ]
 
-    def get_index_component(self, index: int):
-        """Gets xform component by index
+        return connected_components
+
+    def get_control_index_component(self, index: int):
+        """Gets control xform component by index
 
         Args:
-            index (int): _description_
+            index (int):
         """
-        pass
+        setup_components = self.get_setup_index_component(index=index)
+        control_component = [
+            base_comp.get_component(
+                component.container_node["worldMatrix"]
+                .get_dest_connections()[0]
+                .node.get_container_node()
+            )
+            for component in setup_components
+        ]
 
-        # outward facing functions
+        return control_component
 
     def add_clust_xform(
         self,
@@ -323,28 +379,31 @@ class Cluster(base_comp._Component):
         """adds xform to cluster
 
         Args:
-            name (str, optional): _description_. Defaults to "".
+            name (str, optional): Defaults to "".
             parent_xform (component_data.Xform, optional): Defaults to None.
             mirror_axis (component_enum_data.AxisEnum, optional): Defaults to None.
         """
+        # normal add
+        # add mirrored
+        # add with local matrix already attached
+        # add corrective (4 xforms)
 
-        input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
-        len_index = len(input_xforms)
+        input_len = len(self.container_node[self.HIER_DATA.IN_XFORM])
         input_xform = self.get_xform_attrs(
-            index=len_index, xform_type=self.IO_ENUM.input
+            index=input_len, xform_type=self.IO_ENUM.input
         )
 
         if parent_xform is not None:
-            if parent_xform.xform_name is None:
-                parent_xform.xform_name = name
+            # if parent_xform.xform_name is None:
+            parent_xform.xform_name = name
             parent_xform.loc_matrix = None
 
             self._set_xform_attrs(
-                index=len_index, xform_type=self.IO_ENUM.input, xform=parent_xform
+                index=input_len, xform_type=self.IO_ENUM.input, xform=parent_xform
             )
         else:
             self._set_xform_attrs(
-                index=len_index,
+                index=input_len,
                 xform_type=self.IO_ENUM.input,
                 xform=self.XFORM(xform_name=name),
             )
@@ -352,22 +411,19 @@ class Cluster(base_comp._Component):
         inv_attr = None
         if mirror_axis is None:
             setup_cntrl = control.Locator.create(
-                instance_name=input_xform.xform_name, parent=self,
+                instance_name=input_xform.xform_name,
+                parent=self,
+                color=self.__setup_color,
             )
             (
                 setup_cntrl.container_node[setup_cntrl._IN_OFF_MAT]
                 << input_xform.world_matrix
             )
             ws_attr = setup_cntrl.container_node[setup_cntrl._OUT_WS_MAT]
-            setup_cntrl.container_node[setup_cntrl._BLD_INST_FORM] = (
-                setup_cntrl.container_node[setup_cntrl._BLD_INST_FORM].value.replace(
-                    "_c", "_setup_c"
-                )
-            )
+            setup_cntrl.insert_component_namespace_data(index=1, name="setup")
             setup_cntrl.transform_node["t"] = (
                 self.container_node[self._SEC_VEC].value * 2
             )
-            setup_cntrl.rename_nodes()
         else:
             mirror_plane_scale_val = [1 if x == 0 else -1 for x in mirror_axis.value]
 
@@ -379,7 +435,7 @@ class Cluster(base_comp._Component):
                 input_world_matrix=input_xform.world_matrix,
             )
 
-            ws_attr = mirror_inst.container_node[mirror_inst._OUT_MAT]
+            ws_attr = mirror_inst.container_node[mirror_inst._OUT_WRLD_MAT]
 
             inv_mat = nw.create_node(
                 "inverseMatrix", f"{input_xform.xform_name.value}_init_inv"
@@ -393,12 +449,13 @@ class Cluster(base_comp._Component):
             instance_name=input_xform.xform_name,
             parent=self,
             axis_vec=component_enum_data.AxisEnum.y,
-            build_s=0.5,
+            build_s=0.25,
+            color=self.__control_color,
         )
         sphere_cntrl.container_node[sphere_cntrl._IN_OFF_MAT] << ws_attr
 
         self._set_xform_attrs(
-            index=len_index,
+            index=input_len,
             xform_type=self.IO_ENUM.output,
             xform=self.XFORM(
                 init_matrix=ws_attr,

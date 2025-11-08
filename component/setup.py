@@ -362,11 +362,7 @@ class SimpleLimb(_Setup):
         for attr in ["rx", "ry", "rz", "sx", "sy", "sz"]:
             control_inst2_translate.transform_node[attr].set_locked(True)
             control_inst2_translate.transform_node[attr].set_keyable(False)
-        format_attr = control_inst2_translate.container_node[self._BLD_INST_FORM]
-        format_str = format_attr.value
-        format_str = format_str.replace("_", "Translt_")
-        format_attr.set(format_str)
-        control_inst2_translate.rename_nodes()
+        control_inst2_translate.insert_component_namespace_data(1, name="translt")
         control_inst2_orient = control.Locator.create(
             instance_name=self.input_node[self.HIER_DATA.IN_XFORM][2][
                 self.HIER_DATA.IN_XFORM_NAME
@@ -375,11 +371,7 @@ class SimpleLimb(_Setup):
             color=control_color,
             xform_map_index=2,
         )
-        format_attr = control_inst2_orient.container_node[self._BLD_INST_FORM]
-        format_str = format_attr.value
-        format_str = format_str.replace("_", "Ori_")
-        format_attr.set(format_str)
-        control_inst2_orient.rename_nodes()
+        control_inst2_orient.insert_component_namespace_data(1, "ori")
 
         for attr in ["tx", "ty", "tz", "sx", "sy", "sz"]:
             control_inst2_orient.transform_node[attr].set_locked(True)

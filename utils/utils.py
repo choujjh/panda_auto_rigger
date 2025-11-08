@@ -509,6 +509,36 @@ def if_container_is_ancestor(child: nw.Container, ancestor: nw.Container):
     return False
 
 
+def get_enum_names(enum_attr: nw.Attr):
+    """Gets enum Names
+
+    Args:
+        enum_attr (nw.Attr):
+
+    Returns:
+        str:
+    """
+    if enum_attr.type_ != "enum":
+        return None
+    return cmds.attributeQuery(
+        enum_attr.short_name, node=str(enum_attr.node), listEnum=True
+    )[0]
+
+
+def get_enum_string(enum_attr: nw.Attr):
+    """get enum current value as string
+
+    Args:
+        enum_attr (nw.Attr):
+
+    Returns:
+        str:
+    """
+    if enum_attr.type_ != "enum":
+        return None
+    return get_enum_names(enum_attr).split(":")[enum_attr.value]
+
+
 class Namespace:
     """Class of static functions to handle namespaces"""
 

@@ -228,13 +228,25 @@ class Twist(_Matrix):
 
 
 class Mirror(_Matrix):
+    """Mirror mirrors input matrix
+
+    Attributes:
+        _IN_MAT (str): str constant "inputMatrix"
+        _IN_SCALE_MAT (str): str constant "inputScaleMatrix"
+        _IN_WRD_MAT (str): str constant "inputWorldMatrix"
+        _OUT_WRLD_MAT (str): str constant "worldMatrix"
+
+    Returns:
+        _type_: _description_
+    """
+
     class_namespace = "mirror_matrix"
     input_node_type = "multMatrix"
 
     _IN_MAT = "inputMatrix"
     _IN_SCALE_MAT = "inputScaleMatrix"
     _IN_WRD_MAT = "inputWorldMatrix"
-    _OUT_MAT = "outputMatrix"
+    _OUT_WRLD_MAT = "worldMatrix"
 
     @classmethod
     def create(
@@ -274,7 +286,7 @@ class Mirror(_Matrix):
             component_data.AttrData("matrixIn[1]", publish=self._IN_MAT),
             component_data.AttrData("matrixIn[2]", publish=self._IN_SCALE_MAT),
             component_data.AttrData("matrixIn[3]", publish=self._IN_WRD_MAT),
-            component_data.AttrData("matrixSum", publish=self._OUT_MAT),
+            component_data.AttrData("matrixSum", publish=self._OUT_WRLD_MAT),
         )
         return node_data
 
