@@ -1186,7 +1186,7 @@ class _Hierarchy(_Component):
                 return []
 
             # adding matrix mult
-            mat_mult = nw.create_node("multMatrix", f"xform{index}_loc_output_mat_mult")
+            mat_mult = nw.create_node("multMatrix", f"xform{index}_loc_output_matMult")
             mat_mult["matrixIn"][0] << output_world_matrix_src
             mat_mult["matrixIn"][1] << prev_world_inv_matrix_src
             mat_mult["matrixSum"] >> output_loc_matrix
@@ -1194,6 +1194,114 @@ class _Hierarchy(_Component):
             added_nodes.append(mat_mult)
 
             return added_nodes
+
+    def __populate_init_loc_matrix(self, index: int):
+        """Given the index tries to connect or set the output init local matrix
+
+        Args:
+            index (int):
+        """
+        input_xform = self.get_xform_attrs(index=index, xform_type=self.IO_ENUM.input)
+        output_xform = self.get_xform_attrs(index=index, xform_type=self.IO_ENUM.output)
+
+        if output_xform.init_loc_matrix.has_src_connection():
+            return []
+
+        if index > 0:
+            parent_init_inv_src = self.get_xform_attrs(
+                index=index - 1, xform_type=self.IO_ENUM.output
+            ).init_inv_matrix.get_src_connection()
+        else:
+            parent_init_inv_src = self.get_hier_parent_attrs().init_inv_matrix
+
+        world_init_src = output_xform.init_matrix.get_src_connection()
+
+        if index > 0:
+            parent_xform = self.get_xform_attrs(
+                index=index - 1, xform_type=self.IO_ENUM.input
+            )
+            if (
+                parent_xform.init_inv_matrix == parent_init_inv_src
+                and world_init_src == input_xform.init_matrix
+            ):
+                self._set_xform_attrs(
+                    index=index,
+                    xform_type=self.IO_ENUM.output,
+                    xform=self.XFORM(init_loc_matrix=input_xform.init_loc_matrix),
+                )
+                return []
+
+        if parent_init_inv_src is not None and world_init_src is not None:
+            mult_matrix = nw.create_node("multMatrix", f"xform{index}_init_loc_matMult")
+            mult_matrix["matrixIn"][0] << world_init_src
+            mult_matrix["matrixIn"][1] << parent_init_inv_src
+
+            self._set_xform_attrs(
+                index=index,
+                xform_type=self.IO_ENUM.output,
+                xform=self.XFORM(init_loc_matrix=mult_matrix["matrixSum"]),
+            )
+
+            return [mult_matrix]
+
+        return []
+
+        # and world_init_src is not None and
+
+    def __populate_parent_world_init_loc_matrix(self, index: int):
+        """Given the index tries to connect or set the output init local matrix
+
+        Args:
+            index (int):
+        """
+        input_xform = self.get_xform_attrs(index=index, xform_type=self.IO_ENUM.input)
+        output_xform = self.get_xform_attrs(index=index, xform_type=self.IO_ENUM.output)
+
+        if output_xform.parent_world_init_loc_matrix.has_src_connection():
+            return []
+
+        if index > 0:
+            parent_world_src = self.get_xform_attrs(
+                index=index - 1, xform_type=self.IO_ENUM.output
+            ).world_matrix.get_src_connection()
+        else:
+            parent_world_src = self.get_hier_parent_attrs().matrix
+
+        init_loc_matrix_src = output_xform.init_loc_matrix.get_src_connection()
+
+        if index > 0:
+            parent_xform = self.get_xform_attrs(
+                index=index - 1, xform_type=self.IO_ENUM.input
+            )
+            if (
+                parent_xform.world_matrix == parent_world_src
+                and init_loc_matrix_src == input_xform.init_loc_matrix
+            ):
+                self._set_xform_attrs(
+                    index=index,
+                    xform_type=self.IO_ENUM.output,
+                    xform=self.XFORM(
+                        parent_world_init_loc_matrix=input_xform.parent_world_init_loc_matrix
+                    ),
+                )
+                return []
+
+        if parent_world_src is not None and init_loc_matrix_src is not None:
+            mult_matrix = nw.create_node(
+                "multMatrix", f"xform{index}_parent_world_init_local_matMult"
+            )
+            mult_matrix["matrixIn"][0] << init_loc_matrix_src
+            mult_matrix["matrixIn"][1] << parent_world_src
+
+            self._set_xform_attrs(
+                index=index,
+                xform_type=self.IO_ENUM.output,
+                xform=self.XFORM(parent_world_init_loc_matrix=mult_matrix["matrixSum"]),
+            )
+
+            return [mult_matrix]
+
+        return []
 
     def _populate_output_xforms(self):
         """Goes through the output xform attributes and tries to connect name, local matrix, and init matricies"""
@@ -1217,6 +1325,10 @@ class _Hierarchy(_Component):
                 )
             )
             added_nodes.extend(self.__populate_loc_matrix(index=index))
+            added_nodes.extend(self.__populate_init_loc_matrix(index=index))
+            added_nodes.extend(
+                self.__populate_parent_world_init_loc_matrix(index=index)
+            )
 
         # add nodes to container
         self.container_node.add_nodes(*added_nodes)

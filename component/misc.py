@@ -7,6 +7,7 @@ import component.control as control
 import component.matrix as matrix
 import utils.node_wrapper as nw
 from typing import Union
+import maya.cmds as cmds
 
 
 class Cluster(base_comp._Component):
@@ -156,7 +157,7 @@ class Cluster(base_comp._Component):
                 self._IN_SETUP_CLR_B, type_="double", parent=self._IN_SETUP_CLR
             ),
         )
-        node_data.modify_add_attr_kwargs(self._IN_HIER_SIDE, value=None)
+        node_data.modify_add_attr_kwargs(self._IN_HIER_SIDE, value=None, multi=True)
         return node_data
 
     def _output_attr_build_data(self):
@@ -470,3 +471,24 @@ class Cluster(base_comp._Component):
 
     def create_correctives(self, parent_xform: component_data.Xform):
         pass
+
+
+class Mesh(base_comp._Component):
+    """Holds mesh nodes"""
+
+    class_namespace = "mesh"
+    input_node_type = "transform"
+    input_node_name = "grp"
+
+    def _override_build(self, **kwargs):
+        pass
+
+    def add_mesh(self, mesh: nw.Transform):
+        """adds mesh to component
+
+        Args:
+            mesh (nw.Transform):
+        """
+        cmds.parent(str(mesh), str(self.transform_node))
+        self.container_node.add_nodes(mesh, include_hierarchy_below=True)
+        self.rename_nodes()

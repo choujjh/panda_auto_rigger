@@ -1441,7 +1441,7 @@ class Visualize(_Motion):
         self.container_node.add_nodes(ws_grp, loc_grp)
 
 
-class Merge(base_comp._Hierarchy):
+class Merge(_Motion):
     """Merges multiple components together and outputs it"""
 
     class_namespace = "merge_hier"
@@ -1774,3 +1774,25 @@ class Merge(base_comp._Hierarchy):
         )
 
         return hier_vis_remap
+
+
+class Joint(_Motion):
+    class_namespace = "jnt"
+
+    def _override_build(self, control_color=None, **kwargs):
+        input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
+
+        joints = []
+        for index, input_xform in input_xforms.items():
+            joint = nw.create_node("joint", f"{input_xform.xform_name.value}_jnt")
+            joint["offsetParentMatrix"] << input_xform.world_matrix
+            joint["radius"] = 0.5
+            joints.append(joint)
+
+            self._set_xform_attrs(
+                index=index, xform=input_xform, xform_type=self.IO_ENUM.output
+            )
+
+        cmds.parent(*[str(joint) for joint in joints], str(self.transform_node))
+
+        self.container_node.add_nodes(*joints)

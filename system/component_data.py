@@ -264,7 +264,9 @@ class HierData:
         IN_INIT_MAT (str):
         IN_INIT_INV_MAT (str):
         IN_WORLD_MAT (str):
-        IN_WORLD_INV_MAT (str)
+        IN_WORLD_INV_MAT (str):
+        IN_PAR_WRLD_INIT_LOC_MAT (str):
+        IN_INIT_LOC_MAT (str):
         IN_LOC_MAT (str):
         OUT_XFORM (str):
         OUT_XFORM_NAME (str):
@@ -272,6 +274,8 @@ class HierData:
         OUT_INIT_INV_MAT (str):
         OUT_WORLD_MAT (str):
         OUT_WORLD_INV_MAT (str):
+        OUT_PAR_WRLD_INIT_LOC_MAT (str):
+        OUT_INIT_LOC_MAT (str):
         OUT_LOC_MAT (str):
         HIER_PAR_DATA_NAMES (list(str)):
         IN_DATA_NAMES (list(str)):
@@ -289,6 +293,8 @@ class HierData:
     IN_INIT_INV_MAT = "inInitInvMatrix"
     IN_WORLD_MAT = "inWorldMatrix"
     IN_WORLD_INV_MAT = "inWorldInvMatrix"
+    IN_PAR_WRLD_INIT_LOC_MAT = "inParentWorldInitLocMatrix"
+    IN_INIT_LOC_MAT = "inInitLocMatrix"
     IN_LOC_MAT = "inLocMatrix"
 
     OUT_XFORM = "outXform"
@@ -297,6 +303,8 @@ class HierData:
     OUT_INIT_INV_MAT = "outInitInvMatrix"
     OUT_WORLD_MAT = "outWorldMatrix"
     OUT_WORLD_INV_MAT = "outWorldInvMatrix"
+    OUT_PAR_WRLD_INIT_LOC_MAT = "outParentWorldInitLocMatrix"
+    OUT_INIT_LOC_MAT = "outInitLocMatrix"
     OUT_LOC_MAT = "outLocMatrix"
 
     HIER_PAR_DATA_NAMES = [HIER_PAR_MAT, HIER_PAR_INV_MAT, HIER_PAR_INIT_INV_MAT]
@@ -306,6 +314,8 @@ class HierData:
         IN_INIT_INV_MAT,
         IN_WORLD_MAT,
         IN_WORLD_INV_MAT,
+        IN_PAR_WRLD_INIT_LOC_MAT,
+        IN_INIT_LOC_MAT,
         IN_LOC_MAT,
     ]
     OUT_DATA_NAMES = [
@@ -314,6 +324,8 @@ class HierData:
         OUT_INIT_INV_MAT,
         OUT_WORLD_MAT,
         OUT_WORLD_INV_MAT,
+        OUT_PAR_WRLD_INIT_LOC_MAT,
+        OUT_INIT_LOC_MAT,
         OUT_LOC_MAT,
     ]
 
@@ -545,18 +557,22 @@ class Xform:
         init_inv_matrix: Union[utils.Matrix, nw.Attr] = None,
         world_matrix: Union[utils.Matrix, nw.Attr] = None,
         world_inv_matrix: Union[utils.Matrix, nw.Attr] = None,
+        parent_world_init_loc_matrix: Union[utils.Matrix, nw.Attr] = None,
+        init_loc_matrix: Union[utils.Matrix, nw.Attr] = None,
         loc_matrix: Union[utils.Matrix, nw.Attr] = None,
     ):
         """Initializes Xform. tries to populate from xform_attr first, otherwise uses given attributes
 
         Args:
-            xform_attr (nw.Attr, optional): _description_. Defaults to None.
-            xform_type (component_enum_data.IO, optional): _description_. Defaults to component_enum_data.IO.input.
-            xform_name (Union[str, nw.Attr], optional): _description_. Defaults to None.
-            init_matrix (Union[utils.Matrix, nw.Attr], optional): _description_. Defaults to None.
-            init_inv_matrix (Union[utils.Matrix, nw.Attr], optional): _description_. Defaults to None.
-            world_matrix (Union[utils.Matrix, nw.Attr], optional): _description_. Defaults to None.
-            world_inv_matrix (Union[utils.Matrix, nw.Attr], optional): _description_. Defaults to None.
+            xform_attr (nw.Attr, optional): Defaults to None.
+            xform_type (component_enum_data.IO, optional): Defaults to component_enum_data.IO.input.
+            xform_name (Union[str, nw.Attr], optional): Defaults to None.
+            init_matrix (Union[utils.Matrix, nw.Attr], optional): Defaults to None.
+            init_inv_matrix (Union[utils.Matrix, nw.Attr], optional): Defaults to None.
+            world_matrix (Union[utils.Matrix, nw.Attr], optional): Defaults to None.
+            world_inv_matrix (Union[utils.Matrix, nw.Attr], optional): Defaults to None.
+            parent_world_init_loc_matrix (Union[utils.Matrix, nw.Attr]): Defaults to None.
+            init_loc_matrix (Union[utils.Matrix, nw.Attr]): Defaults to None.
             loc_matrix (Union[utils.Matrix, nw.Attr], optional): _description_. Defaults to None.
 
         Raises:
@@ -577,6 +593,10 @@ class Xform:
                 self.init_inv_matrix = xform_attr[HierData.IN_INIT_INV_MAT]
                 self.world_matrix = xform_attr[HierData.IN_WORLD_MAT]
                 self.world_inv_matrix = xform_attr[HierData.IN_WORLD_INV_MAT]
+                self.parent_world_init_loc_matrix = xform_attr[
+                    HierData.IN_PAR_WRLD_INIT_LOC_MAT
+                ]
+                self.init_loc_matrix = xform_attr[HierData.IN_INIT_LOC_MAT]
                 self.loc_matrix = xform_attr[HierData.IN_LOC_MAT]
             else:
                 self.xform_name = xform_attr[HierData.OUT_XFORM_NAME]
@@ -584,6 +604,10 @@ class Xform:
                 self.init_inv_matrix = xform_attr[HierData.OUT_INIT_INV_MAT]
                 self.world_matrix = xform_attr[HierData.OUT_WORLD_MAT]
                 self.world_inv_matrix = xform_attr[HierData.OUT_WORLD_INV_MAT]
+                self.parent_world_init_loc_matrix = xform_attr[
+                    HierData.OUT_PAR_WRLD_INIT_LOC_MAT
+                ]
+                self.init_loc_matrix = xform_attr[HierData.OUT_INIT_LOC_MAT]
                 self.loc_matrix = xform_attr[HierData.OUT_LOC_MAT]
 
         else:
@@ -593,6 +617,8 @@ class Xform:
             self.init_inv_matrix = init_inv_matrix
             self.world_matrix = world_matrix
             self.world_inv_matrix = world_inv_matrix
+            self.parent_world_init_loc_matrix = parent_world_init_loc_matrix
+            self.init_loc_matrix = init_loc_matrix
             self.loc_matrix = loc_matrix
 
             not_none_list = [x for x in self.attrs if x is not None]
@@ -612,6 +638,8 @@ class Xform:
             self.init_inv_matrix,
             self.world_matrix,
             self.world_inv_matrix,
+            self.parent_world_init_loc_matrix,
+            self.init_loc_matrix,
             self.loc_matrix,
         ]
 

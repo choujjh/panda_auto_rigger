@@ -1,6 +1,7 @@
 import system.base_component as base_comp
 import component.anim as anim
 import component.motion as motion
+import component.misc as misc
 import system.component_enum_data as component_enum_data
 import utils.node_wrapper as nw
 import system.component_data as component_data
@@ -13,6 +14,7 @@ class _Character(base_comp._Component):
 
     Attributes
         root_component (component.anim.SingleXform):
+        mesh_component (component.mesh.Mesh):
 
         _IN_COLOR_CONST (str): str constant "colorConst"
         _IN_AXIS_VEC_CONST (str): str constant "axisVecConst"
@@ -170,6 +172,15 @@ class _Character(base_comp._Component):
         """
         return self.child_components()[0]
 
+    @property
+    def mesh_component(self) -> misc.Mesh:
+        """Mesh component
+
+        Returns:
+            misc.Mesh:
+        """
+        return self.child_components()[1]
+
     def _pre_build(
         self,
         instance_name: Union[str, nw.Attr] = None,
@@ -193,24 +204,10 @@ class _Character(base_comp._Component):
             setup_char_side, set_color=setup_color
         )
 
-        root_component = anim.SingleXform.create(
-            instance_name="root",
-            parent=self,
-            source_component=None,
-            control_color=m_char_shader,
-            setup_color=setup_char_shader,
+        self.__create_root_component(
+            mid_shader=m_char_shader, setup_shader=setup_char_shader
         )
-
-        # change root transform
-        transform_shape = root_component._motion_component.child_components()[
-            1
-        ].transform_node.get_shapes()[0]
-        self.root_component._settings_guide_component.transform_node["tz"] = -9
-        cntrl_pnt_len = len(transform_shape["controlPoints"])
-        for control_point in [attr for attr in transform_shape["controlPoints"]][
-            : cntrl_pnt_len - 3
-        ]:
-            control_point.set(utils.Vector(control_point.value) * 7)
+        self.__create_mesh_component()
 
         self.rename_nodes()
 
@@ -227,7 +224,48 @@ class _Character(base_comp._Component):
                 child_component.container_node[self._IN_MOT_VIS] << motion_vis
             if child_component.container_node.has_attr(self._IN_SETUP_VIS):
                 child_component.container_node[self._IN_SETUP_VIS] << setup_vis
+
+            if issubclass(type(child_component), anim._Anim):
+                motion.Joint.create(source_component=child_component, parent=self)
         super()._post_build(**kwargs)
+
+    def __create_root_component(self, mid_shader: nw.Node, setup_shader: nw.Node):
+        """Creates root component
+
+        Args:
+            mid_shader (nw.Node):
+            setup_shader (nw.Node):
+        """
+        root_component = anim.SingleXform.create(
+            instance_name="root",
+            parent=self,
+            source_component=None,
+            control_color=mid_shader,
+            setup_color=setup_shader,
+        )
+
+        # change root transform
+        transform_shape = root_component._motion_component.child_components()[
+            1
+        ].transform_node.get_shapes()[0]
+        self.root_component._settings_guide_component.transform_node["tz"] = -9
+        cntrl_pnt_len = len(transform_shape["controlPoints"])
+        for control_point in [attr for attr in transform_shape["controlPoints"]][
+            : cntrl_pnt_len - 3
+        ]:
+            control_point.set(utils.Vector(control_point.value) * 7)
+
+    def __create_mesh_component(self):
+        """Creates mesh component"""
+        misc.Mesh.create(parent=self)
+
+    def add_mesh(self, mesh: nw.Transform):
+        """Adds mesh to character mesh component
+
+        Args:
+            mesh (nw.Transform):
+        """
+        self.mesh_component.add_mesh(mesh=mesh)
 
     def axis_vec_choice_node(self, choice_node_name: str, enum_attr: nw.Attr = None):
         """Creates a choice node for axis vectors. allows enum to generate a vector
@@ -278,7 +316,7 @@ class SimpleBiped(_Character):
             num_twist_xforms (int, optional): arg for num twist xform in between limb components. Defaults to 3.
             counter_rot_root (bool, optional):  arg for limb component counter rotating root. Defaults to True.
         """
-        cls._kwarg_create(**cls._process_locals(kwarg_dict=locals()))
+        return cls._kwarg_create(**cls._process_locals(kwarg_dict=locals()))
 
     def _override_build(self, num_twist_xforms=3, counter_rot_root=True, **kwargs):
         """Creates all anim components of simple biped
@@ -396,6 +434,6 @@ class SimpleBiped(_Character):
             anim_inst.add_ik_space(
                 space_name="root", space_src_data=self.root_component
             )
-            motion.Visualize.create(
-                instance_name=name, source_component=anim_inst, parent=self
-            )
+            # motion.Visualize.create(
+            #     instance_name=name, source_component=anim_inst, parent=self
+            # )
