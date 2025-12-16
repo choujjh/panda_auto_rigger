@@ -235,9 +235,6 @@ class Mirror(_Matrix):
         _IN_SCALE_MAT (str): str constant "inputScaleMatrix"
         _IN_WRD_MAT (str): str constant "inputWorldMatrix"
         _OUT_WRLD_MAT (str): str constant "worldMatrix"
-
-    Returns:
-        _type_: _description_
     """
 
     class_namespace = "mirror_matrix"
@@ -246,6 +243,9 @@ class Mirror(_Matrix):
     _IN_MAT = "inputMatrix"
     _IN_SCALE_MAT = "inputScaleMatrix"
     _IN_WRD_MAT = "inputWorldMatrix"
+    _IN_MIRROR_BEH = "mirrorBehavior"
+    _IN_ID_MAT = "identityMatrix"
+    _IN_NEG_SCALE_MAT = "negScaleMatrix"
     _OUT_WRLD_MAT = "worldMatrix"
 
     @classmethod
@@ -287,6 +287,23 @@ class Mirror(_Matrix):
             component_data.AttrData("matrixIn[2]", publish=self._IN_SCALE_MAT),
             component_data.AttrData("matrixIn[3]", publish=self._IN_WRD_MAT),
             component_data.AttrData("matrixSum", publish=self._OUT_WRLD_MAT),
+            component_data.AttrData(
+                self._IN_MIRROR_BEH, type_="bool", publish=True, value=True
+            ),
+            component_data.AttrData(
+                self._IN_ID_MAT,
+                type_="matrix",
+                publish=True,
+                value=utils.Matrix.identity_matrix(),
+                locked=True,
+            ),
+            component_data.AttrData(
+                self._IN_NEG_SCALE_MAT,
+                type_="matrix",
+                publish=True,
+                value=utils.Matrix.scale_matrix(-1, -1, -1),
+                locked=True,
+            ),
         )
         return node_data
 
@@ -297,7 +314,7 @@ class Mirror(_Matrix):
         input_matrix=None,
         input_scale_matrix=None,
         input_world_matrix=None,
-        mirror_behavior: bool = True,
+        mirror_behavior: Union[nw.Attr, bool] = True,
         **kwargs,
     ):
         """Handles creation and connection of initial nodes
@@ -308,7 +325,9 @@ class Mirror(_Matrix):
             mirror_behavior (bool, optional): _description_. Defaults to True.
         """
         super()._pre_build(instance_name, parent, **kwargs)
-        self.set_mirror_behavior(mirror_behavior)
+        utils.set_connect_attr_data(
+            self.container_node[self._IN_MIRROR_BEH], mirror_behavior
+        )
         utils.set_connect_attr_data(self.container_node[self._IN_MAT], input_matrix)
         utils.set_connect_attr_data(
             self.container_node[self._IN_SCALE_MAT], input_scale_matrix
@@ -318,15 +337,10 @@ class Mirror(_Matrix):
         )
 
     def _override_build(self, **kwargs):
-        pass
+        """Takes care of derived component creation. must be implemented by child class"""
 
-    def set_mirror_behavior(self, mirror_behavior: bool):
-        """Sets matrix to mirror behavior of input matrix simular to joint mirroring behaviors
-
-        Args:
-            mirror_behavior (bool):
-        """
-        if mirror_behavior:
-            self.input_node["matrixIn"][0] = utils.Matrix.scale_matrix(-1, -1, -1)
-        else:
-            self.input_node["matrixIn"][0] = utils.Matrix.identity_matrix()
+        behavior_choice = nw.create_node("choice", "mirror_behavior_choice")
+        behavior_choice["selector"] << self.container_node[self._IN_MIRROR_BEH]
+        behavior_choice["input"][0] << self.container_node[self._IN_ID_MAT]
+        behavior_choice["input"][1] << self.container_node[self._IN_NEG_SCALE_MAT]
+        behavior_choice["output"] >> self.input_node["matrixIn"][0]

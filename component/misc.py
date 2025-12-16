@@ -55,6 +55,7 @@ class Cluster(base_comp._Component):
     HIER_PARENT = base_comp._Hierarchy.HIER_PARENT
 
     _IN_HIER_SIDE = "inHierSide"
+    _IN_XFORM_PAR = "inXformParent"
     _IN_CNTRL_CLR = "controlColor"
     _IN_CNTRL_CLR_R = "controlColorR"
     _IN_CNTRL_CLR_G = "controlColorG"
@@ -129,7 +130,11 @@ class Cluster(base_comp._Component):
             component_data.AttrData(
                 self._IN_HIER_SIDE,
                 type_=component_enum_data.CharacterSide.none,
-                value=None,
+                parent=self.HIER_DATA.IN_XFORM,
+            ),
+            component_data.AttrData(
+                self._IN_XFORM_PAR,
+                type_="message",
                 parent=self.HIER_DATA.IN_XFORM,
             ),
             component_data.AttrData(
