@@ -3,6 +3,7 @@ import component.enum_manager as enum_manager
 import system.component_data as component_data
 import system.component_enum_data as component_enum_data
 import utils.utils as utils
+import component.hierarchy as hierarchy
 import component.control as control
 import component.matrix as matrix
 import utils.node_wrapper as nw
@@ -11,15 +12,15 @@ import maya.cmds as cmds
 
 
 class Cluster(base_comp._Component):
-    """A component to encapsulate a lot of individual xforms with no chains attached.
+    """a component to encapsulate non chained xforms.
     Inherits _Component
 
     Attributes:
         __Hier (base_comp.Hierarchy): component casted to _Hierarchy component
-        HIER_DATA (base_comp._Hierarchy.HIER_DATA): constant for HierData class. easier for in class use
-        IO_ENUM (base_comp._Hierarchy.IO_ENUM): constant for component_enum_data.IO class. easier for in class use
-        XFORM (base_comp._Hierarchy.XFORM): constant for xform class. easier for in class use
-        HIER_PARENT (base_comp._Hierarchy.HIER_PARENT): constant for HierParent class. easier for in class use
+        HIER_DATA (hierarchy._Hierarchy.HIER_DATA): constant for HierData class. easier for in class use
+        IO_ENUM (hierarchy._Hierarchy.IO_ENUM): constant for component_enum_data.IO class. easier for in class use
+        XFORM (hierarchy._Hierarchy.XFORM): constant for xform class. easier for in class use
+        HIER_PARENT (hierarchy._Hierarchy.HIER_PARENT): constant for HierParent class. easier for in class use
         _IN_HIER_SIDE (str): str constant "inHierSide"
         _IN_CNTRL_CLR (str): str constant "controlColor"
         _IN_CNTRL_CLR_R (str): str constant "controlColorR"
@@ -49,10 +50,10 @@ class Cluster(base_comp._Component):
     input_node_type = "transform"
     input_node_name = "grp"
 
-    HIER_DATA = base_comp._Hierarchy.HIER_DATA
-    IO_ENUM = base_comp._Hierarchy.IO_ENUM
-    XFORM = base_comp._Hierarchy.XFORM
-    HIER_PARENT = base_comp._Hierarchy.HIER_PARENT
+    HIER_DATA = hierarchy._Hierarchy.HIER_DATA
+    IO_ENUM = hierarchy._Hierarchy.IO_ENUM
+    XFORM = hierarchy._Hierarchy.XFORM
+    HIER_PARENT = hierarchy._Hierarchy.HIER_PARENT
 
     _IN_HIER_SIDE = "inHierSide"
     _IN_XFORM_PAR = "inXformParent"
@@ -65,18 +66,18 @@ class Cluster(base_comp._Component):
     _IN_SETUP_CLR_G = "setupColorG"
     _IN_SETUP_CLR_B = "setupColorB"
 
-    _PRM_VEC = base_comp._Hierarchy._PRM_VEC
-    _PRM_VEC_X = base_comp._Hierarchy._PRM_VEC_X
-    _PRM_VEC_Y = base_comp._Hierarchy._PRM_VEC_Y
-    _PRM_VEC_Z = base_comp._Hierarchy._PRM_VEC_Z
-    _SEC_VEC = base_comp._Hierarchy._SEC_VEC
-    _SEC_VEC_X = base_comp._Hierarchy._SEC_VEC_X
-    _SEC_VEC_Y = base_comp._Hierarchy._SEC_VEC_Y
-    _SEC_VEC_Z = base_comp._Hierarchy._SEC_VEC_Z
-    _TER_VEC = base_comp._Hierarchy._TER_VEC
-    _TER_VEC_X = base_comp._Hierarchy._TER_VEC_X
-    _TER_VEC_Y = base_comp._Hierarchy._TER_VEC_Y
-    _TER_VEC_Z = base_comp._Hierarchy._TER_VEC_Z
+    _PRM_VEC = hierarchy._Hierarchy._PRM_VEC
+    _PRM_VEC_X = hierarchy._Hierarchy._PRM_VEC_X
+    _PRM_VEC_Y = hierarchy._Hierarchy._PRM_VEC_Y
+    _PRM_VEC_Z = hierarchy._Hierarchy._PRM_VEC_Z
+    _SEC_VEC = hierarchy._Hierarchy._SEC_VEC
+    _SEC_VEC_X = hierarchy._Hierarchy._SEC_VEC_X
+    _SEC_VEC_Y = hierarchy._Hierarchy._SEC_VEC_Y
+    _SEC_VEC_Z = hierarchy._Hierarchy._SEC_VEC_Z
+    _TER_VEC = hierarchy._Hierarchy._TER_VEC
+    _TER_VEC_X = hierarchy._Hierarchy._TER_VEC_X
+    _TER_VEC_Y = hierarchy._Hierarchy._TER_VEC_Y
+    _TER_VEC_Z = hierarchy._Hierarchy._TER_VEC_Z
 
     def __init__(self, container_node=None):
         super().__init__(container_node)
@@ -87,14 +88,14 @@ class Cluster(base_comp._Component):
         """component as _Hierarchy component
 
         Returns:
-            base_comp._Hierarchy:
+            hierarchy._Hierarchy:
         """
         if self.__hier_inst_var is not None:
             pass
         elif self.container_node is not None:
-            self.__hier_inst_var = base_comp._Hierarchy(self.container_node)
+            self.__hier_inst_var = hierarchy._Hierarchy(self.container_node)
         else:
-            self.__hier_inst_var = base_comp._Hierarchy()
+            self.__hier_inst_var = hierarchy._Hierarchy()
         return self.__hier_inst_var
 
     @property
@@ -219,7 +220,7 @@ class Cluster(base_comp._Component):
         cls,
         instance_name: Union[str, nw.Attr] = None,
         parent: base_comp._Component = None,
-        source_component: base_comp._Hierarchy = None,
+        source_component: hierarchy._Hierarchy = None,
         connect_axis_vecs: bool = True,
         control_color: Union[
             list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
@@ -233,7 +234,7 @@ class Cluster(base_comp._Component):
         Args:
             instance_name (Union[str, nw.Attr], optional): name of component. Defaults to None.
             parent (base_comp._Component, optional): Defaults to None.
-            source_component (base_comp._Hierarchy, optional): source component to connect hierarchy from. Defaults to None.
+            source_component (hierarchy._Hierarchy, optional): source component to connect hierarchy from. Defaults to None.
             connect_axis_vecs (bool, optional): Defaults to True.
             control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
 
@@ -246,7 +247,7 @@ class Cluster(base_comp._Component):
         self,
         instance_name: Union[str, nw.Attr] = None,
         parent: base_comp._Component = None,
-        source_component: base_comp._Hierarchy = None,
+        source_component: hierarchy._Hierarchy = None,
         connect_axis_vecs: bool = True,
         **kwargs,
     ):
@@ -255,7 +256,7 @@ class Cluster(base_comp._Component):
         Args:
             instance_name (Union[str, nw.Attr], optional): name of component. Defaults to None.
             parent (base_comp._Component, optional): Defaults to None.
-            source_component (base_comp._Hierarchy, optional): source component to connect hierarchy from. Defaults to None.
+            source_component (hierarchy._Hierarchy, optional): source component to connect hierarchy from. Defaults to None.
             connect_axis_vecs (bool, optional): Defaults to True.
         """
         # pre build
@@ -479,7 +480,7 @@ class Cluster(base_comp._Component):
 
 
 class Mesh(base_comp._Component):
-    """Holds mesh nodes"""
+    """contains mesh nodes for character component"""
 
     class_namespace = "mesh"
     input_node_type = "transform"

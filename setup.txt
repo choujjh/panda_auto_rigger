@@ -13,13 +13,13 @@ else:
     if not path in sys.path:
         sys.path.append(path)
 
-    import system.test as test
+    import autorigger
     import importlib
 
-    importlib.reload(test)
+    importlib.reload(autorigger)
 
     try:
-        test.test()
+        autorigger.run()
     except:
         import traceback
         traceback.print_exc()

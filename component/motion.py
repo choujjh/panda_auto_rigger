@@ -1,4 +1,5 @@
 import system.base_component as base_comp
+import component.hierarchy as hierarchy
 import component.control as control
 import component.setup as setup
 import component.matrix as matrix
@@ -10,8 +11,8 @@ import utils.utils as utils
 from typing import Union
 
 
-class _Motion(base_comp._Hierarchy):
-    """Base class for motion autorigging components. Derived from Hierarchy"""
+class _Motion(hierarchy._Hierarchy):
+    """base class for motion autorigging components. Derived from Hierarchy"""
 
     component_type = component_enum_data.ComponentType.motion
     input_node_name = "grp"
@@ -1142,7 +1143,7 @@ class TwistHier(_Motion):
         instance_name: Union[str, nw.Attr] = None,
         parent: Union[base_comp._Component, nw.Container] = None,
         input_xforms: Union[list[component_data.Xform], int] = None,
-        source_component: base_comp._Hierarchy = None,
+        source_component: hierarchy._Hierarchy = None,
         connect_parent_hier: bool = True,
         connect_axis_vecs: bool = True,
         num_twist_xforms: int = 3,
@@ -1391,6 +1392,8 @@ class Visualize(_Motion):
 
         prev_loc_transform = loc_grp
 
+        self.connect_input_to_output()
+
         input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
         for index, input_xform in input_xforms.items():
             # making controls
@@ -1430,13 +1433,6 @@ class Visualize(_Motion):
                     >> control_loc_inst.container_node[control._Control._IN_OFF_MAT]
                 )
             prev_loc_transform = control_loc_inst.transform_node
-
-            # connecting to component output
-            output_xform = self.get_xform_attrs(
-                xform_type=self.IO_ENUM.output, index=index
-            )
-            for input_attr, output_attr in zip(input_xform, output_xform):
-                input_attr >> output_attr
 
         self.container_node.add_nodes(ws_grp, loc_grp)
 
@@ -1503,14 +1499,14 @@ class Merge(_Motion):
         cls,
         instance_name: Union[str, nw.Attr] = None,
         parent: Union[base_comp._Component, nw.Container] = None,
-        source_components: list[base_comp._Hierarchy] = [],
+        source_components: list[hierarchy._Hierarchy] = [],
     ):
         """Class method to create component
 
         Args:
             instance_name (Union[str, nw.Attr], optional): name of component. Defaults to None.
             parent (Union[_Component, nw.Container], optional): Defaults to None.
-            source_components (list[base_comp._Hierarchy], optional): Defaults to [].
+            source_components (list[hierarchy._Hierarchy], optional): Defaults to [].
 
         Returns:
             _type_: _description_
@@ -1521,7 +1517,7 @@ class Merge(_Motion):
         self,
         instance_name: Union[str, nw.Attr] = None,
         parent: Union[base_comp._Component, nw.Container] = None,
-        source_components: list[base_comp._Hierarchy] = [],
+        source_components: list[hierarchy._Hierarchy] = [],
         **pre_build_kwargs,
     ):
         """Handles creation and connection of initial nodes and sources
@@ -1529,7 +1525,7 @@ class Merge(_Motion):
         Args:
             instance_name (Union[str, nw.Attr], optional): name of component. Defaults to None.
             parent (Union[_Component, nw.Container], optional): Defaults to None.
-            source_components (list[base_comp._Hierarchy], optional): Defaults to [].
+            source_components (list[hierarchy._Hierarchy], optional): Defaults to [].
         """
         # get initial source_component
         source_component = None if len(source_components) < 1 else source_components[0]
@@ -1582,7 +1578,7 @@ class Merge(_Motion):
                 raise RuntimeError(
                     "source container cannot be parent of merge container"
                 )
-            if not issubclass(type(source_component), base_comp._Hierarchy):
+            if not issubclass(type(source_component), hierarchy._Hierarchy):
                 raise RuntimeError(
                     f"{source_component.container_node} is not hierarchy component"
                 )
@@ -1777,10 +1773,14 @@ class Merge(_Motion):
 
 
 class Joint(_Motion):
+    """creates a joint for every xform"""
+
     class_namespace = "jnt"
 
     def _override_build(self, control_color=None, **kwargs):
         input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
+
+        self.connect_input_to_output()
 
         joints = []
         for index, input_xform in input_xforms.items():
@@ -1788,10 +1788,6 @@ class Joint(_Motion):
             joint["offsetParentMatrix"] << input_xform.world_matrix
             joint["radius"] = 0.5
             joints.append(joint)
-
-            self._set_xform_attrs(
-                index=index, xform=input_xform, xform_type=self.IO_ENUM.output
-            )
 
         cmds.parent(*[str(joint) for joint in joints], str(self.transform_node))
 

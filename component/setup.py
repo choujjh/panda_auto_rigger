@@ -2,13 +2,14 @@ import system.base_component as base_comp
 import system.component_data as component_data
 import system.component_enum_data as component_enum_data
 import component.control as control
+import component.hierarchy as hierarchy
 import utils.utils as utils
 import utils.node_wrapper as nw
 import maya.cmds as cmds
 from typing import Union
 
 
-class _Setup(base_comp._Hierarchy):
+class _Setup(hierarchy._Hierarchy):
     """A Base class for setup autorigging components. Derived from Hierarchy
 
     Attribute:
@@ -36,7 +37,7 @@ class _Setup(base_comp._Hierarchy):
         instance_name: Union[str, nw.Attr] = None,
         parent: base_comp._Component = None,
         input_xforms: Union[list[component_data.Xform], int] = None,
-        source_component: base_comp._Hierarchy = None,
+        source_component: hierarchy._Hierarchy = None,
         connect_parent_hier: bool = True,
         connect_axis_vecs: bool = True,
         control_color: Union[
@@ -687,7 +688,7 @@ class Mirror(_Setup):
         mirror_axis: Union[
             component_enum_data.AxisEnum, nw.Attr
         ] = component_enum_data.AxisEnum.x,
-        source_component: base_comp._Hierarchy = None,
+        source_component: hierarchy._Hierarchy = None,
         connect_parent_hier: bool = True,
         connect_axis_vecs: bool = True,
         control_color=None,
@@ -719,7 +720,7 @@ class Mirror(_Setup):
         mirror_axis: Union[
             component_enum_data.AxisEnum, nw.Attr
         ] = component_enum_data.AxisEnum.x,
-        source_component: base_comp._Hierarchy = None,
+        source_component: hierarchy._Hierarchy = None,
         connect_parent_hier: bool = None,
         connect_axis_vecs: bool = True,
         **kwargs,

@@ -1,6 +1,7 @@
 import system.component_enum_data as component_enum_data
 import system.component_data as component_data
 import system.base_component as base_comp
+import component.hierarchy as hierarchy
 import component.enum_manager as enum_manager
 import component.setup as setup
 import component.motion as motion
@@ -12,7 +13,7 @@ from typing import Union
 import maya.cmds as cmds
 
 
-class _Anim(base_comp._Hierarchy):
+class _Anim(hierarchy._Hierarchy):
     """Base class for anim autorigging components. Derived from Hierarchy. creates setup component in pre build
 
 
@@ -78,6 +79,15 @@ class _Anim(base_comp._Hierarchy):
             setup.Setup:
         """
         return self._get_node_from_key("motion_container", as_component=True)
+
+    @property
+    def _weight_driver_component(self) -> hierarchy.WeightDrivers:
+        """Returns weight driver component
+
+        Returns:
+            hierarchy.WeightDrivers:
+        """
+        return self._get_node_from_key("weight_driver_container", as_component=True)
 
     @property
     def cluster_component(self) -> misc.Cluster:
@@ -213,9 +223,10 @@ class _Anim(base_comp._Hierarchy):
         primary_axis: component_enum_data.AxisEnum = component_enum_data.AxisEnum.x,
         secondary_axis: component_enum_data.AxisEnum = component_enum_data.AxisEnum.y,
         add_settings_cntrl: bool = True,
+        add_weight_driver_component: bool = True,
         mirror_source: "_Anim" = None,
         mirror_axis: component_enum_data.AxisEnum = component_enum_data.AxisEnum.x,
-        source_component: base_comp._Hierarchy = None,
+        source_component: hierarchy._Hierarchy = None,
         connect_parent_hier: bool = True,
         connect_axis_vecs: bool = True,
         control_color: Union[
@@ -239,7 +250,7 @@ class _Anim(base_comp._Hierarchy):
             add_settings_cntrl (bool, optional): Defaults to True.
             mirror_source (_Anim, optional): mirror source component. Defaults to None.
             mirror_axis (component_enum_data.AxisEnum, optional): Defaults to component_enum_data.AxisEnum.x.
-            source_component (base_comp._Hierarchy, optional):  source component to connect hierarchy from. Defaults to None.
+            source_component (hierarchy._Hierarchy, optional):  source component to connect hierarchy from. Defaults to None.
             connect_parent_hier (bool, optional): Defaults to True.
             connect_axis_vecs (bool, optional): Defaults to True.
             control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
@@ -260,6 +271,7 @@ class _Anim(base_comp._Hierarchy):
         primary_axis: component_enum_data.AxisEnum = component_enum_data.AxisEnum.x,
         secondary_axis: component_enum_data.AxisEnum = component_enum_data.AxisEnum.y,
         add_settings_cntrl: bool = True,
+        add_weight_driver_component: bool = True,
         mirror_source: "_Anim" = None,
         mirror_axis: component_enum_data.AxisEnum = component_enum_data.AxisEnum.x,
         setup_color: Union[
@@ -268,7 +280,7 @@ class _Anim(base_comp._Hierarchy):
         control_color: Union[
             list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
         ] = None,
-        source_component: base_comp._Hierarchy = None,
+        source_component: hierarchy._Hierarchy = None,
         connect_parent_hier: bool = None,
         connect_axis_vecs: bool = True,
         **kwargs,
@@ -283,6 +295,7 @@ class _Anim(base_comp._Hierarchy):
             primary_axis (component_enum_data.AxisEnum, optional): Defaults to component_enum_data.AxisEnum.x.
             secondary_axis (component_enum_data.AxisEnum, optional): Defaults to component_enum_data.AxisEnum.y.
             add_settings_cntrl (bool, optional): Defaults to True.
+            add_weight_driver_component (bool, optional): Defaults to True.
             mirror_source (_Anim, optional): mirror source component. Defaults to None.
             mirror_axis (component_enum_data.AxisEnum, optional): Defaults to component_enum_data.AxisEnum.x.
             setup_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
@@ -358,6 +371,8 @@ class _Anim(base_comp._Hierarchy):
             mirror_axis=mirror_axis,
         )
         self.__create_motion_component()
+        if add_weight_driver_component:
+            self.__create_weight_driver_component()
         self.__create_clust_component(
             control_color=control_color, setup_color=setup_color
         )
@@ -388,6 +403,8 @@ class _Anim(base_comp._Hierarchy):
         if self._mirror_src_component is not None:
             self.__mirror_controls_from_source()
         self._attach_output_xforms_to_settings_controls()
+        self._weight_driver_component.source_component_reconnect()
+        self._weight_driver_component.connect_input_to_output()
 
     # settings controls
     def __create_settings_cntrls(self, setup_color=None, control_color=None):
@@ -783,6 +800,15 @@ class _Anim(base_comp._Hierarchy):
         )
         utils.map_to_container(motion_inst.container_node, "motion_container")
 
+    def __create_weight_driver_component(self):
+        """Creates weight_driver_component and maps it to anim container"""
+        weight_driver_inst = hierarchy.WeightDrivers.create(
+            source_component=self._motion_component, parent=self
+        )
+        utils.map_to_container(
+            weight_driver_inst.container_node, "weight_driver_container"
+        )
+
     def __create_clust_component(
         self,
         control_color: Union[
@@ -837,7 +863,7 @@ class SimpleLimb(_Anim):
         add_settings_cntrl: bool = True,
         mirror_source: "_Anim" = None,
         mirror_axis: component_enum_data.AxisEnum = component_enum_data.AxisEnum.x,
-        source_component: base_comp._Hierarchy = None,
+        source_component: hierarchy._Hierarchy = None,
         connect_parent_hier: bool = True,
         connect_axis_vecs: bool = True,
         control_color: Union[
@@ -862,7 +888,7 @@ class SimpleLimb(_Anim):
             add_settings_cntrl (bool, optional): Defaults to True.
             mirror_source (_Anim, optional): mirror source component. Defaults to None.
             mirror_axis (component_enum_data.AxisEnum, optional): Defaults to component_enum_data.AxisEnum.x.
-            source_component (base_comp._Hierarchy, optional):  source component to connect hierarchy from. Defaults to None.
+            source_component (hierarchy._Hierarchy, optional):  source component to connect hierarchy from. Defaults to None.
             connect_parent_hier (bool, optional): Defaults to True.
             connect_axis_vecs (bool, optional): Defaults to True.
             control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.

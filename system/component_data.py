@@ -218,6 +218,9 @@ class AttrData:
             locked (bool, optional): Defaults to False.
             keyable (bool, optional): Defaults to False.
             alias (str, optional): Defaults to None.
+
+        Raises:
+            KeyError: if type is a key to an argument instead of key_
         """
         self.name = name
         self.type_ = type_
@@ -229,6 +232,9 @@ class AttrData:
         self.do_add_attr = self.type_ is not None
 
         self.add_attr_kwargs = add_attr_kwargs
+
+        if "type" in self.add_attr_kwargs.keys():
+            raise KeyError("AttrData cannot have type as argument try type_")
 
         if not isinstance(self.type_, str) and self.type_ is not None:
             enum_class = component_enum_data.get_enum_item_class(self.type_)
