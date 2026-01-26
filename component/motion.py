@@ -1,5 +1,4 @@
 import system.base_component as base_comp
-import component.hierarchy as hierarchy
 import component.control as control
 import component.setup as setup
 import component.matrix as matrix
@@ -11,7 +10,7 @@ import utils.utils as utils
 from typing import Union
 
 
-class _Motion(hierarchy._Hierarchy):
+class _Motion(base_comp._Hierarchy):
     """base class for motion autorigging components. Derived from Hierarchy"""
 
     component_type = component_enum_data.ComponentType.motion
@@ -1143,7 +1142,7 @@ class TwistHier(_Motion):
         instance_name: Union[str, nw.Attr] = None,
         parent: Union[base_comp._Component, nw.Container] = None,
         input_xforms: Union[list[component_data.Xform], int] = None,
-        source_component: hierarchy._Hierarchy = None,
+        source_component: base_comp._Hierarchy = None,
         connect_parent_hier: bool = True,
         connect_axis_vecs: bool = True,
         num_twist_xforms: int = 3,
@@ -1499,14 +1498,14 @@ class Merge(_Motion):
         cls,
         instance_name: Union[str, nw.Attr] = None,
         parent: Union[base_comp._Component, nw.Container] = None,
-        source_components: list[hierarchy._Hierarchy] = [],
+        source_components: list[base_comp._Hierarchy] = [],
     ):
         """Class method to create component
 
         Args:
             instance_name (Union[str, nw.Attr], optional): name of component. Defaults to None.
             parent (Union[_Component, nw.Container], optional): Defaults to None.
-            source_components (list[hierarchy._Hierarchy], optional): Defaults to [].
+            source_components (list[base_comp._Hierarchy], optional): Defaults to [].
 
         Returns:
             _type_: _description_
@@ -1517,7 +1516,7 @@ class Merge(_Motion):
         self,
         instance_name: Union[str, nw.Attr] = None,
         parent: Union[base_comp._Component, nw.Container] = None,
-        source_components: list[hierarchy._Hierarchy] = [],
+        source_components: list[base_comp._Hierarchy] = [],
         **pre_build_kwargs,
     ):
         """Handles creation and connection of initial nodes and sources
@@ -1525,7 +1524,7 @@ class Merge(_Motion):
         Args:
             instance_name (Union[str, nw.Attr], optional): name of component. Defaults to None.
             parent (Union[_Component, nw.Container], optional): Defaults to None.
-            source_components (list[hierarchy._Hierarchy], optional): Defaults to [].
+            source_components (list[base_comp._Hierarchy], optional): Defaults to [].
         """
         # get initial source_component
         source_component = None if len(source_components) < 1 else source_components[0]
@@ -1578,7 +1577,7 @@ class Merge(_Motion):
                 raise RuntimeError(
                     "source container cannot be parent of merge container"
                 )
-            if not issubclass(type(source_component), hierarchy._Hierarchy):
+            if not issubclass(type(source_component), base_comp._Hierarchy):
                 raise RuntimeError(
                     f"{source_component.container_node} is not hierarchy component"
                 )

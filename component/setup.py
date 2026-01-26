@@ -2,14 +2,14 @@ import system.base_component as base_comp
 import system.component_data as component_data
 import system.component_enum_data as component_enum_data
 import component.control as control
-import component.hierarchy as hierarchy
+import component.matrix as matrix
 import utils.utils as utils
 import utils.node_wrapper as nw
 import maya.cmds as cmds
 from typing import Union
 
 
-class _Setup(hierarchy._Hierarchy):
+class _Setup(base_comp._Hierarchy):
     """A Base class for setup autorigging components. Derived from Hierarchy
 
     Attribute:
@@ -37,7 +37,7 @@ class _Setup(hierarchy._Hierarchy):
         instance_name: Union[str, nw.Attr] = None,
         parent: base_comp._Component = None,
         input_xforms: Union[list[component_data.Xform], int] = None,
-        source_component: hierarchy._Hierarchy = None,
+        source_component: base_comp._Hierarchy = None,
         connect_parent_hier: bool = True,
         connect_axis_vecs: bool = True,
         control_color: Union[
@@ -688,7 +688,7 @@ class Mirror(_Setup):
         mirror_axis: Union[
             component_enum_data.AxisEnum, nw.Attr
         ] = component_enum_data.AxisEnum.x,
-        source_component: hierarchy._Hierarchy = None,
+        source_component: base_comp._Hierarchy = None,
         connect_parent_hier: bool = True,
         connect_axis_vecs: bool = True,
         control_color=None,
@@ -720,7 +720,7 @@ class Mirror(_Setup):
         mirror_axis: Union[
             component_enum_data.AxisEnum, nw.Attr
         ] = component_enum_data.AxisEnum.x,
-        source_component: hierarchy._Hierarchy = None,
+        source_component: base_comp._Hierarchy = None,
         connect_parent_hier: bool = None,
         connect_axis_vecs: bool = True,
         **kwargs,
@@ -772,7 +772,6 @@ class Mirror(_Setup):
                 "multMatrix", f"xform{index}_mirror_neg_scale_mult"
             )
 
-            # mult_mat_neg_scale["matrixIn"][0] = utils.Matrix.scale_matrix(-1, -1, -1)
             mult_mat_neg_scale["matrixIn"][0] << input_xform.init_matrix
             (
                 mult_mat_neg_scale["matrixIn"][1]
@@ -793,6 +792,26 @@ class Mirror(_Setup):
                 ),
             )
             added_nodes.extend([mult_mat_neg_scale, mult_mat])
+            # mirror_mat_comp = matrix.Mirror.create(
+            #     instance_name=f"xform{index}",
+            #     parent=self,
+            #     input_matrix=input_xform.init_matrix,
+            # )
+
+            # self._set_xform_attrs(
+            #     index=index,
+            #     xform_type=self.IO_ENUM.output,
+            #     xform=self.XFORM(
+            #         xform_name=input_xform.xform_name,
+            #         init_matrix=mirror_mat_comp.container_node[
+            #             mirror_mat_comp._OUT_WRLD_MAT
+            #         ],
+            #         world_matrix=mirror_mat_comp.container_node[
+            #             mirror_mat_comp._OUT_WRLD_MAT
+            #         ],
+            #     ),
+            # )
+            # mirror_mat_comp.container_node[mirror_mat_comp._OUT_WRLD_MAT]
 
         # mirroring settings
         settings_mult_mat = nw.create_node("multMatrix", "settings_guide_mirror")

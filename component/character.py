@@ -7,6 +7,7 @@ import utils.node_wrapper as nw
 import system.component_data as component_data
 import utils.utils as utils
 from typing import Union
+import maya.cmds as cmds
 
 
 class _Character(base_comp._Component):
@@ -15,6 +16,9 @@ class _Character(base_comp._Component):
     Attributes
         root_component (component.anim.SingleXform):
         mesh_component (component.mesh.Mesh):
+
+        _jnt_grp (nw.Transform): joint group node
+        _anim_grp (nw.Transform): anim group node
 
         _IN_COLOR_CONST (str): str constant "colorConst"
         _IN_AXIS_VEC_CONST (str): str constant "axisVecConst"
@@ -33,6 +37,7 @@ class _Character(base_comp._Component):
     _SETUP_CLR = "setupColor"
     _IN_MOT_VIS = "motionVisibility"
     _IN_SETUP_VIS = "setupVisibility"
+    _IN_JNT_VIS = "jointVisibility"
 
     def _input_attr_build_data(self):
         """Defines all the added, published, or modified attributes for the
@@ -85,6 +90,13 @@ class _Character(base_comp._Component):
             ),
             component_data.AttrData(
                 self._IN_SETUP_VIS,
+                type_="bool",
+                parent=self._IN,
+                keyable=True,
+                value=True,
+            ),
+            component_data.AttrData(
+                self._IN_JNT_VIS,
                 type_="bool",
                 parent=self._IN,
                 keyable=True,
@@ -181,6 +193,24 @@ class _Character(base_comp._Component):
         """
         return self.child_components()[1]
 
+    @property
+    def _jnt_grp(self) -> nw.Transform:
+        """Returns jnt grp
+
+        Returns:
+            nw.Transform:
+        """
+        return self._get_node_from_key("jntGrp")
+
+    @property
+    def _anim_grp(self) -> nw.Transform:
+        """Returns anim grp
+
+        Returns:
+            nw.Transform: _description_
+        """
+        return self._get_node_from_key("animGrp")
+
     def _pre_build(
         self,
         instance_name: Union[str, nw.Attr] = None,
@@ -209,6 +239,8 @@ class _Character(base_comp._Component):
         )
         self.__create_mesh_component()
 
+        self.__create_organization_grps()
+
         self.rename_nodes()
 
     def _post_build(self, **kwargs):
@@ -216,17 +248,29 @@ class _Character(base_comp._Component):
         visibility to character's motion and setup visibility
         """
         child_components = self.child_components()
+        motion_vis = self.container_node[self._IN_MOT_VIS]
+        setup_vis = self.container_node[self._IN_SETUP_VIS]
+        jnt_vis = self.container_node[self._IN_JNT_VIS]
         for child_component in child_components:
-            motion_vis = self.container_node[self._IN_MOT_VIS]
-            setup_vis = self.container_node[self._IN_SETUP_VIS]
+            # if anim type component
+            if issubclass(type(child_component), anim._Anim):
+                # parents anim component transform to char anim group
+                cmds.parent(str(child_component.transform_node), str(self._anim_grp))
 
-            if child_component.container_node.has_attr(self._IN_MOT_VIS):
+                # set vis n anim group
                 child_component.container_node[self._IN_MOT_VIS] << motion_vis
-            if child_component.container_node.has_attr(self._IN_SETUP_VIS):
                 child_component.container_node[self._IN_SETUP_VIS] << setup_vis
 
-            if issubclass(type(child_component), anim._Anim):
-                motion.Joint.create(source_component=child_component, parent=self)
+                # adds joint component to anim component
+                jnt_component = motion.Joint.create(
+                    instance_name=child_component.container_node[self._BLD_INST_NAME],
+                    source_component=child_component,
+                    parent=self,
+                )
+                jnt_component.transform_node["visibility"] << jnt_vis
+                # parents joint component to char joint group
+                cmds.parent(str(jnt_component.transform_node), str(self._jnt_grp))
+
         super()._post_build(**kwargs)
 
     def __create_root_component(self, mid_shader: nw.Node, setup_shader: nw.Node):
@@ -258,6 +302,18 @@ class _Character(base_comp._Component):
     def __create_mesh_component(self):
         """Creates mesh component"""
         misc.Mesh.create(parent=self)
+
+    def __create_organization_grps(self):
+        """creates groups for anim groups and jnts"""
+        jnt_grp = nw.create_node("transform", "jnt_grp")
+        anim_grp = nw.create_node("transform", "anim_grp")
+
+        cmds.parent(str(jnt_grp), str(anim_grp), str(self.transform_node))
+
+        self.container_node.add_nodes(jnt_grp, anim_grp)
+
+        utils.map_to_container(jnt_grp, "jntGrp")
+        utils.map_to_container(anim_grp, "animGrp")
 
     def add_mesh(self, mesh: nw.Transform):
         """Adds mesh to character mesh component

@@ -1398,6 +1398,11 @@ class Attr:
         """Returns if attribute has children"""
         return self.plug.isArray or self.plug.isCompound
 
+    def get_indicies(self):
+        """Get Indicies of attribute. throws TypeError if not an array
+        """
+        return self.plug.getExistingArrayAttributeIndices()
+
     def __len__(self):
         """Gets length of child attributes, returns -1 if there are no children
 
@@ -1425,7 +1430,10 @@ class Attr:
         """
         if not self.has_children():
             raise TypeError("attribute is not of type compound or array")
-        for index in range(self.__len__()):
+        index_list = range(self.__len__())
+        if self.plug.isArray:
+            index_list = self.get_indicies()
+        for index in index_list:
             yield self.__getitem__(index)
 
     # Math Operator Overloads

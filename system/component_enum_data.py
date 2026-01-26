@@ -180,13 +180,14 @@ class ComponentType(MayaEnumAttr):
     anim = 0
     character = 1
     cluster = 2
-    component = 3
-    control = 4
-    hier = 5
-    manager = 6
-    matrix = 7
-    motion = 8
-    setup = 9
+    corrective = 3
+    component = 4
+    control = 5
+    hier = 6
+    manager = 7
+    matrix = 8
+    motion = 9
+    setup = 10
 
 
 class Color(MayaEnumAttr):

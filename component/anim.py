@@ -1,8 +1,8 @@
 import system.component_enum_data as component_enum_data
 import system.component_data as component_data
 import system.base_component as base_comp
-import component.hierarchy as hierarchy
 import component.enum_manager as enum_manager
+import component.corrective as corrective
 import component.setup as setup
 import component.motion as motion
 import component.misc as misc
@@ -13,7 +13,7 @@ from typing import Union
 import maya.cmds as cmds
 
 
-class _Anim(hierarchy._Hierarchy):
+class _Anim(base_comp._Hierarchy):
     """Base class for anim autorigging components. Derived from Hierarchy. creates setup component in pre build
 
 
@@ -22,7 +22,7 @@ class _Anim(hierarchy._Hierarchy):
         _setup_component_type (component.setup.Setup): setup component type that will be used to be created. gets __setup_component_type from inherited class
         _setup_component (component.setup.Setup): setup component instance
         _motion_component (component.motion.MotionWrapper): motion component that contains all other motion components
-        _cluster_component (component.misc.Cluster):
+        _corrective_xform_component (component.corrective.CorrectiveXform): corrective xform component that contains corrective xforms
         _settings_component (component.control._Control):
         _settings_guide_component (component.control._Control):
         _mirror_dest_component (component.anim._Anim): mirror destination component
@@ -73,21 +73,21 @@ class _Anim(hierarchy._Hierarchy):
 
     @property
     def _motion_component(self) -> motion.MotionWrapper:
-        """Returns setup component
+        """Returns motion component
 
         Returns:
-            setup.Setup:
+            motion.MotionWrapper:
         """
         return self._get_node_from_key("motion_container", as_component=True)
 
     @property
-    def _weight_driver_component(self) -> hierarchy.WeightDrivers:
-        """Returns weight driver component
+    def _corrective_xform_component(self) -> corrective.CorrectiveXforms:
+        """Returns corrective xform component
 
         Returns:
-            hierarchy.WeightDrivers:
+            corrective.CorrectiveXform:
         """
-        return self._get_node_from_key("weight_driver_container", as_component=True)
+        return self._get_node_from_key("corrective_xform_container", as_component=True)
 
     @property
     def cluster_component(self) -> misc.Cluster:
@@ -223,10 +223,10 @@ class _Anim(hierarchy._Hierarchy):
         primary_axis: component_enum_data.AxisEnum = component_enum_data.AxisEnum.x,
         secondary_axis: component_enum_data.AxisEnum = component_enum_data.AxisEnum.y,
         add_settings_cntrl: bool = True,
-        add_weight_driver_component: bool = True,
+        add_corrective_xform_component: bool = True,
         mirror_source: "_Anim" = None,
         mirror_axis: component_enum_data.AxisEnum = component_enum_data.AxisEnum.x,
-        source_component: hierarchy._Hierarchy = None,
+        source_component: base_comp._Hierarchy = None,
         connect_parent_hier: bool = True,
         connect_axis_vecs: bool = True,
         control_color: Union[
@@ -250,7 +250,7 @@ class _Anim(hierarchy._Hierarchy):
             add_settings_cntrl (bool, optional): Defaults to True.
             mirror_source (_Anim, optional): mirror source component. Defaults to None.
             mirror_axis (component_enum_data.AxisEnum, optional): Defaults to component_enum_data.AxisEnum.x.
-            source_component (hierarchy._Hierarchy, optional):  source component to connect hierarchy from. Defaults to None.
+            source_component (base_comp._Hierarchy, optional):  source component to connect hierarchy from. Defaults to None.
             connect_parent_hier (bool, optional): Defaults to True.
             connect_axis_vecs (bool, optional): Defaults to True.
             control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
@@ -271,7 +271,7 @@ class _Anim(hierarchy._Hierarchy):
         primary_axis: component_enum_data.AxisEnum = component_enum_data.AxisEnum.x,
         secondary_axis: component_enum_data.AxisEnum = component_enum_data.AxisEnum.y,
         add_settings_cntrl: bool = True,
-        add_weight_driver_component: bool = True,
+        add_corrective_xform_component: bool = True,
         mirror_source: "_Anim" = None,
         mirror_axis: component_enum_data.AxisEnum = component_enum_data.AxisEnum.x,
         setup_color: Union[
@@ -280,7 +280,7 @@ class _Anim(hierarchy._Hierarchy):
         control_color: Union[
             list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node
         ] = None,
-        source_component: hierarchy._Hierarchy = None,
+        source_component: base_comp._Hierarchy = None,
         connect_parent_hier: bool = None,
         connect_axis_vecs: bool = True,
         **kwargs,
@@ -295,7 +295,7 @@ class _Anim(hierarchy._Hierarchy):
             primary_axis (component_enum_data.AxisEnum, optional): Defaults to component_enum_data.AxisEnum.x.
             secondary_axis (component_enum_data.AxisEnum, optional): Defaults to component_enum_data.AxisEnum.y.
             add_settings_cntrl (bool, optional): Defaults to True.
-            add_weight_driver_component (bool, optional): Defaults to True.
+            add_corrective_xform_component (bool, optional): Defaults to True.
             mirror_source (_Anim, optional): mirror source component. Defaults to None.
             mirror_axis (component_enum_data.AxisEnum, optional): Defaults to component_enum_data.AxisEnum.x.
             setup_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
@@ -371,8 +371,8 @@ class _Anim(hierarchy._Hierarchy):
             mirror_axis=mirror_axis,
         )
         self.__create_motion_component()
-        if add_weight_driver_component:
-            self.__create_weight_driver_component()
+        if add_corrective_xform_component:
+            self.__create_corrective_xform_component()
         self.__create_clust_component(
             control_color=control_color, setup_color=setup_color
         )
@@ -403,8 +403,8 @@ class _Anim(hierarchy._Hierarchy):
         if self._mirror_src_component is not None:
             self.__mirror_controls_from_source()
         self._attach_output_xforms_to_settings_controls()
-        self._weight_driver_component.source_component_reconnect()
-        self._weight_driver_component.connect_input_to_output()
+        self._corrective_xform_component.source_component_reconnect()
+        self._corrective_xform_component.connect_input_to_output()
 
     # settings controls
     def __create_settings_cntrls(self, setup_color=None, control_color=None):
@@ -800,13 +800,13 @@ class _Anim(hierarchy._Hierarchy):
         )
         utils.map_to_container(motion_inst.container_node, "motion_container")
 
-    def __create_weight_driver_component(self):
-        """Creates weight_driver_component and maps it to anim container"""
-        weight_driver_inst = hierarchy.WeightDrivers.create(
+    def __create_corrective_xform_component(self):
+        """Creates corrective_xform_component and maps it to anim container"""
+        corrective_xform_inst = corrective.CorrectiveXforms.create(
             source_component=self._motion_component, parent=self
         )
         utils.map_to_container(
-            weight_driver_inst.container_node, "weight_driver_container"
+            corrective_xform_inst.container_node, "corrective_xform_container"
         )
 
     def __create_clust_component(
@@ -863,7 +863,7 @@ class SimpleLimb(_Anim):
         add_settings_cntrl: bool = True,
         mirror_source: "_Anim" = None,
         mirror_axis: component_enum_data.AxisEnum = component_enum_data.AxisEnum.x,
-        source_component: hierarchy._Hierarchy = None,
+        source_component: base_comp._Hierarchy = None,
         connect_parent_hier: bool = True,
         connect_axis_vecs: bool = True,
         control_color: Union[
@@ -888,7 +888,7 @@ class SimpleLimb(_Anim):
             add_settings_cntrl (bool, optional): Defaults to True.
             mirror_source (_Anim, optional): mirror source component. Defaults to None.
             mirror_axis (component_enum_data.AxisEnum, optional): Defaults to component_enum_data.AxisEnum.x.
-            source_component (hierarchy._Hierarchy, optional):  source component to connect hierarchy from. Defaults to None.
+            source_component (base_comp._Hierarchy, optional):  source component to connect hierarchy from. Defaults to None.
             connect_parent_hier (bool, optional): Defaults to True.
             connect_axis_vecs (bool, optional): Defaults to True.
             control_color (Union[list, utils.Vector, component_enum_data.Color, nw.Attr, nw.Node], optional): Defaults to None.
