@@ -4,6 +4,7 @@ from typing import Union
 import utils.om as utils_om
 import utils.apiundo as apiundo
 import re as re
+from collections import deque
 
 
 def wrap_node(node):
@@ -1398,10 +1399,84 @@ class Attr:
         """Returns if attribute has children"""
         return self.plug.isArray or self.plug.isCompound
 
+    def get_all_children_dict(self) -> dict[str, "Attr"]:
+        """Gets all children in a dictionary"""
+        if not self.has_children():
+            raise TypeError(f"{self} does not have children")
+        
+        has_children_list = deque()
+        has_children_list.append(self)
+        
+        attr_dict = {}
+        while len(has_children_list):
+            curr_attr = has_children_list.pop()
+            # print(curr_attr)
+            if curr_attr.has_children():
+                for attr in curr_attr:
+                    if attr.has_children():
+                        has_children_list.append(attr)
+                    else:
+                        key = attr.short_name.replace(self.short_name, "")
+                        attr_dict[key] = attr
+            else:
+                key = curr_attr.short_name.replace(self.short_name, "")
+                attr_dict[key] = curr_attr
+
+        return attr_dict
+
     def get_indicies(self):
-        """Get Indicies of attribute. throws TypeError if not an array
+        """Get Indicies of attribute. throws TypeError if not an array"""
+        return list(self.plug.getExistingArrayAttributeIndices())
+
+    def remove_index(self, rem_index:int, shift_down:bool=True):
+        """remove index and shifts down if applied
+
+        Args:
+            index (int):
+            shift_down (bool, optional): _description_. Defaults to False
         """
-        return self.plug.getExistingArrayAttributeIndices()
+        def __reconnect_attr(src_attr:"Attr", dest_attr:"Attr"):
+            """given a src attr and dest attr transfer all connections and data to dest attr
+
+            Args:
+                src_attr (Attr): 
+                dest_attr (Attr): 
+            """
+            if src_attr.has_src_connection():
+                src_attr.get_src_connection() >> dest_attr
+            else:
+                dest_attr.set(src_attr.value)
+            dest_connections = src_attr.get_dest_connections()
+            for dest_conn_attr in dest_connections:
+                dest_attr >> ~dest_conn_attr
+
+            
+        attr_indicies = self.get_indicies()
+        if rem_index not in attr_indicies:
+            raise IndexError(f"Index not found in {self}")
+        
+        list_find_index = attr_indicies.index(rem_index)
+
+        for list_index, attr_index in enumerate(attr_indicies[list_find_index:-1]):
+            curr_attr = self.__getitem__(attr_index)
+            next_attr = self.__getitem__(attr_indicies[list_index + list_find_index + 1])
+
+            cmds.removeMultiInstance(str(curr_attr), b=True)
+            if not shift_down:
+                return
+            curr_attr = self.__getitem__(attr_index)
+
+            if next_attr.has_children():
+                next_attr_dict = next_attr.get_all_children_dict()
+
+                for key, child_attr in next_attr_dict.items():
+                    __reconnect_attr(src_attr=child_attr, dest_attr=curr_attr[key])
+                    
+            else:
+                __reconnect_attr(src_attr=next_attr, dest_attr=curr_attr)
+
+        if shift_down:
+            cmds.removeMultiInstance(str(self.__getitem__(attr_indicies[-1])), b=True)
 
     def __len__(self):
         """Gets length of child attributes, returns -1 if there are no children
@@ -1537,5 +1612,4 @@ class Attr:
     # skin cluster
     # TODO
     # nodes
-    # set attr should be easier
     # error check __getItem__
