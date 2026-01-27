@@ -441,7 +441,7 @@ class Cluster(base_comp._Component):
                 input_world_matrix=input_xform.world_matrix,
             )
 
-            ws_attr = mirror_inst.container_node[mirror_inst._OUT_WRLD_MAT]
+            ws_attr = mirror_inst.container_node[mirror_inst._OUT_MIR_MAT]
 
             inv_mat = nw.create_node(
                 "inverseMatrix", f"{input_xform.xform_name.value}_init_inv"

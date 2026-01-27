@@ -539,24 +539,7 @@ class _Component:
 
             # connecting parent and child components
             if parent is not None:
-                if parent.has_attr(self._CNTNR_CHLD_COMP):
-                    child_component_len = len(parent[self._CNTNR_CHLD_COMP])
-                    (
-                        parent[self._CNTNR_CHLD_COMP][child_component_len]
-                        >> self.container_node[self._CNTNR_PAR_COMP]
-                    )
-
-                    # parenting transforms
-                    parent_component = get_component(parent)
-                    if (
-                        parent_component is not None
-                        and parent_component.transform_node is not None
-                        and self.transform_node is not None
-                    ):
-                        cmds.parent(
-                            str(self.transform_node),
-                            str(parent_component.transform_node),
-                        )
+                self.parent_component(parent)
 
             # renaming to nodes
             self.rename_nodes()
@@ -796,6 +779,47 @@ class _Component:
         else:
             return get_component(mirror_container)
 
+    def parent_component(self, parent_component:Union["_Component", nw.Container]):
+        """Parents current component to given component
+
+        Args:
+            parent_component (Union[&quot;_Component&quot;, nw.Container]):
+        """
+        # connecting parent and child components
+        if isinstance(parent_component, nw.Container):
+            comp_container = parent_component
+            parent_component = get_component(parent_component)
+        else:
+            comp_container = parent_component.container_node
+
+        if comp_container is not None:
+            if comp_container.has_attr(self._CNTNR_CHLD_COMP):
+                if self.container_node[self._CNTNR_PAR_COMP].has_src_connection():
+                    prev_conn = self.container_node[self._CNTNR_PAR_COMP].get_src_connection()
+                    ~self.container_node[self._CNTNR_PAR_COMP]
+                    if len(prev_conn.get_dest_connections()) == 0:
+                        prev_conn.parent.remove_index(prev_conn.index)
+                    curr_parent_container = self.container_node.get_container_node()
+                    if curr_parent_container is not None:
+                        curr_parent_container.remove_nodes(self.container_node)                        
+                    comp_container.add_nodes(self.container_node)
+                (
+                    comp_container[self._CNTNR_CHLD_COMP][comp_container[self._CNTNR_CHLD_COMP].next_index()]
+                    >> self.container_node[self._CNTNR_PAR_COMP]
+                )
+
+                # parenting transforms
+                if (
+                    parent_component is not None
+                    and parent_component.transform_node is not None
+                    and self.transform_node is not None
+                ):
+                    cmds.parent(
+                        str(self.transform_node),
+                        str(parent_component.transform_node),
+                    )
+        self.rename_nodes()
+        
 
 class _Hierarchy(_Component):
     """A Class meant to be inherited for all hierarchy classes. hierarchy in this

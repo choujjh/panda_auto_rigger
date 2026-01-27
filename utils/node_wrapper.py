@@ -1410,7 +1410,6 @@ class Attr:
         attr_dict = {}
         while len(has_children_list):
             curr_attr = has_children_list.pop()
-            # print(curr_attr)
             if curr_attr.has_children():
                 for attr in curr_attr:
                     if attr.has_children():
@@ -1425,8 +1424,18 @@ class Attr:
         return attr_dict
 
     def get_indicies(self):
-        """Get Indicies of attribute. throws TypeError if not an array"""
-        return list(self.plug.getExistingArrayAttributeIndices())
+        """Get Indicies of attribute. throws TypeError if not an array
+
+        Raises:
+            TypeError: no indicies
+
+        Returns:
+            list(int): indicies list
+        """
+        try:
+            return list(self.plug.getExistingArrayAttributeIndices())
+        except TypeError:
+            raise TypeError(f"{self} does not have indicies")
 
     def remove_index(self, rem_index:int, shift_down:bool=True):
         """remove index and shifts down if applied
@@ -1477,6 +1486,19 @@ class Attr:
 
         if shift_down:
             cmds.removeMultiInstance(str(self.__getitem__(attr_indicies[-1])), b=True)
+    
+    def next_index(self):
+        """next_index _summary_
+
+        Raises:
+            TypeError: no indicie
+
+        Returns:
+            int:
+        """
+        if self.__len__() == 0:
+            return 0
+        return self.get_indicies()[-1]+1
 
     def __len__(self):
         """Gets length of child attributes, returns -1 if there are no children

@@ -18,7 +18,6 @@ class OrientTransformBlend(_Matrix):
 
     pass
 
-
 class Twist(_Matrix):
     """Twist matrix. takes a local matrix and a local init matrix and calculates
     twist
@@ -243,10 +242,8 @@ class Mirror(_Matrix):
     _IN_MAT = "inputMatrix"
     _IN_SCALE_MAT = "inputScaleMatrix"
     _IN_WRD_MAT = "inputWorldMatrix"
-    _IN_MIRROR_BEH = "mirrorBehavior"
-    _IN_ID_MAT = "identityMatrix"
-    _IN_NEG_SCALE_MAT = "negScaleMatrix"
-    _OUT_WRLD_MAT = "worldMatrix"
+    _OUT_MIR_MAT = "mirrorMatrix"
+    _OUT_MIR_BEH_MAT = "mirrorBehaviorMatrix"
 
     @classmethod
     def create(
@@ -256,7 +253,6 @@ class Mirror(_Matrix):
         input_matrix: Union[utils.Matrix, nw.Attr] = None,
         input_scale_matrix: Union[utils.Matrix, nw.Attr] = None,
         input_world_matrix: Union[utils.Matrix, nw.Attr] = None,
-        mirror_behavior: bool = True,
         **kwargs,
     ):
         """Class method to create component
@@ -283,27 +279,10 @@ class Mirror(_Matrix):
         """
         node_data = super()._input_attr_build_data()
         node_data.extend_attr_data(
-            component_data.AttrData("matrixIn[1]", publish=self._IN_MAT),
-            component_data.AttrData("matrixIn[2]", publish=self._IN_SCALE_MAT),
-            component_data.AttrData("matrixIn[3]", publish=self._IN_WRD_MAT),
-            component_data.AttrData("matrixSum", publish=self._OUT_WRLD_MAT),
-            component_data.AttrData(
-                self._IN_MIRROR_BEH, type_="bool", publish=True, value=True
-            ),
-            component_data.AttrData(
-                self._IN_ID_MAT,
-                type_="matrix",
-                publish=True,
-                value=utils.Matrix.identity_matrix(),
-                locked=True,
-            ),
-            component_data.AttrData(
-                self._IN_NEG_SCALE_MAT,
-                type_="matrix",
-                publish=True,
-                value=utils.Matrix.scale_matrix(-1, -1, -1),
-                locked=True,
-            ),
+            component_data.AttrData("matrixIn[0]", publish=self._IN_MAT),
+            component_data.AttrData("matrixIn[1]", publish=self._IN_SCALE_MAT),
+            component_data.AttrData("matrixIn[2]", publish=self._IN_WRD_MAT),
+            component_data.AttrData("matrixSum", publish=self._OUT_MIR_MAT),
         )
         return node_data
 
@@ -314,20 +293,19 @@ class Mirror(_Matrix):
         input_matrix=None,
         input_scale_matrix=None,
         input_world_matrix=None,
-        mirror_behavior: Union[nw.Attr, bool] = True,
         **kwargs,
     ):
         """Handles creation and connection of initial nodes
 
         Args:
-            instance_name (_type_, optional): _description_. Defaults to None.
-            parent (_type_, optional): _description_. Defaults to None.
-            mirror_behavior (bool, optional): _description_. Defaults to True.
+            instance_name (str, nw.Attr, optional): _description_. Defaults to None.
+            parent (str, nw.Attr, optional): _description_. Defaults to None.
+            input_matrix (nw.Attr, utils.Matrix, list):
+            input_scale_matrix (nw.Attr, utils.Matrix, list):
+            input_world_matrix (nw.Attr, utils.Matrix, list):
         """
         super()._pre_build(instance_name, parent, **kwargs)
-        utils.set_connect_attr_data(
-            self.container_node[self._IN_MIRROR_BEH], mirror_behavior
-        )
+
         utils.set_connect_attr_data(self.container_node[self._IN_MAT], input_matrix)
         utils.set_connect_attr_data(
             self.container_node[self._IN_SCALE_MAT], input_scale_matrix
@@ -339,8 +317,9 @@ class Mirror(_Matrix):
     def _override_build(self, **kwargs):
         """Takes care of derived component creation. must be implemented by child class"""
 
-        behavior_choice = nw.create_node("choice", "mirror_behavior_choice")
-        behavior_choice["selector"] << self.container_node[self._IN_MIRROR_BEH]
-        behavior_choice["input"][0] << self.container_node[self._IN_ID_MAT]
-        behavior_choice["input"][1] << self.container_node[self._IN_NEG_SCALE_MAT]
-        behavior_choice["output"] >> self.input_node["matrixIn"][0]
+        mirror_beh_mult = nw.create_node("multMatrix", "mirror_beh_mat")
+        mirror_beh_mult["matrixIn"][0] = utils.Matrix.scale_matrix(-1, -1, -1)
+        mirror_beh_mult["matrixIn"][1] << self.input_node["matrixSum"]
+
+        self.container_node.add_nodes(mirror_beh_mult)
+        self.container_node.publish_attr(mirror_beh_mult["matrixSum"], self._OUT_MIR_BEH_MAT)

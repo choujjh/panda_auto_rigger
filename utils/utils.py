@@ -789,10 +789,13 @@ class Matrix(om2.MMatrix):
         Returns:
             list:
         """
+        z_scalar = 1
+        if self.det4x4() < 0:
+            z_scalar = -1
         return (
             om2.MVector(self.column(0)).length(),
             om2.MVector(self.column(1)).length(),
-            om2.MVector(self.column(2)).length(),
+            om2.MVector(self.column(2)).length() * z_scalar,
         )
 
     def column(self, index):
