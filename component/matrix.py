@@ -18,6 +18,7 @@ class OrientTransformBlend(_Matrix):
 
     pass
 
+
 class Twist(_Matrix):
     """Twist matrix. takes a local matrix and a local init matrix and calculates
     twist
@@ -322,4 +323,6 @@ class Mirror(_Matrix):
         mirror_beh_mult["matrixIn"][1] << self.input_node["matrixSum"]
 
         self.container_node.add_nodes(mirror_beh_mult)
-        self.container_node.publish_attr(mirror_beh_mult["matrixSum"], self._OUT_MIR_BEH_MAT)
+        self.container_node.publish_attr(
+            mirror_beh_mult["matrixSum"], self._OUT_MIR_BEH_MAT
+        )

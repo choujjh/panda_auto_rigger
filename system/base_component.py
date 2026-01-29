@@ -779,7 +779,7 @@ class _Component:
         else:
             return get_component(mirror_container)
 
-    def parent_component(self, parent_component:Union["_Component", nw.Container]):
+    def parent_component(self, parent_component: Union["_Component", nw.Container]):
         """Parents current component to given component
 
         Args:
@@ -795,16 +795,20 @@ class _Component:
         if comp_container is not None:
             if comp_container.has_attr(self._CNTNR_CHLD_COMP):
                 if self.container_node[self._CNTNR_PAR_COMP].has_src_connection():
-                    prev_conn = self.container_node[self._CNTNR_PAR_COMP].get_src_connection()
+                    prev_conn = self.container_node[
+                        self._CNTNR_PAR_COMP
+                    ].get_src_connection()
                     ~self.container_node[self._CNTNR_PAR_COMP]
                     if len(prev_conn.get_dest_connections()) == 0:
                         prev_conn.parent.remove_index(prev_conn.index)
                     curr_parent_container = self.container_node.get_container_node()
                     if curr_parent_container is not None:
-                        curr_parent_container.remove_nodes(self.container_node)                        
+                        curr_parent_container.remove_nodes(self.container_node)
                     comp_container.add_nodes(self.container_node)
                 (
-                    comp_container[self._CNTNR_CHLD_COMP][comp_container[self._CNTNR_CHLD_COMP].next_index()]
+                    comp_container[self._CNTNR_CHLD_COMP][
+                        comp_container[self._CNTNR_CHLD_COMP].next_index()
+                    ]
                     >> self.container_node[self._CNTNR_PAR_COMP]
                 )
 
@@ -819,7 +823,7 @@ class _Component:
                         str(parent_component.transform_node),
                     )
         self.rename_nodes()
-        
+
 
 class _Hierarchy(_Component):
     """A Class meant to be inherited for all hierarchy classes. hierarchy in this

@@ -1403,10 +1403,10 @@ class Attr:
         """Gets all children in a dictionary"""
         if not self.has_children():
             raise TypeError(f"{self} does not have children")
-        
+
         has_children_list = deque()
         has_children_list.append(self)
-        
+
         attr_dict = {}
         while len(has_children_list):
             curr_attr = has_children_list.pop()
@@ -1437,19 +1437,20 @@ class Attr:
         except TypeError:
             raise TypeError(f"{self} does not have indicies")
 
-    def remove_index(self, rem_index:int, shift_down:bool=True):
+    def remove_index(self, rem_index: int, shift_down: bool = True):
         """remove index and shifts down if applied
 
         Args:
             index (int):
             shift_down (bool, optional): _description_. Defaults to False
         """
-        def __reconnect_attr(src_attr:"Attr", dest_attr:"Attr"):
+
+        def __reconnect_attr(src_attr: "Attr", dest_attr: "Attr"):
             """given a src attr and dest attr transfer all connections and data to dest attr
 
             Args:
-                src_attr (Attr): 
-                dest_attr (Attr): 
+                src_attr (Attr):
+                dest_attr (Attr):
             """
             if src_attr.has_src_connection():
                 src_attr.get_src_connection() >> dest_attr
@@ -1459,16 +1460,17 @@ class Attr:
             for dest_conn_attr in dest_connections:
                 dest_attr >> ~dest_conn_attr
 
-            
         attr_indicies = self.get_indicies()
         if rem_index not in attr_indicies:
             raise IndexError(f"Index not found in {self}")
-        
+
         list_find_index = attr_indicies.index(rem_index)
 
         for list_index, attr_index in enumerate(attr_indicies[list_find_index:-1]):
             curr_attr = self.__getitem__(attr_index)
-            next_attr = self.__getitem__(attr_indicies[list_index + list_find_index + 1])
+            next_attr = self.__getitem__(
+                attr_indicies[list_index + list_find_index + 1]
+            )
 
             cmds.removeMultiInstance(str(curr_attr), b=True)
             if not shift_down:
@@ -1480,13 +1482,13 @@ class Attr:
 
                 for key, child_attr in next_attr_dict.items():
                     __reconnect_attr(src_attr=child_attr, dest_attr=curr_attr[key])
-                    
+
             else:
                 __reconnect_attr(src_attr=next_attr, dest_attr=curr_attr)
 
         if shift_down:
             cmds.removeMultiInstance(str(self.__getitem__(attr_indicies[-1])), b=True)
-    
+
     def next_index(self):
         """next_index _summary_
 
@@ -1498,7 +1500,7 @@ class Attr:
         """
         if self.__len__() == 0:
             return 0
-        return self.get_indicies()[-1]+1
+        return self.get_indicies()[-1] + 1
 
     def __len__(self):
         """Gets length of child attributes, returns -1 if there are no children

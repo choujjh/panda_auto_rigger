@@ -539,3 +539,270 @@ class Wrapper(base_comp._Component):
         namespace_attr[self._BLD_COMP_NAME].set(namespace)
         namespace_attr.set_locked(True)
         self.rename_nodes()
+
+
+class AxisVectorPicker(base_comp._Component):
+    """given 3 axis, and 3 vector outputs primary, secondary, and tertiary vectors
+
+    Attributes:
+        _IN_PRM_AXIS (str): str constant for "primaryAxis"
+        _IN_SEC_AXIS (str): str constant for "secondaryAxis"
+        _IN_TER_AXIS (str): str constant for "tertiaryAxis"
+        _IN_X_VEC (str): str constant for "xVec"
+        _IN_X_VEC_X (str): str constant for "xVecX"
+        _IN_X_VEC_Y (str): str constant for "xVecY"
+        _IN_X_VEC_Z (str): str constant for "xVecZ"
+        _IN_Y_VEC (str): str constant for "yVec"
+        _IN_Y_VEC_X (str): str constant for "yVecX"
+        _IN_Y_VEC_Y (str): str constant for "yVecY"
+        _IN_Y_VEC_Z (str): str constant for "yVecZ"
+        _IN_Z_VEC (str): str constant for "zVec"
+        _IN_Z_VEC_X (str): str constant for "zVecX"
+        _IN_Z_VEC_Y (str): str constant for "zVecY"
+        _IN_Z_VEC_Z (str): str constant for "zVecZ"
+        _OUT_PRM_VEC (str): str constant for "PrimaryVec"
+        _OUT_PRM_VEC_X (str): str constant for "PrimaryVecX"
+        _OUT_PRM_VEC_Y (str): str constant for "PrimaryVecY"
+        _OUT_PRM_VEC_Z (str): str constant for "PrimaryVecZ"
+        _OUT_SEC_VEC (str): str constant for "SecVec"
+        _OUT_SEC_VEC_X (str): str constant for "SecVecX"
+        _OUT_SEC_VEC_Y (str): str constant for "SecVecY"
+        _OUT_SEC_VEC_Z (str): str constant for "SecVecZ"
+        _OUT_TER_VEC (str): str constant for "TerVec"
+        _OUT_TER_VEC_X (str): str constant for "TerVecX"
+        _OUT_TER_VEC_Y (str): str constant for "TerVecY"
+        _OUT_TER_VEC_Z (str): str constant for "TerVecZ"
+    """
+
+    _IN_PRM_AXIS = "primaryAxis"
+    _IN_SEC_AXIS = "secondaryAxis"
+    _IN_TER_AXIS = "tertiaryAxis"
+
+    _IN_X_VEC = "xVec"
+    _IN_X_VEC_X = "xVecX"
+    _IN_X_VEC_Y = "xVecY"
+    _IN_X_VEC_Z = "xVecZ"
+    _IN_Y_VEC = "yVec"
+    _IN_Y_VEC_X = "yVecX"
+    _IN_Y_VEC_Y = "yVecY"
+    _IN_Y_VEC_Z = "yVecZ"
+    _IN_Z_VEC = "zVec"
+    _IN_Z_VEC_X = "zVecX"
+    _IN_Z_VEC_Y = "zVecY"
+    _IN_Z_VEC_Z = "zVecZ"
+
+    _OUT_PRM_VEC = "PrimaryVec"
+    _OUT_PRM_VEC_X = "PrimaryVecX"
+    _OUT_PRM_VEC_Y = "PrimaryVecY"
+    _OUT_PRM_VEC_Z = "PrimaryVecZ"
+    _OUT_SEC_VEC = "SecVec"
+    _OUT_SEC_VEC_X = "SecVecX"
+    _OUT_SEC_VEC_Y = "SecVecY"
+    _OUT_SEC_VEC_Z = "SecVecZ"
+    _OUT_TER_VEC = "TerVec"
+    _OUT_TER_VEC_X = "TerVecX"
+    _OUT_TER_VEC_Y = "TerVecY"
+    _OUT_TER_VEC_Z = "TerVecZ"
+
+    def _input_attr_build_data(self):
+        """Defines all the added, published, or modified attributes for the
+        input node. inherits all input node data from _Component
+
+        Returns:
+            comp_data.NodeData:
+        """
+        node_data = super()._input_attr_build_data()
+
+        node_data.extend_attr_data(
+            component_data.AttrData(
+                self._IN_PRM_AXIS, type_=component_enum_data.AxisEnum.x, parent=self._IN
+            ),
+            component_data.AttrData(
+                self._IN_SEC_AXIS, type_=component_enum_data.AxisEnum.y, parent=self._IN
+            ),
+            component_data.AttrData(
+                self._IN_TER_AXIS, type_=component_enum_data.AxisEnum.z, parent=self._IN
+            ),
+            component_data.AttrData(
+                self._IN_X_VEC, type_="double3", value=[1, 0, 0], parent=self._IN
+            ),
+            component_data.AttrData(
+                self._IN_X_VEC_X, type_="double", parent=self._IN_X_VEC
+            ),
+            component_data.AttrData(
+                self._IN_X_VEC_Y, type_="double", parent=self._IN_X_VEC
+            ),
+            component_data.AttrData(
+                self._IN_X_VEC_Z, type_="double", parent=self._IN_X_VEC
+            ),
+            component_data.AttrData(
+                self._IN_Y_VEC, type_="double3", value=[0, 1, 0], parent=self._IN
+            ),
+            component_data.AttrData(
+                self._IN_Y_VEC_X, type_="double", parent=self._IN_Y_VEC
+            ),
+            component_data.AttrData(
+                self._IN_Y_VEC_Y, type_="double", parent=self._IN_Y_VEC
+            ),
+            component_data.AttrData(
+                self._IN_Y_VEC_Z, type_="double", parent=self._IN_Y_VEC
+            ),
+            component_data.AttrData(
+                self._IN_Z_VEC, type_="double3", value=[0, 0, 1], parent=self._IN
+            ),
+            component_data.AttrData(
+                self._IN_Z_VEC_X, type_="double", parent=self._IN_Z_VEC
+            ),
+            component_data.AttrData(
+                self._IN_Z_VEC_Y, type_="double", parent=self._IN_Z_VEC
+            ),
+            component_data.AttrData(
+                self._IN_Z_VEC_Z, type_="double", parent=self._IN_Z_VEC
+            ),
+        )
+
+        return node_data
+
+    def _output_attr_build_data(self):
+        """Defines all the added, published, or modified attributes for the
+        output node. inherits all output node data from _Component
+
+        Returns:
+            comp_data.NodeData:
+        """
+        node_data = super()._output_attr_build_data()
+
+        node_data.extend_attr_data(
+            component_data.AttrData(
+                self._OUT_PRM_VEC, type_="double3", parent=self._OUT
+            ),
+            component_data.AttrData(
+                self._OUT_PRM_VEC_X, type_="double", parent=self._OUT_PRM_VEC
+            ),
+            component_data.AttrData(
+                self._OUT_PRM_VEC_Y, type_="double", parent=self._OUT_PRM_VEC
+            ),
+            component_data.AttrData(
+                self._OUT_PRM_VEC_Z, type_="double", parent=self._OUT_PRM_VEC
+            ),
+            component_data.AttrData(
+                self._OUT_SEC_VEC, type_="double3", parent=self._OUT
+            ),
+            component_data.AttrData(
+                self._OUT_SEC_VEC_X, type_="double", parent=self._OUT_SEC_VEC
+            ),
+            component_data.AttrData(
+                self._OUT_SEC_VEC_Y, type_="double", parent=self._OUT_SEC_VEC
+            ),
+            component_data.AttrData(
+                self._OUT_SEC_VEC_Z, type_="double", parent=self._OUT_SEC_VEC
+            ),
+            component_data.AttrData(
+                self._OUT_TER_VEC, type_="double3", parent=self._OUT
+            ),
+            component_data.AttrData(
+                self._OUT_TER_VEC_X, type_="double", parent=self._OUT_TER_VEC
+            ),
+            component_data.AttrData(
+                self._OUT_TER_VEC_Y, type_="double", parent=self._OUT_TER_VEC
+            ),
+            component_data.AttrData(
+                self._OUT_TER_VEC_Z, type_="double", parent=self._OUT_TER_VEC
+            ),
+        )
+
+        return node_data
+
+    def _override_build(self, **kwargs):
+        """Takes care of component creation. adds all nodes needed for 
+        calculation
+
+        Args:
+            control_color (Union[list, utils.Vector, component_enum_data.Color, 
+            nw.Attr, nw.Node], optional): color for controls. Defaults to None.
+        """
+        added_nodes = []
+        sec_mult = nw.create_node("multiply", "sec_mult")
+        sec_mult["input"][0] << self.container_node[self._IN_SEC_AXIS]
+        sec_mult["input"][1] = 10
+
+        add_doub_lin = nw.create_node("addDoubleLinear", "prm_sec_combine")
+        add_doub_lin["input1"] << sec_mult["output"]
+        add_doub_lin["input2"] << self.container_node[self._IN_PRM_AXIS]
+
+        ter_remap = nw.create_node("remapValue", "ter_remap")
+        ter_remap["inputValue"] << add_doub_lin["output"]
+        ter_remap["outValue"] >> self.container_node[self._IN_TER_AXIS]
+        ter_remap["outputMax"] = 5
+        ter_remap["inputMax"] = 55
+
+        added_nodes.extend([sec_mult, add_doub_lin, ter_remap])
+
+        axis_dict = {
+            str(axis.value): component_enum_data.AxisEnum.index_of(axis)
+            for axis in component_enum_data.AxisEnum
+        }
+
+        remap_index = 0
+
+        for prim_index, prim_axis in enumerate(component_enum_data.AxisEnum):
+            for sec_index, sec_axis in enumerate(component_enum_data.AxisEnum):
+                prim_vec = utils.Vector(prim_axis.value)
+                sec_vec = utils.Vector(sec_axis.value)
+
+                ter_vec = list(prim_vec ^ sec_vec)
+                for index, value in enumerate(ter_vec):
+                    if value == 0:
+                        ter_vec[index] = 0.0
+                ter_vec = str(ter_vec)
+
+                if ter_vec in ["[0.0, 0.0, 0.0]"]:
+                    ter_index = prim_index
+                else:
+                    ter_index = axis_dict[ter_vec]
+
+                out_scalar = ter_index / 5.0
+                in_scalar = (prim_index + (sec_index * 10)) / 55.0
+
+                ter_remap["value"][remap_index]["value_FloatValue"].set(out_scalar)
+                ter_remap["value"][remap_index]["value_Position"].set(in_scalar - 0.001)
+                ter_remap["value"][remap_index]["value_Interp"].set(0)
+                remap_index = remap_index + 1
+
+        input_vec_list = []
+        for x in range(2):
+            for input_vec in [
+                self.container_node[self._IN_X_VEC],
+                self.container_node[self._IN_Y_VEC],
+                self.container_node[self._IN_Z_VEC],
+            ]:
+                if x == 0:
+                    input_vec_list.append(input_vec)
+                else:
+                    mult_div = nw.create_node(
+                        "multiplyDivide", f"neg_{input_vec.short_name}"
+                    )
+                    mult_div["input1"] << input_vec
+                    mult_div["input2"] = [-1, -1, -1]
+                    added_nodes.append(mult_div)
+
+                    input_vec_list.append(mult_div["output"])
+
+        in_axis_list = [
+            self.container_node[attr_name]
+            for attr_name in [self._IN_PRM_AXIS, self._IN_SEC_AXIS, self._IN_TER_AXIS]
+        ]
+        out_vec_list = [
+            self.container_node[attr_name]
+            for attr_name in [self._OUT_PRM_VEC, self._OUT_SEC_VEC, self._OUT_TER_VEC]
+        ]
+
+        for in_axis, out_vec in zip(in_axis_list, out_vec_list):
+            choice = nw.create_node("choice", f"{out_vec.short_name}Choice")
+            for index, input_vec in enumerate(input_vec_list):
+                choice["input"][index] << input_vec
+            choice["selector"] << in_axis
+            choice["output"] >> out_vec
+            added_nodes.append(choice)
+
+        self.container_node.add_nodes(*added_nodes)
