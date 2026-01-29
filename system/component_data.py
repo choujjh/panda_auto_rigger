@@ -505,6 +505,7 @@ def double3_attr_data(
     parent: str = None,
     value=[0, 0, 0],
     multi: bool = False,
+    locked: bool = False,
 ):
     """creates AttrData list for double3 attributes
 
@@ -514,13 +515,19 @@ def double3_attr_data(
         parent (str, optional): Defaults to None.
         value (list, optional): defaults to [0, 0, 0].
         multi (bool, optional): Defaults to False.
+        locked (bool, optional): Defaults to False.
 
     Returns:
         list(AttrData):
     """
 
     attr_data_list = []
-    parent_add_attr_kwargs = {"multi": multi, "parent": parent, "value": value}
+    parent_add_attr_kwargs = {
+        "multi": multi,
+        "parent": parent,
+        "value": value,
+        "locked": locked,
+    }
     if parent_add_attr_kwargs["parent"] is None:
         parent_add_attr_kwargs.pop("parent")
 

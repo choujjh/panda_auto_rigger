@@ -58,27 +58,19 @@ class _Character(base_comp._Component):
             for color_item in enum_item:
                 if enum_parent == self._IN_COLOR_CONST:
                     values = utils.get_rgb_from_index(color_item)
-                    suffix = "RGB"
+                    suffix = component_enum_data.double3Types.rgb
                 else:
                     values = color_item.value
-                    suffix = "XYZ"
-                attr_data.append(
-                    component_data.AttrData(
-                        color_item.name,
-                        type_="double3",
+                    suffix = component_enum_data.double3Types.rgb
+                attr_data.extend(
+                    component_data.double3_attr_data(
+                        attr_name=color_item.name,
+                        double3_type=suffix,
                         parent=enum_parent,
+                        value=values,
                         locked=True,
                     )
                 )
-                for index in range(3):
-                    attr_data.append(
-                        component_data.AttrData(
-                            f"{color_item.name}{suffix[index]}",
-                            type_="double",
-                            parent=color_item.name,
-                            value=values[index],
-                        )
-                    )
             node_data.extend_attr_data(*attr_data)
         node_data.extend_attr_data(
             component_data.AttrData(

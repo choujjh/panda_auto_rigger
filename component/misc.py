@@ -131,9 +131,15 @@ class Cluster(base_comp._Component):
         node_data = super()._output_attr_build_data()
         node_data.extend_attr_data(self.HIER_DATA.get_xform_data(self.IO_ENUM.output))
         node_data.extend_attr_data(
-            *component_data.double3_attr_data(attr_name=self._PRM_VEC, value=[1, 0, 0], parent=self._OUT),
-            *component_data.double3_attr_data(attr_name=self._SEC_VEC, value=[0, 1, 0], parent=self._OUT),
-            *component_data.double3_attr_data(attr_name=self._TER_VEC, value=[0, 0, 1], parent=self._OUT),
+            *component_data.double3_attr_data(
+                attr_name=self._PRM_VEC, value=[1, 0, 0], parent=self._OUT
+            ),
+            *component_data.double3_attr_data(
+                attr_name=self._SEC_VEC, value=[0, 1, 0], parent=self._OUT
+            ),
+            *component_data.double3_attr_data(
+                attr_name=self._TER_VEC, value=[0, 0, 1], parent=self._OUT
+            ),
         )
         return node_data
 
