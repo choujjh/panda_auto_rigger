@@ -437,5 +437,5 @@ class IO(Enum):
 class double3Types(MayaEnumAttr):
     """Enum for xyz or rgb"""
 
-    xyz = 0
-    rgb = 1
+    xyz = ["X", "Y", "Z"]
+    rgb = ["R", "G", "B"]

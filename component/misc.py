@@ -22,25 +22,10 @@ class Cluster(base_comp._Component):
         HIER_PARENT (base_comp._Hierarchy.HIER_PARENT): constant for HierParent class. easier for in class use
         _IN_HIER_SIDE (str): str constant "inHierSide"
         _IN_CNTRL_CLR (str): str constant "controlColor"
-        _IN_CNTRL_CLR_R (str): str constant "controlColorR"
-        _IN_CNTRL_CLR_G (str): str constant "controlColorG"
-        _IN_CNTRL_CLR_B (str): str constant "controlColorB"
         _IN_SETUP_CLR (str): str constant "setupColor"
-        _IN_SETUP_CLR_R (str): str constant "setupColorR"
-        _IN_SETUP_CLR_G (str): str constant "setupColorG"
-        _IN_SETUP_CLR_B (str): str constant "setupColorB"
         _PRM_VEC (str): str constant "primaryVec"
-        _PRM_VEC_X (str): str constant "primaryVecX"
-        _PRM_VEC_Y (str): str constant "primaryVecY"
-        _PRM_VEC_Z (str): str constant "primaryVecZ"
         _SEC_VEC (str): str constant "secondaryVec"
-        _SEC_VEC_X (str): str constant "secondaryVecX"
-        _SEC_VEC_Y (str): str constant "secondaryVecY"
-        _SEC_VEC_Z (str): str constant "secondaryVecZ"
         _TER_VEC (str): str constant "tertiaryVec"
-        _TER_VEC_X (str): str constant "tertiaryVecX"
-        _TER_VEC_Y (str): str constant "tertiaryVecY"
-        _TER_VEC_Z (str): str constant "tertiaryVecZ"
 
     """
 
@@ -57,26 +42,11 @@ class Cluster(base_comp._Component):
     _IN_HIER_SIDE = "inHierSide"
     _IN_XFORM_PAR = "inXformParent"
     _IN_CNTRL_CLR = "controlColor"
-    _IN_CNTRL_CLR_R = "controlColorR"
-    _IN_CNTRL_CLR_G = "controlColorG"
-    _IN_CNTRL_CLR_B = "controlColorB"
     _IN_SETUP_CLR = "setupColor"
-    _IN_SETUP_CLR_R = "setupColorR"
-    _IN_SETUP_CLR_G = "setupColorG"
-    _IN_SETUP_CLR_B = "setupColorB"
 
     _PRM_VEC = base_comp._Hierarchy._PRM_VEC
-    _PRM_VEC_X = base_comp._Hierarchy._PRM_VEC_X
-    _PRM_VEC_Y = base_comp._Hierarchy._PRM_VEC_Y
-    _PRM_VEC_Z = base_comp._Hierarchy._PRM_VEC_Z
     _SEC_VEC = base_comp._Hierarchy._SEC_VEC
-    _SEC_VEC_X = base_comp._Hierarchy._SEC_VEC_X
-    _SEC_VEC_Y = base_comp._Hierarchy._SEC_VEC_Y
-    _SEC_VEC_Z = base_comp._Hierarchy._SEC_VEC_Z
     _TER_VEC = base_comp._Hierarchy._TER_VEC
-    _TER_VEC_X = base_comp._Hierarchy._TER_VEC_X
-    _TER_VEC_Y = base_comp._Hierarchy._TER_VEC_Y
-    _TER_VEC_Z = base_comp._Hierarchy._TER_VEC_Z
 
     def __init__(self, container_node=None):
         super().__init__(container_node)
@@ -137,29 +107,15 @@ class Cluster(base_comp._Component):
                 type_="message",
                 parent=self.HIER_DATA.IN_XFORM,
             ),
-            component_data.AttrData(
-                self._IN_CNTRL_CLR, type_="double3", parent=self._IN
+            *component_data.double3_attr_data(
+                attr_name=self._IN_CNTRL_CLR,
+                double3_type=component_enum_data.double3Types.rgb,
+                parent=self._IN,
             ),
-            component_data.AttrData(
-                self._IN_CNTRL_CLR_R, type_="double", parent=self._IN_CNTRL_CLR
-            ),
-            component_data.AttrData(
-                self._IN_CNTRL_CLR_G, type_="double", parent=self._IN_CNTRL_CLR
-            ),
-            component_data.AttrData(
-                self._IN_CNTRL_CLR_B, type_="double", parent=self._IN_CNTRL_CLR
-            ),
-            component_data.AttrData(
-                self._IN_SETUP_CLR, type_="double3", parent=self._IN
-            ),
-            component_data.AttrData(
-                self._IN_SETUP_CLR_R, type_="double", parent=self._IN_SETUP_CLR
-            ),
-            component_data.AttrData(
-                self._IN_SETUP_CLR_G, type_="double", parent=self._IN_SETUP_CLR
-            ),
-            component_data.AttrData(
-                self._IN_SETUP_CLR_B, type_="double", parent=self._IN_SETUP_CLR
+            *component_data.double3_attr_data(
+                attr_name=self._IN_SETUP_CLR,
+                double3_type=component_enum_data.double3Types.rgb,
+                parent=self._IN,
             ),
         )
         node_data.modify_add_attr_kwargs(self._IN_HIER_SIDE, value=None, multi=True)
@@ -175,42 +131,9 @@ class Cluster(base_comp._Component):
         node_data = super()._output_attr_build_data()
         node_data.extend_attr_data(self.HIER_DATA.get_xform_data(self.IO_ENUM.output))
         node_data.extend_attr_data(
-            component_data.AttrData(
-                self._PRM_VEC, type_="double3", parent=self._OUT, value=[1, 0, 0]
-            ),
-            component_data.AttrData(
-                self._PRM_VEC_X, type_="double", parent=self._PRM_VEC
-            ),
-            component_data.AttrData(
-                self._PRM_VEC_Y, type_="double", parent=self._PRM_VEC
-            ),
-            component_data.AttrData(
-                self._PRM_VEC_Z, type_="double", parent=self._PRM_VEC
-            ),
-            component_data.AttrData(
-                self._SEC_VEC, type_="double3", parent=self._OUT, value=[0, 1, 0]
-            ),
-            component_data.AttrData(
-                self._SEC_VEC_X, type_="double", parent=self._SEC_VEC
-            ),
-            component_data.AttrData(
-                self._SEC_VEC_Y, type_="double", parent=self._SEC_VEC
-            ),
-            component_data.AttrData(
-                self._SEC_VEC_Z, type_="double", parent=self._SEC_VEC
-            ),
-            component_data.AttrData(
-                self._TER_VEC, type_="double3", parent=self._OUT, value=[0, 0, 1]
-            ),
-            component_data.AttrData(
-                self._TER_VEC_X, type_="double", parent=self._TER_VEC
-            ),
-            component_data.AttrData(
-                self._TER_VEC_Y, type_="double", parent=self._TER_VEC
-            ),
-            component_data.AttrData(
-                self._TER_VEC_Z, type_="double", parent=self._TER_VEC
-            ),
+            *component_data.double3_attr_data(attr_name=self._PRM_VEC, value=[1, 0, 0], parent=self._OUT),
+            *component_data.double3_attr_data(attr_name=self._SEC_VEC, value=[0, 1, 0], parent=self._OUT),
+            *component_data.double3_attr_data(attr_name=self._TER_VEC, value=[0, 0, 1], parent=self._OUT),
         )
         return node_data
 
@@ -549,29 +472,11 @@ class AxisVectorPicker(base_comp._Component):
         _IN_SEC_AXIS (str): str constant for "secondaryAxis"
         _IN_TER_AXIS (str): str constant for "tertiaryAxis"
         _IN_X_VEC (str): str constant for "xVec"
-        _IN_X_VEC_X (str): str constant for "xVecX"
-        _IN_X_VEC_Y (str): str constant for "xVecY"
-        _IN_X_VEC_Z (str): str constant for "xVecZ"
         _IN_Y_VEC (str): str constant for "yVec"
-        _IN_Y_VEC_X (str): str constant for "yVecX"
-        _IN_Y_VEC_Y (str): str constant for "yVecY"
-        _IN_Y_VEC_Z (str): str constant for "yVecZ"
         _IN_Z_VEC (str): str constant for "zVec"
-        _IN_Z_VEC_X (str): str constant for "zVecX"
-        _IN_Z_VEC_Y (str): str constant for "zVecY"
-        _IN_Z_VEC_Z (str): str constant for "zVecZ"
         _OUT_PRM_VEC (str): str constant for "PrimaryVec"
-        _OUT_PRM_VEC_X (str): str constant for "PrimaryVecX"
-        _OUT_PRM_VEC_Y (str): str constant for "PrimaryVecY"
-        _OUT_PRM_VEC_Z (str): str constant for "PrimaryVecZ"
         _OUT_SEC_VEC (str): str constant for "SecVec"
-        _OUT_SEC_VEC_X (str): str constant for "SecVecX"
-        _OUT_SEC_VEC_Y (str): str constant for "SecVecY"
-        _OUT_SEC_VEC_Z (str): str constant for "SecVecZ"
         _OUT_TER_VEC (str): str constant for "TerVec"
-        _OUT_TER_VEC_X (str): str constant for "TerVecX"
-        _OUT_TER_VEC_Y (str): str constant for "TerVecY"
-        _OUT_TER_VEC_Z (str): str constant for "TerVecZ"
     """
 
     _IN_PRM_AXIS = "primaryAxis"
@@ -579,30 +484,12 @@ class AxisVectorPicker(base_comp._Component):
     _IN_TER_AXIS = "tertiaryAxis"
 
     _IN_X_VEC = "xVec"
-    _IN_X_VEC_X = "xVecX"
-    _IN_X_VEC_Y = "xVecY"
-    _IN_X_VEC_Z = "xVecZ"
     _IN_Y_VEC = "yVec"
-    _IN_Y_VEC_X = "yVecX"
-    _IN_Y_VEC_Y = "yVecY"
-    _IN_Y_VEC_Z = "yVecZ"
     _IN_Z_VEC = "zVec"
-    _IN_Z_VEC_X = "zVecX"
-    _IN_Z_VEC_Y = "zVecY"
-    _IN_Z_VEC_Z = "zVecZ"
 
     _OUT_PRM_VEC = "PrimaryVec"
-    _OUT_PRM_VEC_X = "PrimaryVecX"
-    _OUT_PRM_VEC_Y = "PrimaryVecY"
-    _OUT_PRM_VEC_Z = "PrimaryVecZ"
-    _OUT_SEC_VEC = "SecVec"
-    _OUT_SEC_VEC_X = "SecVecX"
-    _OUT_SEC_VEC_Y = "SecVecY"
-    _OUT_SEC_VEC_Z = "SecVecZ"
-    _OUT_TER_VEC = "TerVec"
-    _OUT_TER_VEC_X = "TerVecX"
-    _OUT_TER_VEC_Y = "TerVecY"
-    _OUT_TER_VEC_Z = "TerVecZ"
+    _OUT_SEC_VEC = "SecondaryVec"
+    _OUT_TER_VEC = "TertiaryVec"
 
     def _input_attr_build_data(self):
         """Defines all the added, published, or modified attributes for the
@@ -623,41 +510,14 @@ class AxisVectorPicker(base_comp._Component):
             component_data.AttrData(
                 self._IN_TER_AXIS, type_=component_enum_data.AxisEnum.z, parent=self._IN
             ),
-            component_data.AttrData(
-                self._IN_X_VEC, type_="double3", value=[1, 0, 0], parent=self._IN
+            *component_data.double3_attr_data(
+                attr_name=self._IN_X_VEC, value=[1, 0, 0], parent=self._IN
             ),
-            component_data.AttrData(
-                self._IN_X_VEC_X, type_="double", parent=self._IN_X_VEC
+            *component_data.double3_attr_data(
+                attr_name=self._IN_Y_VEC, value=[0, 1, 0], parent=self._IN
             ),
-            component_data.AttrData(
-                self._IN_X_VEC_Y, type_="double", parent=self._IN_X_VEC
-            ),
-            component_data.AttrData(
-                self._IN_X_VEC_Z, type_="double", parent=self._IN_X_VEC
-            ),
-            component_data.AttrData(
-                self._IN_Y_VEC, type_="double3", value=[0, 1, 0], parent=self._IN
-            ),
-            component_data.AttrData(
-                self._IN_Y_VEC_X, type_="double", parent=self._IN_Y_VEC
-            ),
-            component_data.AttrData(
-                self._IN_Y_VEC_Y, type_="double", parent=self._IN_Y_VEC
-            ),
-            component_data.AttrData(
-                self._IN_Y_VEC_Z, type_="double", parent=self._IN_Y_VEC
-            ),
-            component_data.AttrData(
-                self._IN_Z_VEC, type_="double3", value=[0, 0, 1], parent=self._IN
-            ),
-            component_data.AttrData(
-                self._IN_Z_VEC_X, type_="double", parent=self._IN_Z_VEC
-            ),
-            component_data.AttrData(
-                self._IN_Z_VEC_Y, type_="double", parent=self._IN_Z_VEC
-            ),
-            component_data.AttrData(
-                self._IN_Z_VEC_Z, type_="double", parent=self._IN_Z_VEC
+            *component_data.double3_attr_data(
+                attr_name=self._IN_Z_VEC, value=[0, 0, 1], parent=self._IN
             ),
         )
 
@@ -673,52 +533,24 @@ class AxisVectorPicker(base_comp._Component):
         node_data = super()._output_attr_build_data()
 
         node_data.extend_attr_data(
-            component_data.AttrData(
-                self._OUT_PRM_VEC, type_="double3", parent=self._OUT
+            *component_data.double3_attr_data(
+                attr_name=self._OUT_PRM_VEC, parent=self._OUT
             ),
-            component_data.AttrData(
-                self._OUT_PRM_VEC_X, type_="double", parent=self._OUT_PRM_VEC
+            *component_data.double3_attr_data(
+                attr_name=self._OUT_SEC_VEC, parent=self._OUT
             ),
-            component_data.AttrData(
-                self._OUT_PRM_VEC_Y, type_="double", parent=self._OUT_PRM_VEC
-            ),
-            component_data.AttrData(
-                self._OUT_PRM_VEC_Z, type_="double", parent=self._OUT_PRM_VEC
-            ),
-            component_data.AttrData(
-                self._OUT_SEC_VEC, type_="double3", parent=self._OUT
-            ),
-            component_data.AttrData(
-                self._OUT_SEC_VEC_X, type_="double", parent=self._OUT_SEC_VEC
-            ),
-            component_data.AttrData(
-                self._OUT_SEC_VEC_Y, type_="double", parent=self._OUT_SEC_VEC
-            ),
-            component_data.AttrData(
-                self._OUT_SEC_VEC_Z, type_="double", parent=self._OUT_SEC_VEC
-            ),
-            component_data.AttrData(
-                self._OUT_TER_VEC, type_="double3", parent=self._OUT
-            ),
-            component_data.AttrData(
-                self._OUT_TER_VEC_X, type_="double", parent=self._OUT_TER_VEC
-            ),
-            component_data.AttrData(
-                self._OUT_TER_VEC_Y, type_="double", parent=self._OUT_TER_VEC
-            ),
-            component_data.AttrData(
-                self._OUT_TER_VEC_Z, type_="double", parent=self._OUT_TER_VEC
+            *component_data.double3_attr_data(
+                attr_name=self._OUT_TER_VEC, parent=self._OUT
             ),
         )
-
         return node_data
 
     def _override_build(self, **kwargs):
-        """Takes care of component creation. adds all nodes needed for 
+        """Takes care of component creation. adds all nodes needed for
         calculation
 
         Args:
-            control_color (Union[list, utils.Vector, component_enum_data.Color, 
+            control_color (Union[list, utils.Vector, component_enum_data.Color,
             nw.Attr, nw.Node], optional): color for controls. Defaults to None.
         """
         added_nodes = []

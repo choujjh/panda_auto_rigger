@@ -839,17 +839,8 @@ class _Hierarchy(_Component):
         _check_output (bool): setting to see if output xforms are checked
 
         _PRM_VEC (str): str constant "primaryVec"
-        _PRM_VEC_X (str): str constant "primaryVecX"
-        _PRM_VEC_Y (str): str constant "primaryVecY"
-        _PRM_VEC_Z (str): str constant "primaryVecZ"
         _SEC_VEC (str): str constant "secondaryVec"
-        _SEC_VEC_X (str): str constant "secondaryVecX"
-        _SEC_VEC_Y (str): str constant "secondaryVecY"
-        _SEC_VEC_Z (str): str constant "secondaryVecZ"
         _TER_VEC (str): str constant "tertiaryVec"
-        _TER_VEC_X (str): str constant "tertiaryVecX"
-        _TER_VEC_Y (str): str constant "tertiaryVecY"
-        _TER_VEC_Z (str): str constant "tertiaryVecZ"
     """
 
     class_namespace = "hier"
@@ -863,17 +854,8 @@ class _Hierarchy(_Component):
     XFORM = component_data.Xform
     HIER_PARENT = component_data.HierParent
     _PRM_VEC = "primaryVec"
-    _PRM_VEC_X = "primaryVecX"
-    _PRM_VEC_Y = "primaryVecY"
-    _PRM_VEC_Z = "primaryVecZ"
     _SEC_VEC = "secondaryVec"
-    _SEC_VEC_X = "secondaryVecX"
-    _SEC_VEC_Y = "secondaryVecY"
-    _SEC_VEC_Z = "secondaryVecZ"
     _TER_VEC = "tertiaryVec"
-    _TER_VEC_X = "tertiaryVecX"
-    _TER_VEC_Y = "tertiaryVecY"
-    _TER_VEC_Z = "tertiaryVecZ"
 
     def _input_attr_build_data(self):
         """Defines all the added, published, or modified attributes for the
@@ -897,41 +879,14 @@ class _Hierarchy(_Component):
         node_data = super()._output_attr_build_data()
         node_data.extend_attr_data(self.HIER_DATA.get_xform_data(self.IO_ENUM.output))
         node_data.extend_attr_data(
-            component_data.AttrData(
-                self._PRM_VEC, type_="double3", parent=self._OUT, value=[1, 0, 0]
+            *component_data.double3_attr_data(
+                attr_name=self._PRM_VEC, parent=self._OUT, value=[1, 0, 0]
             ),
-            component_data.AttrData(
-                self._PRM_VEC_X, type_="double", parent=self._PRM_VEC
+            *component_data.double3_attr_data(
+                attr_name=self._SEC_VEC, parent=self._OUT, value=[0, 1, 0]
             ),
-            component_data.AttrData(
-                self._PRM_VEC_Y, type_="double", parent=self._PRM_VEC
-            ),
-            component_data.AttrData(
-                self._PRM_VEC_Z, type_="double", parent=self._PRM_VEC
-            ),
-            component_data.AttrData(
-                self._SEC_VEC, type_="double3", parent=self._OUT, value=[0, 1, 0]
-            ),
-            component_data.AttrData(
-                self._SEC_VEC_X, type_="double", parent=self._SEC_VEC
-            ),
-            component_data.AttrData(
-                self._SEC_VEC_Y, type_="double", parent=self._SEC_VEC
-            ),
-            component_data.AttrData(
-                self._SEC_VEC_Z, type_="double", parent=self._SEC_VEC
-            ),
-            component_data.AttrData(
-                self._TER_VEC, type_="double3", parent=self._OUT, value=[0, 0, 1]
-            ),
-            component_data.AttrData(
-                self._TER_VEC_X, type_="double", parent=self._TER_VEC
-            ),
-            component_data.AttrData(
-                self._TER_VEC_Y, type_="double", parent=self._TER_VEC
-            ),
-            component_data.AttrData(
-                self._TER_VEC_Z, type_="double", parent=self._TER_VEC
+            *component_data.double3_attr_data(
+                attr_name=self._TER_VEC, parent=self._OUT, value=[0, 0, 1]
             ),
         )
         return node_data

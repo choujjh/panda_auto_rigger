@@ -499,6 +499,58 @@ def xform_to_hier_parent(xform: "Xform"):
     )
 
 
+def double3_attr_data(
+    attr_name: str,
+    double3_type: component_enum_data.double3Types = component_enum_data.double3Types.xyz,
+    parent: str = None,
+    value=[0, 0, 0],
+    multi: bool = False,
+):
+    """creates AttrData list for double3 attributes
+
+    Args:
+        attr_name (str):
+        double3_type (component_enum_data.double3Types, optional): Defaults to component_enum_data.double3Types.xyz.
+        parent (str, optional): Defaults to None.
+        value (list, optional): defaults to [0, 0, 0].
+        multi (bool, optional): Defaults to False.
+
+    Returns:
+        list(AttrData):
+    """
+
+    attr_data_list = []
+    parent_add_attr_kwargs = {"multi": multi, "parent": parent, "value": value}
+    if parent_add_attr_kwargs["parent"] is None:
+        parent_add_attr_kwargs.pop("parent")
+
+    attr_data_list.append(
+        AttrData(attr_name, type_="double3", **parent_add_attr_kwargs)
+    )
+    for attr_suffix in double3_type.value:
+        attr_data_list.append(
+            AttrData(f"{attr_name}{attr_suffix}", type_="double", parent=attr_name)
+        )
+
+    return attr_data_list
+
+
+def double3_sub_attr_name(
+    attr_name: str,
+    double3_type: component_enum_data.double3Types = component_enum_data.double3Types.xyz,
+):
+    """Generates subattr names for double3 attribute
+
+    Args:
+        attr_name (str):
+        double3_type (component_enum_data.double3Types, optional): Defaults to component_enum_data.double3Types.xyz.
+
+    Returns:
+        list(str):
+    """
+    return [f"{attr_name}{attr_suffix}" for attr_suffix in double3_type.value]
+
+
 class HierParent:
     """Encapsulates HierParent attribute"""
 

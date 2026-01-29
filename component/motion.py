@@ -611,19 +611,19 @@ class SimpleIK(_Motion):
                 "float $topRSin1 = 0;",
                 "float $botLSin1 = 0;\n",
                 "float $topRSin = 1;",
-                f"if ({self.container_node[self._TER_VEC_X]} != 0.0) {{",
+                f"if ({self.container_node[self._TER_VEC]}X != 0.0) {{",
                 f"\t{loc_xform1_row['input']} = 1;",
                 f"\t\tif ({loc_xform1_row['outputZ']} != 0) {{",
                 f"\t\t\t$topRSin = {loc_xform1_row['outputZ']};",
                 "\t}",
                 "}",
-                f"else if ({self.container_node[self._TER_VEC_Y]} != 0.0) {{",
+                f"else if ({self.container_node[self._TER_VEC]}Y != 0.0) {{",
                 f"\t{loc_xform1_row['input']} = 0;",
                 f"\t\t\tif ({loc_xform1_row['outputZ']} != 0) {{",
                 f"\t\t$topRSin = {loc_xform1_row['outputZ']};",
                 "\t}",
                 "}",
-                f"else if ({self.container_node[self._TER_VEC_Z]} != 0.0) {{",
+                f"else if ({self.container_node[self._TER_VEC]}Z != 0.0) {{",
                 f"\t{loc_xform1_row['input']} = 0;",
                 f"\t\t\tif ({loc_xform1_row['outputY']} != 0) {{",
                 f"\t\t$topRSin = {loc_xform1_row['outputY']};",
@@ -748,19 +748,19 @@ class SimpleIK(_Motion):
                     expression_str.extend(
                         [
                             f"matrix $rot_matrix{index}[3][3] = <<1.0, 0.0, 0.0; 0.0, 1.0, 0.0; 0.0, 0.0, 1.0>>;\n",
-                            f"if({self.container_node[self._TER_VEC_X]} != 0.0) {{",
+                            f"if({self.container_node[self._TER_VEC]}X != 0.0) {{",
                             f"\t$rot_matrix{index}[1][1] = {cos};",
                             f"\t$rot_matrix{index}[1][2] = {topRSin};",
                             f"\t$rot_matrix{index}[2][1] = {botLSin};",
                             f"\t$rot_matrix{index}[2][2] = {cos};",
                             "}",
-                            f"else if({self.container_node[self._TER_VEC_Y]} != 0.0) {{",
+                            f"else if({self.container_node[self._TER_VEC]}Y != 0.0) {{",
                             f"\t$rot_matrix{index}[0][0] = {cos};",
                             f"\t$rot_matrix{index}[0][2] = {topRSin};",
                             f"\t$rot_matrix{index}[2][0] = {botLSin};",
                             f"\t$rot_matrix{index}[2][2] = {cos};",
                             "}",
-                            f"else if({self.container_node[self._TER_VEC_Z]} != 0.0) {{",
+                            f"else if({self.container_node[self._TER_VEC]}Z != 0.0) {{",
                             f"\t$rot_matrix{index}[0][0] = {cos};",
                             f"\t$rot_matrix{index}[0][1] = {topRSin};",
                             f"\t$rot_matrix{index}[1][0] = {botLSin};",
@@ -782,16 +782,16 @@ class SimpleIK(_Motion):
                     length = ik_build_data_node[f"length{index}"]
                     expression_str.extend(
                         [
-                            f"{rot_loc_matrix['in30']} = {self.container_node[self._PRM_VEC_X]} * {length};",
-                            f"{rot_loc_matrix['in31']} = {self.container_node[self._PRM_VEC_Y]} * {length};",
-                            f"{rot_loc_matrix['in32']} = {self.container_node[self._PRM_VEC_Z]} * {length};",
+                            f"{rot_loc_matrix['in30']} = {self.container_node[self._PRM_VEC][0]} * {length};",
+                            f"{rot_loc_matrix['in31']} = {self.container_node[self._PRM_VEC][1]} * {length};",
+                            f"{rot_loc_matrix['in32']} = {self.container_node[self._PRM_VEC][2]} * {length};",
                         ]
                     )
             expression_str.extend(
                 [
-                    f"\n{rot2_point_matrix['inPointX']}={ik_build_data_node['length2']} * {self.container_node[self._PRM_VEC_X]};",
-                    f"{rot2_point_matrix['inPointY']}={ik_build_data_node['length2']} * {self.container_node[self._PRM_VEC_Y]};",
-                    f"{rot2_point_matrix['inPointZ']}={ik_build_data_node['length2']} * {self.container_node[self._PRM_VEC_Z]};",
+                    f"\n{rot2_point_matrix['inPointX']}={ik_build_data_node['length2']} * {self.container_node[self._PRM_VEC][1]};",
+                    f"{rot2_point_matrix['inPointY']}={ik_build_data_node['length2']} * {self.container_node[self._PRM_VEC][1]};",
+                    f"{rot2_point_matrix['inPointZ']}={ik_build_data_node['length2']} * {self.container_node[self._PRM_VEC][2]};",
                 ]
             )
             return "\n".join(expression_str)

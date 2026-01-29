@@ -29,9 +29,6 @@ class Twist(_Matrix):
         _IN_LOC_INIT_MATRIX (str): str constant "localInitMatrix"
         _IN_LOC_MATRIX (str): str constant "localMatrix"
         _IN_PRM_VEC (str): str constant "primaryVec"
-        _IN_PRM_VEC_X (str): str constant "primaryVecX"
-        _IN_PRM_VEC_Y (str): str constant "primaryVecY"
-        _IN_PRM_VEC_Z (str): str constant "primaryVecZ"
         _OUT_ROT_MATRIX (str): str constant "rotMatrix"
 
     """
@@ -43,9 +40,6 @@ class Twist(_Matrix):
     _IN_LOC_INIT_MATRIX = "localInitMatrix"
     _IN_LOC_MATRIX = "localMatrix"
     _IN_PRM_VEC = "primaryVec"
-    _IN_PRM_VEC_X = "primaryVecX"
-    _IN_PRM_VEC_Y = "primaryVecY"
-    _IN_PRM_VEC_Z = "primaryVecZ"
     _OUT_ROT_MATRIX = "rotMatrix"
 
     def _input_attr_build_data(self):
@@ -69,17 +63,8 @@ class Twist(_Matrix):
             component_data.AttrData(
                 self._IN_LOC_MATRIX, type_="matrix", parent=self._IN
             ),
-            component_data.AttrData(
-                self._IN_PRM_VEC, type_="double3", parent=self._IN, value=[1, 0, 0]
-            ),
-            component_data.AttrData(
-                self._IN_PRM_VEC_X, type_="double", parent=self._IN_PRM_VEC
-            ),
-            component_data.AttrData(
-                self._IN_PRM_VEC_Y, type_="double", parent=self._IN_PRM_VEC
-            ),
-            component_data.AttrData(
-                self._IN_PRM_VEC_Z, type_="double", parent=self._IN_PRM_VEC
+            *component_data.double3_attr_data(
+                attr_name=self._IN_PRM_VEC, value=[1, 0, 0], parent=self._IN
             ),
         )
 

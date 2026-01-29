@@ -76,24 +76,9 @@ class AxisVector(_Singleton):
             component_data.AttrData(self._OUT_AXIS, type_="compound", parent=self._OUT)
         ]
         for item in component_enum_data.AxisEnum:
-            attr_data.append(
-                component_data.AttrData(
-                    item.name, type_="double3", parent=self._OUT_AXIS
-                )
-            )
-            attr_data.append(
-                component_data.AttrData(
-                    f"{item.name}X", type_="double", parent=item.name
-                )
-            )
-            attr_data.append(
-                component_data.AttrData(
-                    f"{item.name}Y", type_="double", parent=item.name
-                )
-            )
-            attr_data.append(
-                component_data.AttrData(
-                    f"{item.name}Z", type_="double", parent=item.name
+            attr_data.extend(
+                component_data.double3_attr_data(
+                    attr_name=item.name, value=item.value, parent=self._OUT_AXIS
                 )
             )
         node_data.extend_attr_data(*attr_data)
@@ -102,9 +87,6 @@ class AxisVector(_Singleton):
 
     def _override_build(self, **kwargs):
         """writes all axis vectors to output node"""
-        for item in component_enum_data.AxisEnum:
-            self.output_node[self._OUT_AXIS][item.name] = item.value
-
         self.output_node[self._OUT_AXIS].set_locked(True)
 
 
@@ -132,24 +114,11 @@ class Color(_Singleton):
             component_data.AttrData(self._OUT_COLOR, type_="compound", parent=self._OUT)
         ]
         for item in component_enum_data.Color:
-            attr_data.append(
-                component_data.AttrData(
-                    item.name, type_="double3", parent=self._OUT_COLOR
-                )
-            )
-            attr_data.append(
-                component_data.AttrData(
-                    f"{item.name}R", type_="double", parent=item.name
-                )
-            )
-            attr_data.append(
-                component_data.AttrData(
-                    f"{item.name}G", type_="double", parent=item.name
-                )
-            )
-            attr_data.append(
-                component_data.AttrData(
-                    f"{item.name}B", type_="double", parent=item.name
+            attr_data.extend(
+                component_data.double3_attr_data(
+                    attr_name=item.name,
+                    double3_type=component_enum_data.double3Types.rgb,
+                    parent=self._OUT_COLOR,
                 )
             )
         node_data.extend_attr_data(*attr_data)
