@@ -239,7 +239,6 @@ class Mirror(_Matrix):
         input_matrix: Union[utils.Matrix, nw.Attr] = None,
         input_scale_matrix: Union[utils.Matrix, nw.Attr] = None,
         input_world_matrix: Union[utils.Matrix, nw.Attr] = None,
-        **kwargs,
     ):
         """Class method to create component
 

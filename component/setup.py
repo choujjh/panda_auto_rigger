@@ -768,50 +768,25 @@ class Mirror(_Setup):
         added_nodes = []
         input_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.input)
         for index, input_xform in input_xforms.items():
-            mult_mat_neg_scale = nw.create_node(
-                "multMatrix", f"xform{index}_mirror_neg_scale_mult"
+            mirror_mat_inst = matrix.Mirror.create(
+                instance_name=f"xform{index}",
+                parent=self,
+                input_matrix=input_xform.init_matrix,
+                input_scale_matrix=self.container_node[self._IN_MIRROR_MAT]
             )
 
-            mult_mat_neg_scale["matrixIn"][0] << input_xform.init_matrix
-            (
-                mult_mat_neg_scale["matrixIn"][1]
-                << self.container_node[self._IN_MIRROR_MAT]
-            )
-
-            mult_mat = nw.create_node("multMatrix", f"xform{index}_mirror_ws_mult")
-            mult_mat["matrixIn"][0] = utils.Matrix.scale_matrix(-1, -1, -1)
-            mult_mat["matrixIn"][1] << mult_mat_neg_scale["matrixSum"]
+            mirror_mat = mirror_mat_inst.container_node[mirror_mat_inst._OUT_MIR_MAT]
+            mirror_beh_mat = mirror_mat_inst.container_node[mirror_mat_inst._OUT_MIR_BEH_MAT]
 
             self._set_xform_attrs(
                 index=index,
                 xform_type=self.IO_ENUM.output,
                 xform=self.XFORM(
                     xform_name=input_xform.xform_name,
-                    init_matrix=mult_mat_neg_scale["matrixSum"],
-                    world_matrix=mult_mat["matrixSum"],
+                    init_matrix=mirror_mat,
+                    world_matrix=mirror_beh_mat,
                 ),
             )
-            added_nodes.extend([mult_mat_neg_scale, mult_mat])
-            # mirror_mat_comp = matrix.Mirror.create(
-            #     instance_name=f"xform{index}",
-            #     parent=self,
-            #     input_matrix=input_xform.init_matrix,
-            # )
-
-            # self._set_xform_attrs(
-            #     index=index,
-            #     xform_type=self.IO_ENUM.output,
-            #     xform=self.XFORM(
-            #         xform_name=input_xform.xform_name,
-            #         init_matrix=mirror_mat_comp.container_node[
-            #             mirror_mat_comp._OUT_WRLD_MAT
-            #         ],
-            #         world_matrix=mirror_mat_comp.container_node[
-            #             mirror_mat_comp._OUT_WRLD_MAT
-            #         ],
-            #     ),
-            # )
-            # mirror_mat_comp.container_node[mirror_mat_comp._OUT_WRLD_MAT]
 
         # mirroring settings
         settings_mult_mat = nw.create_node("multMatrix", "settings_guide_mirror")
