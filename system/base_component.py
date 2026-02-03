@@ -806,9 +806,7 @@ class _Component:
                         curr_parent_container.remove_nodes(self.container_node)
                     comp_container.add_nodes(self.container_node)
                 (
-                    comp_container[self._CNTNR_CHLD_COMP][
-                        comp_container[self._CNTNR_CHLD_COMP].next_index()
-                    ]
+                    comp_container[self._CNTNR_CHLD_COMP].next_index_attr()
                     >> self.container_node[self._CNTNR_PAR_COMP]
                 )
 

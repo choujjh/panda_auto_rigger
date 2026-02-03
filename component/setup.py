@@ -772,11 +772,13 @@ class Mirror(_Setup):
                 instance_name=f"xform{index}",
                 parent=self,
                 input_matrix=input_xform.init_matrix,
-                input_scale_matrix=self.container_node[self._IN_MIRROR_MAT]
+                input_scale_matrix=self.container_node[self._IN_MIRROR_MAT],
             )
 
             mirror_mat = mirror_mat_inst.container_node[mirror_mat_inst._OUT_MIR_MAT]
-            mirror_beh_mat = mirror_mat_inst.container_node[mirror_mat_inst._OUT_MIR_BEH_MAT]
+            mirror_beh_mat = mirror_mat_inst.container_node[
+                mirror_mat_inst._OUT_MIR_BEH_MAT
+            ]
 
             self._set_xform_attrs(
                 index=index,

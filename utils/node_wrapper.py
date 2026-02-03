@@ -1490,7 +1490,7 @@ class Attr:
             cmds.removeMultiInstance(str(self.__getitem__(attr_indicies[-1])), b=True)
 
     def next_index(self):
-        """next_index _summary_
+        """gets next index
 
         Raises:
             TypeError: no indicie
@@ -1501,6 +1501,13 @@ class Attr:
         if self.__len__() == 0:
             return 0
         return self.get_indicies()[-1] + 1
+
+    def next_index_attr(self):
+        """Gets next index as an attribute
+
+        Returns: Attr
+        """
+        return self.__getitem__(self.next_index())
 
     def __len__(self):
         """Gets length of child attributes, returns -1 if there are no children

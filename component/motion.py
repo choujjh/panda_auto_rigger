@@ -5,6 +5,7 @@ import component.matrix as matrix
 import utils.node_wrapper as nw
 import system.component_data as component_data
 import system.component_enum_data as component_enum_data
+import component.hierarchy_helper as hier_helper
 import maya.cmds as cmds
 import utils.utils as utils
 from typing import Union
@@ -1127,6 +1128,18 @@ class SimpleIK(_Motion):
             else:
                 enum_names = f"{enum_names}:{space_name}"
             cmds.addAttr(str(attr), edit=True, enumName=enum_names)
+
+
+class SimpleIK2(_Motion):
+    class_namespace = "simpleIK"
+    _max_num_xforms = (3, 3)
+
+    # TODO take out later
+    _check_output = False
+    _populate_output = False
+
+    def _override_build(self, control_color=None, **kwargs):
+        hier_helper.HierLengths.create(parent=self, source_component=self)
 
 
 class TwistHier(_Motion):
