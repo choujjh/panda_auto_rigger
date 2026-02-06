@@ -644,3 +644,12 @@ class AxisVectorPicker(base_comp._Component):
             added_nodes.append(choice)
 
         self.container_node.add_nodes(*added_nodes)
+
+
+# class LawOfCos(base_comp._Component):
+#     def _input_attr_build_data(self):
+#         node_data = super()._input_attr_build_data()
+
+#         node_data.extend_attr_data(
+#             component_data.AttrData()
+#         )

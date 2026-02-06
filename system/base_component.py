@@ -57,6 +57,8 @@ class _Component:
         _CNTNR_CNTRL_CHLDRN (str): str constant "controlChildren"
         _MIRROR_SRC (str): str constant "mirrorSource"
         _MIRROR_DEST (str): str constant "mirrorDest"
+        __MAP_INPUT_NODE (str): str constant "inputNode"
+        __MAP_OUTPUT_NODE (str): str constant "outputNode"
     """
 
     component_type = component_enum_data.ComponentType.component
@@ -79,6 +81,9 @@ class _Component:
     _CNTNR_CNTRL_CHLDRN = "controlChildren"
     _MIRROR_SRC = "mirrorSource"
     _MIRROR_DEST = "mirrorDest"
+
+    __MAP_INPUT_NODE = "inputNode"
+    __MAP_OUTPUT_NODE = "outputNode"
 
     def __init__(self, container_node: nw.Node = None):
         """initializes component with container nodes
@@ -149,7 +154,7 @@ class _Component:
         Returns:
             nw.Node:
         """
-        return self._get_node_from_key("input_node")
+        return self._get_node_from_key(self.__MAP_INPUT_NODE)
 
     @property
     def output_node(self) -> nw.Node:
@@ -158,7 +163,7 @@ class _Component:
         Returns:
             nw.Node:
         """
-        return self._get_node_from_key("output_node")
+        return self._get_node_from_key(self.__MAP_OUTPUT_NODE)
 
     @property
     def transform_node(self) -> nw.Transform:
@@ -613,9 +618,11 @@ class _Component:
 
         self.container_node.add_nodes(*component_nodes)
 
-        utils.map_to_container(input_node, node_message_name="input_node")
+        utils.map_to_container(input_node, node_message_name=self.__MAP_INPUT_NODE)
         if has_output_node:
-            utils.map_to_container(output_node, node_message_name="output_node")
+            utils.map_to_container(
+                output_node, node_message_name=self.__MAP_OUTPUT_NODE
+            )
 
             output_node_attr_data.publish_attr_data_attributes(output_node)
 
@@ -744,7 +751,7 @@ class _Component:
                     {
                         COMP_LEN: len(connection.parent),
                         COMP_INDEX: connection.index,
-                        COMP_NAMESPC: get_component(curr_container).get_short_namespace,
+                        COMP_NAMESPC: get_component(curr_container).get_short_namespace(),
                     }
                 )
                 curr_container = curr_container.get_container_node()
@@ -773,7 +780,11 @@ class _Component:
                         break
                 if mirror_container is not None:
                     continue
+            
+            exit()
             return None
+        
+
         if mirror_container is None:
             return None
         else:

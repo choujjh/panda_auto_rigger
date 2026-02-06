@@ -39,6 +39,9 @@ class _Character(base_comp._Component):
     _IN_SETUP_VIS = "setupVisibility"
     _IN_JNT_VIS = "jointVisibility"
 
+    __MAP_JNT_GRP = "jntGrp"
+    __MAP_ANIM_GRP = "animGrp"
+
     def _input_attr_build_data(self):
         """Defines all the added, published, or modified attributes for the
         input node. inherits all input node data from _Component
@@ -192,7 +195,7 @@ class _Character(base_comp._Component):
         Returns:
             nw.Transform:
         """
-        return self._get_node_from_key("jntGrp")
+        return self._get_node_from_key(self.__MAP_JNT_GRP)
 
     @property
     def _anim_grp(self) -> nw.Transform:
@@ -201,7 +204,7 @@ class _Character(base_comp._Component):
         Returns:
             nw.Transform: _description_
         """
-        return self._get_node_from_key("animGrp")
+        return self._get_node_from_key(self.__MAP_ANIM_GRP)
 
     def _pre_build(
         self,
@@ -304,8 +307,8 @@ class _Character(base_comp._Component):
 
         self.container_node.add_nodes(jnt_grp, anim_grp)
 
-        utils.map_to_container(jnt_grp, "jntGrp")
-        utils.map_to_container(anim_grp, "animGrp")
+        utils.map_to_container(jnt_grp, self.__MAP_JNT_GRP)
+        utils.map_to_container(anim_grp, self.__MAP_ANIM_GRP)
 
     def add_mesh(self, mesh: nw.Transform):
         """Adds mesh to character mesh component

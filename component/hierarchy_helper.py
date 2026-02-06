@@ -12,6 +12,7 @@ class HierLengths(base_comp._Component):
         _OUT_CURR_LEN (str): str constant "currLen"
         _OUT_CLIP_CURR_LEN (str): str constant "clipCurrLen"
     """
+
     class_namespace = "hierLen"
 
     _IN_WRLD_MAT = "worldMatrix"

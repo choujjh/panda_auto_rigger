@@ -57,6 +57,13 @@ class _Anim(base_comp._Hierarchy):
     _OUT_SET_CNTRL_LOC_MAT = "outputSettingCntrlLocMatrix"
     _MIRROR_AXIS = "mirrorAxis"
 
+    __MAP_SETTING_GUIDE_CNTNR = "settingsGuidecContainer"
+    __MAP_SETTING_CNTNR = "settingsContainer"
+    __MAP_SETUP_CNTNR = "setupContainer"
+    __MAP_MOT_CNTNR = "motionContainer"
+    __MAP_CORR_CNTNR = "correctiveContainer"
+    __MAP_CLUST_CNTNR = "clustContainer"
+
     @property
     def _setup_component_type(self):
         """Returns class specific _setup_component_type. works for inherited classes"""
@@ -69,7 +76,7 @@ class _Anim(base_comp._Hierarchy):
         Returns:
             setup.Setup:
         """
-        return self._get_node_from_key("setup_container", as_component=True)
+        return self._get_node_from_key(self.__MAP_SETUP_CNTNR, as_component=True)
 
     @property
     def _motion_component(self) -> motion.MotionWrapper:
@@ -78,7 +85,7 @@ class _Anim(base_comp._Hierarchy):
         Returns:
             motion.MotionWrapper:
         """
-        return self._get_node_from_key("motion_container", as_component=True)
+        return self._get_node_from_key(self.__MAP_MOT_CNTNR, as_component=True)
 
     @property
     def _corrective_xform_component(self) -> corrective.CorrectiveXforms:
@@ -87,7 +94,7 @@ class _Anim(base_comp._Hierarchy):
         Returns:
             corrective.CorrectiveXform:
         """
-        return self._get_node_from_key("corrective_xform_container", as_component=True)
+        return self._get_node_from_key(self.__MAP_CORR_CNTNR, as_component=True)
 
     @property
     def cluster_component(self) -> misc.Cluster:
@@ -96,7 +103,7 @@ class _Anim(base_comp._Hierarchy):
         Returns:
             misc.Cluster:
         """
-        return self._get_node_from_key("clust_container", as_component=True)
+        return self._get_node_from_key(self.__MAP_CLUST_CNTNR, as_component=True)
 
     @property
     def _settings_component(self) -> control._Control:
@@ -105,9 +112,9 @@ class _Anim(base_comp._Hierarchy):
         Returns:
             Control:
         """
-        if not self.container_node.has_attr("settings_container"):
+        if not self.container_node.has_attr(self.__MAP_SETTING_CNTNR):
             return
-        return self._get_node_from_key("settings_container", as_component=True)
+        return self._get_node_from_key(self.__MAP_SETTING_CNTNR, as_component=True)
 
     @property
     def _settings_guide_component(self) -> control._Control:
@@ -116,9 +123,11 @@ class _Anim(base_comp._Hierarchy):
         Returns:
             Control:
         """
-        if not self.container_node.has_attr("settings_guide_container"):
+        if not self.container_node.has_attr(self.__MAP_SETTING_GUIDE_CNTNR):
             return
-        return self._get_node_from_key("settings_guide_container", as_component=True)
+        return self._get_node_from_key(
+            self.__MAP_SETTING_GUIDE_CNTNR, as_component=True
+        )
 
     @property
     def _mirror_dest_component(self) -> "_Anim":
@@ -436,7 +445,7 @@ class _Anim(base_comp._Hierarchy):
             settings_init.transform_node["translate"] = [1, 1, 1]
             utils.map_to_container(
                 node=settings_init.container_node,
-                node_message_name="settings_guide_container",
+                node_message_name=self.__MAP_SETTING_GUIDE_CNTNR,
                 container_message_name="anim_container",
                 container=self.container_node,
             )
@@ -456,7 +465,7 @@ class _Anim(base_comp._Hierarchy):
         )
         utils.map_to_container(
             node=settings.container_node,
-            node_message_name="settings_container",
+            node_message_name=self.__MAP_SETTING_CNTNR,
             container_message_name="anim_container",
             container=self.container_node,
         )
@@ -486,7 +495,7 @@ class _Anim(base_comp._Hierarchy):
 
     def _attach_output_xforms_to_settings_controls(self):
         """Takes finished output xforms and applies it to settings init choice"""
-        output_xforms = self.get_xform_attrs(xform_type=self.IO_ENUM.output)
+        output_xforms = self._motion_component.get_xform_attrs(xform_type=self.IO_ENUM.output)
         settings_guide = self._settings_guide_component
         if settings_guide is not None:
             settings_guide_choice = (
@@ -787,7 +796,7 @@ class _Anim(base_comp._Hierarchy):
             setup_inst.container_node[setup_inst._IN_HAS_PARENT_HIER]
             << self.container_node[self._IN_HAS_PARENT_HIER]
         )
-        utils.map_to_container(setup_inst.container_node, "setup_container")
+        utils.map_to_container(setup_inst.container_node, self.__MAP_SETUP_CNTNR)
         if self._mirror_src_component is None:
             self.container_node[self._IN_SET_XFORM_FOLLOW_INDEX] = (
                 len(self.get_xform_attrs(self.IO_ENUM.input)) - 1
@@ -798,7 +807,7 @@ class _Anim(base_comp._Hierarchy):
         motion_inst = motion.MotionWrapper.create(
             source_component=self._setup_component, parent=self
         )
-        utils.map_to_container(motion_inst.container_node, "motion_container")
+        utils.map_to_container(motion_inst.container_node, self.__MAP_MOT_CNTNR)
 
     def __create_corrective_xform_component(self):
         """Creates corrective_xform_component and maps it to anim container"""
@@ -806,7 +815,7 @@ class _Anim(base_comp._Hierarchy):
             source_component=self._motion_component, parent=self
         )
         utils.map_to_container(
-            corrective_xform_inst.container_node, "corrective_xform_container"
+            corrective_xform_inst.container_node, self.__MAP_CORR_CNTNR
         )
 
     def __create_clust_component(
@@ -830,7 +839,7 @@ class _Anim(base_comp._Hierarchy):
             control_color=control_color,
             setup_color=setup_color,
         )
-        utils.map_to_container(clust_inst.container_node, "clust_container")
+        utils.map_to_container(clust_inst.container_node, self.__MAP_CLUST_CNTNR)
 
 
 class SimpleLimb(_Anim):
@@ -843,6 +852,8 @@ class SimpleLimb(_Anim):
     _setup_component_type = setup.SimpleLimb
     _max_num_xforms = (3, 3)
 
+    __MAP_IK_CNTNR = "ikContainer"
+
     @property
     def _ik_component(self) -> motion.SimpleIK:
         """Returns ik component
@@ -850,7 +861,7 @@ class SimpleLimb(_Anim):
         Returns:
             motion.SetupIK:
         """
-        return self._get_node_from_key("ik_container", as_component=True)
+        return self._get_node_from_key(self.__MAP_IK_CNTNR, as_component=True)
 
     @classmethod
     def create(
@@ -932,7 +943,7 @@ class SimpleLimb(_Anim):
 
         utils.map_to_container(
             node=ik_inst.container_node,
-            node_message_name="ik_container",
+            node_message_name=self.__MAP_IK_CNTNR,
             container_message_name="anim_container",
             container=self.container_node,
         )

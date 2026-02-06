@@ -5,7 +5,13 @@ import utils.utils as utils
 
 
 class WeightDriver(base_comp._Hierarchy):
-    """Holds driven weights from hierarchy"""
+    """Holds driven weights from hierarchy
+
+    Attributes:
+        _OUT_DRIVER (str): str constant "driver"
+        _OUT_WEIGHT (str): str constant "weight"
+        _OUT_WEIGHT_NAME (str): str constant "name"
+    """
 
     class_namespace = "weightDrv"
     component_type = component_enum_data.ComponentType.corrective
@@ -47,10 +53,18 @@ class WeightDriver(base_comp._Hierarchy):
 
 
 class CorrectiveXforms(base_comp._Hierarchy):
+    """Corrective xform component
+
+    Attributes:
+        __MAP_WEIGHT_DRV_CNTNR (str): str constant "weightDriverContainer"
+    """
+
     component_type = component_enum_data.ComponentType.corrective
     input_node_type = "transform"
     _check_output = False
     _populate_output = False
+
+    __MAP_WEIGHT_DRV_CNTNR = "weightDriverContainer"
 
     class_namespace = "CorrectiveXform"
 
@@ -61,7 +75,7 @@ class CorrectiveXforms(base_comp._Hierarchy):
         Returns:
             WeightDriver:
         """
-        return self._get_node_from_key("weight_driver_container", as_component=True)
+        return self._get_node_from_key(self.__MAP_WEIGHT_DRV_CNTNR, as_component=True)
 
     def _override_build(self, control_color=None, **kwargs):
         self.__create_weight_driver_component()
@@ -70,5 +84,5 @@ class CorrectiveXforms(base_comp._Hierarchy):
         """Creates motion component and maps it to anim container"""
         weight_driver_inst = WeightDriver.create(source_component=self, parent=self)
         utils.map_to_container(
-            weight_driver_inst.container_node, "weight_driver_container"
+            weight_driver_inst.container_node, self.__MAP_WEIGHT_DRV_CNTNR
         )
